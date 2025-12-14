@@ -1,0 +1,162 @@
+{
+  "name": "sftp-extension",
+  "displayName": "ctlim_SFTP",
+  "description": "SFTP/FTP sync extension for VS Code",
+  "version": "0.1.0",
+  "publisher": "your-name",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:ctlimSftp.upload",
+    "onCommand:ctlimSftp.download",
+    "onCommand:ctlimSftp.sync",
+    "onCommand:ctlimSftp.config",
+    "onView:ctlimSftpView"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ctlim-sftp-explorer",
+          "title": "ctlim_SFTP",
+          "icon": "$(cloud-upload)"
+        }
+      ]
+    },
+    "views": {
+      "ctlim-sftp-explorer": [
+        {
+          "id": "ctlimSftpView",
+          "name": "Remote Files"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "ctlimSftp.connectServer",
+        "title": "ctlim SFTP: Connect to Server"
+      },
+      {
+        "command": "ctlimSftp.disconnectServer",
+        "title": "ctlim SFTP: Disconnect Server"
+      },
+      {
+        "command": "ctlimSftp.upload",
+        "title": "ctlim SFTP: Upload File"
+      },
+      {
+        "command": "ctlimSftp.download",
+        "title": "ctlim SFTP: Download File"
+      },
+      {
+        "command": "ctlimSftp.sync",
+        "title": "ctlim SFTP: Sync Local -> Remote"
+      },
+      {
+        "command": "ctlimSftp.config",
+        "title": "ctlim SFTP: Config"
+      },
+      {
+        "command": "ctlimSftp.refresh",
+        "title": "ctlim SFTP: Refresh Remote Explorer",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ctlimSftp.openRemoteFile",
+        "title": "ctlim SFTP: Open Remote File"
+      },
+      {
+        "command": "ctlimSftp.deleteRemoteFile",
+        "title": "ctlim SFTP: Delete Remote File"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "ctlimSftp.refresh",
+          "when": "view == ctlimSftpView",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "ctlimSftp.disconnectServer",
+          "when": "view == ctlimSftpView && viewItem == server",
+          "group": "server@1"
+        },
+        {
+          "command": "ctlimSftp.deleteRemoteFile",
+          "when": "view == ctlimSftpView && viewItem == remoteFile",
+          "group": "ctlimSftp@1"
+        },
+        {
+          "command": "ctlimSftp.deleteRemoteFile",
+          "when": "view == ctlimSftpView && viewItem == remoteDirectory",
+          "group": "ctlimSftp@2"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "ctlimSftp.upload",
+          "group": "ctlimSftp@1"
+        },
+        {
+          "command": "ctlimSftp.download",
+          "group": "ctlimSftp@2"
+        },
+        {
+          "command": "ctlimSftp.sync",
+          "group": "ctlimSftp@3"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "SFTP",
+      "properties": {
+        "sftp.host": {
+          "type": "string",
+          "default": "",
+          "description": "SFTP 서버 호스트"
+        },
+        "sftp.port": {
+          "type": "number",
+          "default": 22,
+          "description": "SFTP 서버 포트"
+        },
+        "sftp.username": {
+          "type": "string",
+          "default": "",
+          "description": "SFTP 사용자명"
+        },
+        "sftp.remotePath": {
+          "type": "string",
+          "default": "/",
+          "description": "원격 경로"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@types/ssh2-sftp-client": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "ssh2-sftp-client": "^10.0.3"
+  }
+}
