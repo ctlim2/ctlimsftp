@@ -1,0 +1,85 @@
+{
+  "name": "ctlimsftp",
+  "displayName": "CTLim SFTP",
+  "version": "1.0.0",
+  "description": "SFTP extension with file modification detection to prevent concurrent editing conflicts",
+  "publisher": "ctlim",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onCommand:ctlimsftp.downloadFile",
+    "onCommand:ctlimsftp.uploadFile",
+    "onCommand:ctlimsftp.configure"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ctlimsftp.downloadFile",
+        "title": "SFTP: Download File"
+      },
+      {
+        "command": "ctlimsftp.uploadFile",
+        "title": "SFTP: Upload File"
+      },
+      {
+        "command": "ctlimsftp.configure",
+        "title": "SFTP: Configure Connection"
+      }
+    ],
+    "configuration": {
+      "title": "CTLim SFTP",
+      "properties": {
+        "ctlimsftp.enableModificationWarning": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable warning when file has been modified on server"
+        },
+        "ctlimsftp.host": {
+          "type": "string",
+          "default": "",
+          "description": "SFTP server host"
+        },
+        "ctlimsftp.port": {
+          "type": "number",
+          "default": 22,
+          "description": "SFTP server port"
+        },
+        "ctlimsftp.username": {
+          "type": "string",
+          "default": "",
+          "description": "SFTP username"
+        },
+        "ctlimsftp.remotePath": {
+          "type": "string",
+          "default": "/",
+          "description": "Remote path on SFTP server"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "lint": "echo 'No linting configured'",
+    "package": "vsce package"
+  },
+  "keywords": ["sftp", "ftp", "remote", "sync"],
+  "author": "ctlim",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^25.0.2",
+    "@types/vscode": "^1.107.0",
+    "@vscode/vsce": "^3.7.1",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@types/ssh2": "^1.15.5",
+    "ssh2": "^1.17.0",
+    "ssh2-sftp-client": "^12.0.1"
+  }
+}
