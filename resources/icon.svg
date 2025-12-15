@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
+  <path class="a" d="M 149.929 75.648 L 133.019 75.648 C 131.019 75.548 127.089 71.418 124.829 71.418 L 114.929 71.418 C 113.725 71.418 112.748 72.394 112.748 73.598 C 112.748 73.615 112.748 73.632 112.749 73.648 L 112.749 80.938 L 151.749 80.938 L 151.749 77.518 C 151.771 76.508 150.97 75.671 149.959 75.648 L 149.929 75.648 Z" style="fill: none; stroke: rgb(0, 0, 0); stroke-linecap: round; stroke-linejoin: round; stroke-width: 1;"/>
+  <path class="a" d="M 151.749 80.928 L 112.749 80.928 L 112.749 99.648 C 112.737 100.853 113.705 101.838 114.909 101.848 L 114.919 101.848 L 149.569 101.848 C 150.773 101.848 151.749 100.872 151.749 99.668 L 151.749 99.648 L 151.749 80.928 Z" style="fill: none; stroke: rgb(0, 0, 0); stroke-linecap: round; stroke-linejoin: round; stroke-width: 1;"/>
+  <text style="white-space: pre; fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 28px;" x="115.276" y="108.204" transform="matrix(0.308749, 0, 0, 0.296005, 80.806282, 62.805904)">ctlim-ftp</text>
+</svg>

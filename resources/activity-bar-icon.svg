@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Folder icon -->
+  <path d="M 3 4 L 10 4 L 12 6 L 21 6 L 21 20 L 3 20 Z" 
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"/>
+  
+  <!-- FTP text -->
+  <text x="12" y="15" 
+        font-family="Arial, sans-serif" 
+        font-size="7" 
+        font-weight="bold" 
+        text-anchor="middle" 
+        fill="currentColor">FTP</text>
+</svg>

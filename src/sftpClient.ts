@@ -14,6 +14,48 @@ export class SftpClient {
             host: config.host,
             port: config.port,
             username: config.username,
+            // Add algorithms for compatibility with older SSH servers
+            algorithms: {
+                kex: [
+                    'curve25519-sha256',
+                    'curve25519-sha256@libssh.org',
+                    'ecdh-sha2-nistp256',
+                    'ecdh-sha2-nistp384',
+                    'ecdh-sha2-nistp521',
+                    'diffie-hellman-group-exchange-sha256',
+                    'diffie-hellman-group14-sha256',
+                    'diffie-hellman-group14-sha1',
+                    'diffie-hellman-group1-sha1'
+                ],
+                cipher: [
+                    'aes128-ctr',
+                    'aes192-ctr',
+                    'aes256-ctr',
+                    'aes128-gcm',
+                    'aes128-gcm@openssh.com',
+                    'aes256-gcm',
+                    'aes256-gcm@openssh.com',
+                    'aes256-cbc',
+                    'aes192-cbc',
+                    'aes128-cbc',
+                    '3des-cbc'
+                ],
+                serverHostKey: [
+                    'ssh-ed25519',
+                    'ecdsa-sha2-nistp256',
+                    'ecdsa-sha2-nistp384',
+                    'ecdsa-sha2-nistp521',
+                    'rsa-sha2-512',
+                    'rsa-sha2-256',
+                    'ssh-rsa',
+                    'ssh-dss'
+                ],
+                hmac: [
+                    'hmac-sha2-256',
+                    'hmac-sha2-512',
+                    'hmac-sha1'
+                ]
+            }
         };
 
         if (config.privateKey) {
@@ -46,11 +88,6 @@ export class SftpClient {
             throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
         }
 
-        console.log('=== uploadFile Debug ===');
-        console.log('localPath:', localPath);
-        console.log('workspaceFolder:', workspaceFolder);
-        console.log('config.remotePath:', config.remotePath);
-
         // First calculate what the remote path would be
         const relativePath = workspaceFolder 
             ? path.relative(workspaceFolder, localPath)
@@ -63,20 +100,16 @@ export class SftpClient {
 
         // Check if metadata exists to get original remote path
         const metadata = this.getFileMetadata(localPath, calculatedRemotePath, config);
+        
         let remotePath: string;
         
         if (metadata && metadata.remotePath) {
             // Use the original remote path from metadata
             remotePath = metadata.remotePath;
-            console.log('Using remotePath from metadata:', remotePath);
         } else {
             // Use calculated remote path
             remotePath = calculatedRemotePath;
-            console.log('Calculated relativePath:', relativePath);
-            console.log('Calculated remotePath:', remotePath);
         }
-        console.log('Final remotePath:', remotePath);
-        console.log('=======================');
 
         // Check for conflicts if metadata exists
         if (!skipConflictCheck && metadata) {
@@ -239,8 +272,11 @@ export class SftpClient {
 
     private getMetadataPath(localPath: string, remotePath: string, config: SftpConfig): string {
         const metadataDir = this.getMetadataDir(config);
-        // Use remote path as filename (replace slashes with safe characters)
-        const safeRemotePath = remotePath.replace(/^\//g, '').replace(/\//g, '_');
+        // Encode remote path safely: _ -> _u_, / -> __
+        const safeRemotePath = remotePath
+            .replace(/^\//g, '')
+            .replace(/_/g, '_u_')
+            .replace(/\//g, '__');
         return path.join(metadataDir, `${safeRemotePath}.json`);
     }
 
@@ -270,10 +306,10 @@ export class SftpClient {
         }
 
         try {
-            const metadata: FileMetadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+            const fileContent = fs.readFileSync(metadataPath, 'utf-8');
+            const metadata: FileMetadata = JSON.parse(fileContent);
             return metadata;
         } catch (error) {
-            console.error('Failed to read metadata:', error);
             return null;
         }
     }

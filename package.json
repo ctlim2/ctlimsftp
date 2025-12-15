@@ -1,21 +1,22 @@
 {
-  "name": "sftp-extension",
-  "displayName": "ctlim_SFTP",
-  "description": "SFTP/FTP sync extension for VS Code",
-  "version": "0.1.0",
-  "publisher": "your-name",
+  "name": "ctlim-sftp",
+  "displayName": "ctlim SFTP",
+  "description": "Simple SFTP sync extension with upload on save and conflict detection",
+  "version": "0.2.1",
+  "publisher": "ctlim",
+  "icon": "resources/icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
     "Other"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ctlim2/ctlimsftp"
+  },
   "activationEvents": [
-    "onCommand:ctlimSftp.upload",
-    "onCommand:ctlimSftp.download",
-    "onCommand:ctlimSftp.sync",
-    "onCommand:ctlimSftp.config",
-    "onView:ctlimSftpView"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -24,7 +25,7 @@
         {
           "id": "ctlim-sftp-explorer",
           "title": "ctlim_SFTP",
-          "icon": "$(cloud-upload)"
+          "icon": "resources/activity-bar-icon.svg"
         }
       ]
     },
@@ -32,7 +33,8 @@
       "ctlim-sftp-explorer": [
         {
           "id": "ctlimSftpView",
-          "name": "Remote Files"
+          "name": "Remote Files",
+          "icon": "resources/activity-bar-icon.svg"
         }
       ]
     },

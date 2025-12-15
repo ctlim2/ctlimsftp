@@ -15,9 +15,29 @@ export function activate(context: vscode.ExtensionContext) {
     // Register Tree View Provider
     treeProvider = new SftpTreeProvider();
     const treeView = vscode.window.createTreeView('ctlimSftpView', {
-        treeDataProvider: treeProvider
+        treeDataProvider: treeProvider,
+        showCollapseAll: true
     });
+    
+    // Handle single click on tree items
+    treeView.onDidChangeSelection(async (e) => {
+        if (e.selection.length > 0) {
+            const item = e.selection[0];
+            
+            // Execute command if item has one
+            if (item.command) {
+                await vscode.commands.executeCommand(
+                    item.command.command,
+                    ...(item.command.arguments || [])
+                );
+            }
+        }
+    });
+    
     context.subscriptions.push(treeView);
+
+    // Check and reload remote files on startup
+    setTimeout(() => checkAndReloadRemoteFiles(), 2000);
 
     // Connect to server command
     const connectServerCommand = vscode.commands.registerCommand('ctlimSftp.connectServer', async (serverItem) => {
@@ -51,10 +71,10 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            // Use the config's workspaceRoot for temp folder
-            const workspaceRoot = connection.config.workspaceRoot;
-            if (!workspaceRoot) {
-                vscode.window.showErrorMessage('워크스페이스 경로를 찾을 수 없습니다.');
+            // Get workspace folder (not workspaceRoot)
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
                 return;
             }
 
@@ -63,7 +83,7 @@ export function activate(context: vscode.ExtensionContext) {
             const relativeToRemotePath = remotePath.startsWith(config.remotePath)
                 ? remotePath.substring(config.remotePath.length).replace(/^\/+/, '')
                 : path.basename(remotePath);
-            const tempLocalPath = path.join(workspaceRoot, relativeToRemotePath);
+            const tempLocalPath = path.join(workspaceFolder.uri.fsPath, relativeToRemotePath);
             const tempDir = path.dirname(tempLocalPath);
             
             if (!fs.existsSync(tempDir)) {
@@ -79,12 +99,16 @@ export function activate(context: vscode.ExtensionContext) {
                 await connection.client.client.get(remotePath, tempLocalPath);
                 
                 // Save metadata to individual file
-                const metadataDir = path.join(workspaceRoot, '.vscode', '.sftp-metadata');
+                const metadataDir = path.join(workspaceFolder.uri.fsPath, '.vscode', '.sftp-metadata');
                 if (!fs.existsSync(metadataDir)) {
                     fs.mkdirSync(metadataDir, { recursive: true });
                 }
                 
-                const safeRemotePath = remotePath.replace(/^\//g, '').replace(/\//g, '_');
+                // Encode remote path safely: _ -> _u_, / -> __
+                const safeRemotePath = remotePath
+                    .replace(/^\//g, '')
+                    .replace(/_/g, '_u_')
+                    .replace(/\//g, '__');
                 const metadataPath = path.join(metadataDir, `${safeRemotePath}.json`);
                 const metadata = {
                     remotePath,
@@ -264,12 +288,10 @@ export function activate(context: vscode.ExtensionContext) {
 
         const config = await loadConfig();
         if (!config) {
-            console.log('uploadOnSave: 설정 파일이 없습니다.');
             return;
         }
         
         if (!config.uploadOnSave) {
-            console.log('uploadOnSave: uploadOnSave가 비활성화되어 있습니다.');
             return;
         }
 
@@ -286,7 +308,6 @@ export function activate(context: vscode.ExtensionContext) {
         });
 
         if (shouldIgnore) {
-            console.log(`uploadOnSave: 무시 패턴에 해당됨 (${relativePath})`);
             return;
         }
 
@@ -301,23 +322,38 @@ export function activate(context: vscode.ExtensionContext) {
             
             if (result.conflict) {
                 const choice = await vscode.window.showWarningMessage(
-                    `파일이 서버에서 수정되었습니다: ${path.basename(document.uri.fsPath)}\n로컬 변경사항으로 덮어쓰시겠습니까?`,
-                    '덮어쓰기',
+                    `⚠️ 충돌 감지!\n\n파일이 서버에서 수정되었습니다: ${path.basename(document.uri.fsPath)}\n\n로컬 변경사항으로 덮어쓰시겠습니까?`,
+                    { modal: true },
+                    '덕어쓰기',
                     '취소',
                     '비교'
                 );
                 
-                if (choice === '덮어쓰기') {
+                if (choice === '덕어쓰기') {
                     const forceResult = await sftpClient.uploadFile(document.uri.fsPath, config, true, workspaceFolder.uri.fsPath);
                     if (forceResult.uploaded) {
                         vscode.window.showInformationMessage(`✅ 자동 업로드 (강제): ${path.basename(document.uri.fsPath)}`);
+                        // Refresh metadata after successful upload
+                        const relativePath = path.relative(workspaceFolder.uri.fsPath, document.uri.fsPath);
+                        const calculatedRemotePath = path.posix.join(
+                            config.remotePath,
+                            relativePath.replace(/\\/g, '/')
+                        );
+                        await refreshFileMetadata(document.uri.fsPath, calculatedRemotePath, config, workspaceFolder.uri.fsPath);
                     }
                 } else if (choice === '비교') {
-                    // TODO: Implement diff functionality
-                    vscode.window.showInformationMessage('Diff 기능은 아직 구현되지 않았습니다.');
+                    // Show diff between local and remote
+                    await showDiff(document.uri.fsPath, result.remotePath, config, workspaceFolder.uri.fsPath);
                 }
             } else if (result.uploaded) {
                 vscode.window.showInformationMessage(`✅ 자동 업로드: ${path.basename(document.uri.fsPath)}`);
+                // Refresh metadata after successful upload
+                const relativePath = path.relative(workspaceFolder.uri.fsPath, document.uri.fsPath);
+                const calculatedRemotePath = path.posix.join(
+                    config.remotePath,
+                    relativePath.replace(/\\/g, '/')
+                );
+                await refreshFileMetadata(document.uri.fsPath, calculatedRemotePath, config, workspaceFolder.uri.fsPath);
             }
         } catch (error) {
             vscode.window.showErrorMessage(`❌ 자동 업로드 실패: ${error}`);
@@ -325,10 +361,10 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    // File open watcher for downloadOnOpen
+    // File open watcher for downloadOnOpen and metadata refresh
     const openWatcher = vscode.workspace.onDidOpenTextDocument(async (document) => {
         const config = await loadConfig();
-        if (!config || !config.downloadOnOpen) {
+        if (!config) {
             return;
         }
 
@@ -342,28 +378,40 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        if (config.downloadOnOpen === 'confirm') {
-            const result = await vscode.window.showInformationMessage(
-                '이 파일을 서버에서 다운로드하시겠습니까?',
-                '다운로드',
-                '취소'
-            );
-            if (result !== '다운로드') {
-                return;
-            }
-        }
-
+        // Check if metadata exists for this file
+        const relativePath = path.relative(workspaceFolder.uri.fsPath, document.uri.fsPath);
+        const calculatedRemotePath = path.posix.join(
+            config.remotePath,
+            relativePath.replace(/\\/g, '/')
+        );
+        
         try {
             await ensureClient(config);
             if (!sftpClient) {
                 return;
             }
 
-            await sftpClient.downloadFile(document.uri.fsPath, config, workspaceFolder.uri.fsPath);
-            vscode.window.showInformationMessage(`자동 다운로드: ${path.basename(document.uri.fsPath)}`);
+            // Refresh metadata when file is opened
+            await refreshFileMetadata(document.uri.fsPath, calculatedRemotePath, config, workspaceFolder.uri.fsPath);
+
+            // Handle downloadOnOpen if enabled
+            if (config.downloadOnOpen) {
+                if (config.downloadOnOpen === 'confirm') {
+                    const result = await vscode.window.showInformationMessage(
+                        '이 파일을 서버에서 다운로드하시겠습니까?',
+                        '다운로드',
+                        '취소'
+                    );
+                    if (result !== '다운로드') {
+                        return;
+                    }
+                }
+
+                await sftpClient.downloadFile(document.uri.fsPath, config, workspaceFolder.uri.fsPath);
+                vscode.window.showInformationMessage(`자동 다운로드: ${path.basename(document.uri.fsPath)}`);
+            }
         } catch (error) {
             // Ignore if file doesn't exist on remote
-            console.log(`다운로드 실패 (무시됨): ${error}`);
         }
     });
 
@@ -440,6 +488,171 @@ async function ensureClient(config: SftpConfig): Promise<void> {
     if (!sftpClient.isConnected()) {
         await sftpClient.connect(config);
         currentConfig = config;
+    }
+}
+
+async function showDiff(localPath: string, remotePath: string, config: SftpConfig, workspaceFolder: string): Promise<void> {
+    try {
+        if (!sftpClient || !sftpClient.isConnected()) {
+            vscode.window.showErrorMessage('서버에 연결되어 있지 않습니다.');
+            return;
+        }
+
+        // Create temp directory for remote file
+        const tempDir = path.join(workspaceFolder, '.vscode', '.sftp-tmp');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        // Download remote file to temp location
+        const fileName = path.basename(remotePath);
+        const tempRemotePath = path.join(tempDir, `${fileName}.remote`);
+        
+        if (sftpClient.client) {
+            await sftpClient.client.get(remotePath, tempRemotePath);
+
+            // Open diff view
+            const localUri = vscode.Uri.file(localPath);
+            const remoteUri = vscode.Uri.file(tempRemotePath);
+            
+            await vscode.commands.executeCommand(
+                'vscode.diff',
+                remoteUri,
+                localUri,
+                `${fileName} (서버) ↔ ${fileName} (로컬)`
+            );
+        }
+    } catch (error) {
+        vscode.window.showErrorMessage(`Diff 표시 실패: ${error}`);
+    }
+}
+
+async function refreshFileMetadata(localPath: string, remotePath: string, config: SftpConfig, workspaceFolder: string): Promise<boolean> {
+    try {
+        if (!sftpClient || !sftpClient.isConnected()) {
+            return false;
+        }
+
+        const remoteStats = await sftpClient.getRemoteFileStats(remotePath);
+        if (!remoteStats) {
+            return false;
+        }
+
+        // Save updated metadata
+        const metadataDir = path.join(workspaceFolder, '.vscode', '.sftp-metadata');
+        if (!fs.existsSync(metadataDir)) {
+            fs.mkdirSync(metadataDir, { recursive: true });
+        }
+
+        const safeRemotePath = remotePath
+            .replace(/^\//g, '')
+            .replace(/_/g, '_u_')
+            .replace(/\//g, '__');
+        const metadataPath = path.join(metadataDir, `${safeRemotePath}.json`);
+        
+        const metadata = {
+            remotePath,
+            remoteModifyTime: remoteStats.modifyTime,
+            localPath,
+            downloadTime: Date.now()
+        };
+
+        fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
+async function checkAndReloadRemoteFiles() {
+    try {
+        const config = await loadConfig();
+        if (!config) {
+            return;
+        }
+
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            return;
+        }
+
+        // Get all open text documents
+        const openDocuments = vscode.workspace.textDocuments.filter(doc => 
+            !doc.uri.fsPath.endsWith('ctlim-sftp.json') &&
+            doc.uri.fsPath.startsWith(workspaceFolder.uri.fsPath)
+        );
+
+        if (openDocuments.length === 0) {
+            return;
+        }
+
+        await ensureClient(config);
+        if (!sftpClient) {
+            return;
+        }
+
+        const metadataDir = path.join(workspaceFolder.uri.fsPath, '.vscode', '.sftp-metadata');
+        if (!fs.existsSync(metadataDir)) {
+            return;
+        }
+
+        for (const document of openDocuments) {
+            try {
+                const relativePath = path.relative(workspaceFolder.uri.fsPath, document.uri.fsPath);
+                const calculatedRemotePath = path.posix.join(
+                    config.remotePath,
+                    relativePath.replace(/\\/g, '/')
+                );
+
+                // Check if metadata exists
+                const safeRemotePath = calculatedRemotePath
+                    .replace(/^\//g, '')
+                    .replace(/_/g, '_u_')
+                    .replace(/\//g, '__');
+                const metadataPath = path.join(metadataDir, `${safeRemotePath}.json`);
+
+                if (!fs.existsSync(metadataPath)) {
+                    continue;
+                }
+
+                // Read metadata
+                const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+                
+                // Check remote file
+                const remoteStats = await sftpClient.getRemoteFileStats(calculatedRemotePath);
+                if (!remoteStats) {
+                    continue;
+                }
+
+                // If remote file is newer, ask user
+                if (remoteStats.modifyTime !== metadata.remoteModifyTime) {
+                    const fileName = path.basename(document.uri.fsPath);
+                    const choice = await vscode.window.showWarningMessage(
+                        `⚠️ 서버 파일 변경 감지!\n\n파일: ${fileName}\n서버의 파일이 수정되었습니다.\n\n로컬 파일을 서버 버전으로 업데이트하시겠습니까?`,
+                        { modal: true },
+                        '다운로드',
+                        '무시',
+                        '비교'
+                    );
+
+                    if (choice === '다운로드') {
+                        await sftpClient.downloadFile(document.uri.fsPath, config, workspaceFolder.uri.fsPath);
+                        vscode.window.showInformationMessage(`✅ 다운로드 완료: ${fileName}`);
+                        
+                        // Reload the document
+                        const newDoc = await vscode.workspace.openTextDocument(document.uri);
+                        await vscode.window.showTextDocument(newDoc, { preview: false, preserveFocus: true });
+                    } else if (choice === '비교') {
+                        // Show diff between local and remote
+                        await showDiff(document.uri.fsPath, calculatedRemotePath, config, workspaceFolder.uri.fsPath);
+                    }
+                }
+            } catch (error) {
+                // Ignore file check errors
+            }
+        }
+    } catch (error) {
+        // Ignore remote file check errors
     }
 }
 
