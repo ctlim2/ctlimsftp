@@ -25,15 +25,7 @@ export function activate(context: vscode.ExtensionContext) {
         await configureConnection();
     });
 
-    // Watch for file saves to check for modifications
-    const saveListener = vscode.workspace.onWillSaveTextDocument(async (event) => {
-        const config = vscode.workspace.getConfiguration('ctlimsftp');
-        if (config.get<boolean>('enableModificationWarning')) {
-            await checkFileModificationBeforeSave(event);
-        }
-    });
-
-    context.subscriptions.push(downloadCommand, uploadCommand, configureCommand, saveListener);
+    context.subscriptions.push(downloadCommand, uploadCommand, configureCommand);
 }
 
 async function downloadFile() {
@@ -212,57 +204,6 @@ async function uploadFile() {
         });
     } catch (error) {
         vscode.window.showErrorMessage(`Failed to upload file: ${error instanceof Error ? error.message : String(error)}`);
-    }
-}
-
-async function checkFileModificationBeforeSave(event: vscode.TextDocumentWillSaveEvent) {
-    const localPath = event.document.uri.fsPath;
-    const metadata = await fileTracker.getFileMetadata(localPath);
-
-    if (!metadata) {
-        // No metadata means this file wasn't downloaded from SFTP
-        return;
-    }
-
-    try {
-        const config = vscode.workspace.getConfiguration('ctlimsftp');
-        const host = config.get<string>('host');
-        
-        if (!host) {
-            return;
-        }
-
-        const password = await vscode.window.showInputBox({
-            prompt: 'Enter SFTP password to check for modifications',
-            password: true
-        });
-
-        if (!password) {
-            return;
-        }
-
-        await sftpClient.connect({
-            host: host,
-            port: config.get<number>('port') || 22,
-            username: config.get<string>('username') || '',
-            password: password
-        });
-
-        const currentStats = await sftpClient.stat(metadata.remotePath);
-        
-        if (currentStats.modifyTime !== metadata.mtime || currentStats.size !== metadata.size) {
-            vscode.window.showWarningMessage(
-                `⚠️ Warning: The file "${metadata.remotePath}" has been modified on the server!\n\n` +
-                `Original: ${new Date(metadata.mtime).toLocaleString()} (${metadata.size} bytes)\n` +
-                `Current: ${new Date(currentStats.modifyTime).toLocaleString()} (${currentStats.size} bytes)\n\n` +
-                `Another user may have made changes. Consider downloading the latest version before saving.`
-            );
-        }
-
-        await sftpClient.disconnect();
-    } catch (error) {
-        // Silently fail if we can't check (e.g., connection issues)
-        console.error('Failed to check file modification:', error);
     }
 }
 

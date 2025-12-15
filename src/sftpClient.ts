@@ -35,7 +35,7 @@ export class SftpClient {
 
     async stat(remotePath: string): Promise<FileStats> {
         if (!this.client) {
-            throw new Error('Not connected to SFTP server');
+            throw new Error('Not connected to SFTP server. Please call connect() first with valid credentials.');
         }
 
         const stats = await this.client.stat(remotePath);
@@ -47,7 +47,7 @@ export class SftpClient {
 
     async downloadFile(remotePath: string, localPath: string): Promise<void> {
         if (!this.client) {
-            throw new Error('Not connected to SFTP server');
+            throw new Error('Not connected to SFTP server. Please call connect() first with valid credentials.');
         }
 
         await this.client.get(remotePath, localPath);
@@ -55,7 +55,7 @@ export class SftpClient {
 
     async uploadFile(localPath: string, remotePath: string): Promise<void> {
         if (!this.client) {
-            throw new Error('Not connected to SFTP server');
+            throw new Error('Not connected to SFTP server. Please call connect() first with valid credentials.');
         }
 
         await this.client.put(localPath, remotePath);
@@ -63,7 +63,7 @@ export class SftpClient {
 
     async list(remotePath: string): Promise<any[]> {
         if (!this.client) {
-            throw new Error('Not connected to SFTP server');
+            throw new Error('Not connected to SFTP server. Please call connect() first with valid credentials.');
         }
 
         return await this.client.list(remotePath);
