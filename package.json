@@ -5,7 +5,7 @@
   "description": "SFTP extension with file modification detection to prevent concurrent editing conflicts",
   "publisher": "ctlim",
   "engines": {
-    "vscode": "^1.75.0"
+    "vscode": "^1.107.0"
   },
   "categories": ["Other"],
   "activationEvents": [
@@ -71,6 +71,10 @@
   "keywords": ["sftp", "ftp", "remote", "sync"],
   "author": "ctlim",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ctlim2/ctlimsftp.git"
+  },
   "devDependencies": {
     "@types/node": "^25.0.2",
     "@types/vscode": "^1.107.0",
