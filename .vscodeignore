@@ -6,3 +6,14 @@ src/**
 **/*.map
 **/*.ts
 !resources/**
+temp_extract/**
+data/**
+install.bat
+install.ps1
+install.sh
+INSTALL.md
+.git/**
+.github/**
+tsconfig.json
+node_modules/**/.bin/**
+**/*.vsix

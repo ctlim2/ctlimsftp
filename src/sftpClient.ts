@@ -1,11 +1,24 @@
 import SftpClient2 from 'ssh2-sftp-client';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as vscode from 'vscode';
 import { SftpConfig, RemoteFile, FileMetadata } from './types';
 
 export class SftpClient {
     public client: SftpClient2 | null = null;
     private connected: boolean = false;
+    private outputChannel: vscode.OutputChannel | null = null;
+
+    private log(message: string): void {
+        if (this.outputChannel) {
+            this.outputChannel.appendLine(message);
+        }
+        console.log(message);
+    }
+
+    setOutputChannel(channel: vscode.OutputChannel): void {
+        this.outputChannel = channel;
+    }
 
     async connect(config: SftpConfig): Promise<void> {
         this.client = new SftpClient2();
@@ -129,7 +142,9 @@ export class SftpClient {
         const remoteDir = path.posix.dirname(remotePath);
         await this.ensureRemoteDir(remoteDir);
 
+        this.log(`업로드 중: ${localPath} -> ${remotePath}`);
         await this.client.put(localPath, remotePath);
+        this.log(`업로드 완료: ${remotePath}`);
         
         // Update metadata after successful upload
         try {
