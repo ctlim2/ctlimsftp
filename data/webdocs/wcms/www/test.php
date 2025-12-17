@@ -1,15 +1,11 @@
 <?php
 
-
-
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-
-
 include_once "/data/webdocs/wcms/classes/class_autoload_comm.php";
 
-
+//test ok 
 
 
 $startTime = microtime(1);

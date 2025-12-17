@@ -166,10 +166,23 @@ export class SftpClient {
             ? path.relative(workspaceFolder, localPath)
             : path.basename(localPath);
         
-        const remotePath = path.posix.join(
+        const calculatedRemotePath = path.posix.join(
             config.remotePath,
             relativePath.replace(/\\/g, '/')
         );
+
+        // Check if metadata exists to get original remote path
+        const metadata = this.getFileMetadata(localPath, calculatedRemotePath, config);
+        
+        let remotePath: string;
+        
+        if (metadata && metadata.remotePath) {
+            // Use the original remote path from metadata
+            remotePath = metadata.remotePath;
+        } else {
+            // Use calculated remote path
+            remotePath = calculatedRemotePath;
+        }
 
         // Get remote file stats before download
         const remoteStats = await this.client.stat(remotePath);
