@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { SftpConfig, RemoteFile, FileMetadata } from './types';
+import { config } from 'process';
 
 export class SftpClient {
     public client: SftpClient2 | null = null;
@@ -20,6 +21,7 @@ export class SftpClient {
         this.outputChannel = channel;
     }
 
+//#region connection functions    
     async connect(config: SftpConfig): Promise<void> {
         this.client = new SftpClient2();
         
@@ -85,7 +87,17 @@ export class SftpClient {
     }
 
     isConnected(): boolean {
-        return this.connected;
+        // Check both flag and actual SFTP client connection
+        if (!this.connected || !this.client) {
+            return false;
+        }
+        // Try to check if the client's SFTP connection is valid
+        try {
+            // @ts-ignore - accessing internal property
+            return this.client.client !== undefined && this.client.sftp !== null;
+        } catch {
+            return false;
+        }
     }
 
     async disconnect(): Promise<void> {
@@ -95,111 +107,10 @@ export class SftpClient {
             this.client = null;
         }
     }
+//#endregion
 
-    async uploadFile(localPath: string, config: SftpConfig, skipConflictCheck: boolean = false, workspaceFolder?: string): Promise<{ uploaded: boolean; conflict: boolean; remotePath: string }> {
-        if (!this.client) {
-            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
-        }
 
-        // First calculate what the remote path would be
-        const relativePath = workspaceFolder 
-            ? path.relative(workspaceFolder, localPath)
-            : path.basename(localPath);
-        
-        const calculatedRemotePath = path.posix.join(
-            config.remotePath,
-            relativePath.replace(/\\/g, '/')
-        );
-
-        // Check if metadata exists to get original remote path
-        const metadata = this.getFileMetadata(localPath, calculatedRemotePath, config);
-        
-        let remotePath: string;
-        
-        if (metadata && metadata.remotePath) {
-            // Use the original remote path from metadata
-            remotePath = metadata.remotePath;
-        } else {
-            // Use calculated remote path
-            remotePath = calculatedRemotePath;
-        }
-
-        // Check for conflicts if metadata exists
-        if (!skipConflictCheck && metadata) {
-            try {
-                const remoteStats = await this.client.stat(remotePath);
-                const remoteModifyTime = new Date(remoteStats.modifyTime).getTime();
-                
-                if (remoteModifyTime !== metadata.remoteModifyTime) {
-                    return { uploaded: false, conflict: true, remotePath };
-                }
-            } catch (error) {
-                // File doesn't exist on remote, proceed with upload
-            }
-        }
-
-        // 원격 디렉토리 생성
-        const remoteDir = path.posix.dirname(remotePath);
-        await this.ensureRemoteDir(remoteDir);
-
-        this.log(`업로드 중: ${localPath} -> ${remotePath}`);
-        await this.client.put(localPath, remotePath);
-        this.log(`업로드 완료: ${remotePath}`);
-        
-        // Update metadata after successful upload
-        try {
-            const remoteStats = await this.client.stat(remotePath);
-            this.saveFileMetadata(localPath, remotePath, new Date(remoteStats.modifyTime).getTime(), config);
-        } catch (error) {
-            console.error('Failed to update metadata:', error);
-        }
-        
-        return { uploaded: true, conflict: false, remotePath };
-    }
-
-    async downloadFile(localPath: string, config: SftpConfig, workspaceFolder?: string): Promise<void> {
-        if (!this.client) {
-            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
-        }
-
-        const relativePath = workspaceFolder 
-            ? path.relative(workspaceFolder, localPath)
-            : path.basename(localPath);
-        
-        const calculatedRemotePath = path.posix.join(
-            config.remotePath,
-            relativePath.replace(/\\/g, '/')
-        );
-
-        // Check if metadata exists to get original remote path
-        const metadata = this.getFileMetadata(localPath, calculatedRemotePath, config);
-        
-        let remotePath: string;
-        
-        if (metadata && metadata.remotePath) {
-            // Use the original remote path from metadata
-            remotePath = metadata.remotePath;
-        } else {
-            // Use calculated remote path
-            remotePath = calculatedRemotePath;
-        }
-
-        // Get remote file stats before download
-        const remoteStats = await this.client.stat(remotePath);
-        const remoteModifyTime = new Date(remoteStats.modifyTime).getTime();
-
-        // 로컬 디렉토리 생성
-        const localDir = path.dirname(localPath);
-        if (!fs.existsSync(localDir)) {
-            fs.mkdirSync(localDir, { recursive: true });
-        }
-
-        await this.client.get(remotePath, localPath);
-        
-        // Save metadata after successful download
-        this.saveFileMetadata(localPath, remotePath, remoteModifyTime, config);
-    }
-
+/*
     async syncFolder(localFolder: string, config: SftpConfig): Promise<void> {
         if (!this.client) {
             throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
@@ -215,7 +126,7 @@ export class SftpClient {
             }
         }
     }
-
+*/
     private async ensureRemoteDir(remotePath: string): Promise<void> {
         if (!this.client) {
             return;
@@ -293,41 +204,24 @@ export class SftpClient {
         }
     }
 
-    private getMetadataDir(config: SftpConfig): string {
-        const workspaceRoot = config.workspaceRoot || '';
-        return path.join(workspaceRoot, '.vscode', '.sftp-metadata');
-    }
-
-    private getMetadataPath(localPath: string, remotePath: string, config: SftpConfig): string {
-        const metadataDir = this.getMetadataDir(config);
-        // Encode remote path safely: _ -> _u_, / -> __
-        const safeRemotePath = remotePath
-            .replace(/^\//g, '')
+// #region metadata functions    
+    static makeMetafileName(localPath: string): string {
+        const safeLocalPath = localPath
+            .replace(/:/g, '_c_')
             .replace(/_/g, '_u_')
-            .replace(/\//g, '__');
-        return path.join(metadataDir, `${safeRemotePath}.json`);
+            .replace(/[\\\/]/g, '__');
+        return `${safeLocalPath}.json`;
     }
 
-    private saveFileMetadata(localPath: string, remotePath: string, remoteModifyTime: number, config: SftpConfig): void {
-        const metadataDir = this.getMetadataDir(config);
-        
-        if (!fs.existsSync(metadataDir)) {
-            fs.mkdirSync(metadataDir, { recursive: true });
-        }
-
-        const metadataPath = this.getMetadataPath(localPath, remotePath, config);
-        const metadata: FileMetadata = {
-            remotePath,
-            remoteModifyTime,
-            localPath,
-            downloadTime: Date.now()
-        };
-
-        fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+    static getMetadataPath(localPath: string, config: SftpConfig): string {
+        const workspaceRoot = config.workspaceRoot || '';
+        const metadataDir = path.join(workspaceRoot, '.vscode', '.sftp-metadata');
+        const safeLocalPath = SftpClient.makeMetafileName(localPath);
+        return path.join(metadataDir, safeLocalPath);
     }
 
-    private getFileMetadata(localPath: string, remotePath: string, config: SftpConfig): FileMetadata | null {
-        const metadataPath = this.getMetadataPath(localPath, remotePath, config);
+    private getFileMetadata(localPath: string, config: SftpConfig): FileMetadata | null {
+        const metadataPath = SftpClient.getMetadataPath(localPath, config);
         
         if (!fs.existsSync(metadataPath)) {
             return null;
@@ -336,22 +230,183 @@ export class SftpClient {
         try {
             const fileContent = fs.readFileSync(metadataPath, 'utf-8');
             const metadata: FileMetadata = JSON.parse(fileContent);
+this.log(`read metadate info ${metadataPath}\n ${metadata.remotePath} : mtime=${metadata.remoteModifyTime}, size=${metadata.remoteFileSize}`);
             return metadata;
         } catch (error) {
             return null;
         }
     }
 
-    async getRemoteFileStats(remotePath: string): Promise<{ modifyTime: number } | null> {
-        if (!this.client) {
-            return null;
+
+    async isSameMetadata(local: string, remote: string, config: SftpConfig): Promise<boolean> {
+        // Read metadata
+        const localMetadata = await this.getLocalFileInfo(local, config);
+        if (!localMetadata) {
+            return false;
         }
+        // Check remote file
+        const remoteMetadata = await this.getRemoteFileInfo(remote);
+        if (!remoteMetadata) {
+            return false;
+        }
+
+this.log(`compare metadata \nlocal mtime=${localMetadata.remoteModifyTime}, size=${localMetadata.remoteFileSize}\nremote mtime=${remoteMetadata.remoteModifyTime}, size=${remoteMetadata.remoteFileSize}`);        
+
+        if(localMetadata.remoteModifyTime == remoteMetadata.remoteModifyTime && localMetadata.remoteFileSize == remoteMetadata.remoteFileSize) return true;
+        else return false;
+    }
+//#endregion
+
+//#region save metadata
+    async saveRemoteFileMetadata(remotePath:string, localPath: string, config: SftpConfig, workspaceFolder?: string): Promise<void> {
+        
+        // Get remote file stats before download
+        const remoteMetadata = await this.getRemoteFileInfo(remotePath);
+
+        // Save metadata after successful download
+        this.saveFileMetadata(localPath, remotePath, remoteMetadata.remoteModifyTime, remoteMetadata.remoteFileSize, config);
+    }
+
+    public saveFileMetadata(localPath: string, remotePath: string, remoteModifyTime: number, remoteFileSize: number, config: SftpConfig): void {
+        const metadataPath = SftpClient.getMetadataPath(localPath, config);
+
+        
+        const metadata: FileMetadata = {
+            remotePath,
+            remoteModifyTime,
+            remoteFileSize,
+            localPath,
+            downloadTime: Date.now(),
+            configName: config.name  // 서버 config 이름 저장
+        };
+
+        config.metadataPath = metadataPath;
         
         try {
-            const stats = await this.client.stat(remotePath);
-            return { modifyTime: new Date(stats.modifyTime).getTime() };
+            // Ensure metadata directory exists
+            const metadataDir = path.dirname(metadataPath);
+            if (!fs.existsSync(metadataDir)) {
+                fs.mkdirSync(metadataDir, { recursive: true });
+            }
+            
+            fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+            this.log(`save metadate info ${metadata.remotePath} : mtime=${metadata.remoteModifyTime}, size=${metadata.remoteFileSize}`);
+            this.log(`save metadate file ${metadataPath}`);
         } catch (error) {
-            return null;
+            console.error('Failed to save metadata:', error);
+            this.log(`메타데이터 저장 실패: ${metadataPath}`);
         }
     }
+//#endregion
+
+//#region get metadata
+    async getLocalFileInfo(remotePath: string, config: SftpConfig): Promise<{ remoteModifyTime: number; remoteFileSize: number }> {
+        let localInfo = this.getFileMetadata(remotePath, config);
+        return { remoteModifyTime: localInfo?.remoteModifyTime || 0, remoteFileSize: localInfo?.remoteFileSize || 0 };
+    }
+    
+    async getRemoteFileInfo(remotePath: string): Promise<{ remoteModifyTime: number; remoteFileSize: number }> {
+        if (!this.client) {
+            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+        }
+        
+        const remoteStats = await this.client.stat(remotePath);
+        const remoteModifyTime = new Date(remoteStats.modifyTime).getTime();
+        const remoteFileSize = remoteStats.size;
+        this.log(`retmote file : ${remotePath}`)
+        this.log(`get remote file info ${remotePath} : mtime=${remoteModifyTime}, size=${remoteFileSize}`);
+        return { remoteModifyTime: remoteModifyTime, remoteFileSize: remoteFileSize };
+    }
+//#endregion
+
+    /**
+     * @return 워크스페이스 메타데이터 디렉토리 경로 또는 null
+     */
+    static getWorkspaceMetadataDir(in_config:SftpConfig): string | null{
+        const workspaceFolder = in_config.workspaceRoot;
+        if (!workspaceFolder) {
+            vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+            return null;
+        }
+        return path.join(workspaceFolder, '.vscode', '.sftp-metadata');
+    }
+
+
+
+
+    /**
+     * 
+     * @param remotePath 
+     * @param workspaceFolder 
+     * @param config 
+     * @param folderMake 
+     * @returns 
+     */
+    static getDownloadFolder(remotePath:string, workspaceFolder:string , config:SftpConfig, folderMake:boolean=true, isDir:boolean=true):string | null {
+        const relativeToRemotePath = remotePath.startsWith(config.remotePath || '')
+            ? remotePath.substring(config.remotePath.length).replace(/^\/+/, '')
+            : path.basename(remotePath);
+        
+        // config.context 폴더 + 원격 상대 경로
+        const contextPath = config.context || './';
+        const fullContextPath = path.isAbsolute(contextPath) 
+            ? contextPath 
+            : path.join(workspaceFolder, contextPath);
+        
+        const tempLocalPath = path.join(fullContextPath, relativeToRemotePath);
+        const tempDir = path.dirname(tempLocalPath);
+        
+        if (folderMake==true &&!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+        if(isDir) {
+            return tempDir;
+        }
+        return tempLocalPath;
+    }
+
+
+    
+    /**
+     * 
+     * @param localPath 
+     * @param config 
+     * @param skipConflictCheck 
+     * @param workspaceFolder 
+     * @returns 
+     */
+//    async uploadFile(localPath: string, remotePath: string, skipConflictCheck: boolean = false, config: SftpConfig): Promise<{ uploaded: boolean; conflict: boolean; remotePath: string }> {
+    async uploadFile(localPath: string, remotePath: string, config: SftpConfig): Promise<boolean> {
+        if (!this.client) {
+            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+        }
+
+        // Check if connection is still alive
+        if (!this.isConnected()) {
+            throw new Error('SFTP 연결이 끊어졌습니다. 다시 연결해주세요.');
+        }
+/*
+        // upload 할 리모트의 경로 계산
+        const fSameMetadata = await this.isSameMetadata(localPath, remotePath, config);
+
+        // Check for conflicts if metadata exists
+        if (!skipConflictCheck && !fSameMetadata) {
+            return { uploaded: false, conflict: true, remotePath: remotePath };
+        }
+
+        // 원격 디렉토리 생성
+  */  
+        this.log(`업로드 중: ${localPath} -> ${remotePath}`);
+        await this.client.put(localPath, remotePath);
+        this.log(`업로드 완료: '${remotePath}`);
+        
+        // Update metadata after successful upload
+        const remoteMetadata = await this.getRemoteFileInfo(remotePath);
+        this.saveFileMetadata(localPath, remotePath, remoteMetadata.remoteModifyTime, remoteMetadata.remoteFileSize, config);
+        
+        return true;
+    }
+
+
+
 }

@@ -181,6 +181,9 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
                             ? contextPath 
                             : path.join(folder.uri.fsPath, contextPath);
                         
+                        // Set workspaceRoot in config object
+                        config.workspaceRoot = workspaceRoot;
+                        
                         const serverName = config.name || `${config.username}@${config.host}`;
                         this.serverList.push({
                             name: serverName,

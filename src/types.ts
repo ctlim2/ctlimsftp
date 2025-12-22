@@ -21,6 +21,7 @@ export interface SftpConfig {
     };
     defaultProfile?: string;
     workspaceRoot?: string;
+    metadataPath?: string;
 }
 
 export interface ServerListItem {
@@ -43,6 +44,10 @@ export interface RemoteFile {
 export interface FileMetadata {
     remotePath: string;
     remoteModifyTime: number;
+    remoteFileSize: number;
     localPath: string;
     downloadTime: number;
+    configName?: string;  // 파일이 속한 서버 config 이름
+    workspaceRoot?: string;
+
 }
