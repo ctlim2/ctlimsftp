@@ -537,7 +537,6 @@ export function activate(context: vscode.ExtensionContext) {
                     `⚠️ 충돌 감지!\n\n파일이 서버에서 수정되었습니다: ${path.basename(document.uri.fsPath)}\n\n로컬 변경사항으로 덮어쓰시겠습니까?`,
                     { modal: true },
                     '덮어쓰기',
-                    '취소',
                     '비교'
                 );
                 
@@ -1517,8 +1516,7 @@ console.error(`원격 파일 확인 실패: ${fileInfo.metadata.remotePath}`, re
                         `⚠️ 파일: ${fileName}\n서버에서 수정되었습니다.`,
                         { modal: true },
                         '다운로드',
-                        '비교',
-                        '건너뛰기'
+                        '비교'
                     );
 
                     if (fileChoice === '다운로드') {
