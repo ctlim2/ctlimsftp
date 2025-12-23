@@ -17,7 +17,7 @@ export class SftpTreeItem extends vscode.TreeItem {
         super(label, collapsibleState);
         
         if (itemType === 'server') {
-            this.iconPath = new vscode.ThemeIcon('server', new vscode.ThemeColor('charts.blue'));
+            this.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('charts.blue'));
             this.contextValue = 'server';
             this.tooltip = `${serverItem?.host}:${serverItem?.port}`;
             this.description = `${serverItem?.username}@${serverItem?.host}`;
@@ -25,8 +25,8 @@ export class SftpTreeItem extends vscode.TreeItem {
             this.iconPath = new vscode.ThemeIcon('folder', new vscode.ThemeColor('charts.yellow'));
             this.contextValue = 'remoteDirectory';
         } else if (itemType === 'remoteFile') {
-            // Set icon based on file extension
-            this.iconPath = this.getFileIcon(label);
+            // Use resourceUri for Material Icon Theme support
+            this.resourceUri = vscode.Uri.file(label);
             this.contextValue = 'remoteFile';
         } else {
             this.contextValue = 'message';
@@ -44,98 +44,6 @@ export class SftpTreeItem extends vscode.TreeItem {
             };
         }
         // Server command is set in getChildren() based on connection status
-    }
-
-    private getFileIcon(fileName: string): vscode.ThemeIcon {
-        const ext = fileName.split('.').pop()?.toLowerCase() || '';
-        
-        // Programming languages
-        if (['js', 'jsx', 'mjs'].includes(ext)) {
-            return new vscode.ThemeIcon('symbol-method', new vscode.ThemeColor('charts.yellow'));
-        }
-        if (['ts', 'tsx'].includes(ext)) {
-            return new vscode.ThemeIcon('symbol-method', new vscode.ThemeColor('charts.blue'));
-        }
-        if (['php'].includes(ext)) {
-            return new vscode.ThemeIcon('symbol-class', new vscode.ThemeColor('charts.purple'));
-        }
-        if (['py'].includes(ext)) {
-            return new vscode.ThemeIcon('symbol-class', new vscode.ThemeColor('charts.blue'));
-        }
-        if (['java', 'class'].includes(ext)) {
-            return new vscode.ThemeIcon('symbol-class', new vscode.ThemeColor('charts.red'));
-        }
-        if (['c', 'cpp', 'h', 'hpp'].includes(ext)) {
-            return new vscode.ThemeIcon('symbol-namespace', new vscode.ThemeColor('charts.blue'));
-        }
-        if (['cs'].includes(ext)) {
-            return new vscode.ThemeIcon('symbol-class', new vscode.ThemeColor('charts.purple'));
-        }
-        if (['go'].includes(ext)) {
-            return new vscode.ThemeIcon('symbol-method', new vscode.ThemeColor('charts.blue'));
-        }
-        if (['rs'].includes(ext)) {
-            return new vscode.ThemeIcon('symbol-namespace', new vscode.ThemeColor('charts.orange'));
-        }
-        
-        // Web files
-        if (['html', 'htm'].includes(ext)) {
-            return new vscode.ThemeIcon('symbol-tag', new vscode.ThemeColor('charts.orange'));
-        }
-        if (['css', 'scss', 'sass', 'less'].includes(ext)) {
-            return new vscode.ThemeIcon('symbol-color', new vscode.ThemeColor('charts.blue'));
-        }
-        if (['json'].includes(ext)) {
-            return new vscode.ThemeIcon('symbol-misc', new vscode.ThemeColor('charts.yellow'));
-        }
-        if (['xml', 'svg'].includes(ext)) {
-            return new vscode.ThemeIcon('symbol-tag', new vscode.ThemeColor('charts.green'));
-        }
-        
-        // Documents
-        if (['md', 'markdown'].includes(ext)) {
-            return new vscode.ThemeIcon('markdown', new vscode.ThemeColor('charts.blue'));
-        }
-        if (['txt', 'log'].includes(ext)) {
-            return new vscode.ThemeIcon('output', new vscode.ThemeColor('charts.foreground'));
-        }
-        if (['pdf'].includes(ext)) {
-            return new vscode.ThemeIcon('file-pdf', new vscode.ThemeColor('charts.red'));
-        }
-        
-        // Data files
-        if (['sql'].includes(ext)) {
-            return new vscode.ThemeIcon('database', new vscode.ThemeColor('charts.purple'));
-        }
-        if (['yaml', 'yml'].includes(ext)) {
-            return new vscode.ThemeIcon('symbol-misc', new vscode.ThemeColor('charts.red'));
-        }
-        if (['csv', 'tsv'].includes(ext)) {
-            return new vscode.ThemeIcon('graph', new vscode.ThemeColor('charts.green'));
-        }
-        
-        // Images
-        if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'ico'].includes(ext)) {
-            return new vscode.ThemeIcon('file-media', new vscode.ThemeColor('charts.purple'));
-        }
-        
-        // Archives
-        if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2'].includes(ext)) {
-            return new vscode.ThemeIcon('file-zip', new vscode.ThemeColor('charts.orange'));
-        }
-        
-        // Config files
-        if (['env', 'ini', 'conf', 'config'].includes(ext)) {
-            return new vscode.ThemeIcon('settings-gear', new vscode.ThemeColor('charts.yellow'));
-        }
-        
-        // Shell scripts
-        if (['sh', 'bash', 'zsh', 'bat', 'cmd', 'ps1'].includes(ext)) {
-            return new vscode.ThemeIcon('terminal', new vscode.ThemeColor('charts.green'));
-        }
-        
-        // Default
-        return new vscode.ThemeIcon('file', new vscode.ThemeColor('charts.foreground'));
     }
 }
 
@@ -307,9 +215,9 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
                 
                 // Change icon color based on connection status
                 if (isConnected) {
-                    item.iconPath = new vscode.ThemeIcon('server', new vscode.ThemeColor('charts.blue'));
+                    item.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('charts.blue'));
                 } else {
-                    item.iconPath = new vscode.ThemeIcon('server', new vscode.ThemeColor('foreground'));
+                    item.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('foreground'));
                 }
                 
                 // Only add command if not connected (to avoid double execution)

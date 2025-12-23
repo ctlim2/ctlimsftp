@@ -5,6 +5,9 @@ import * as vscode from 'vscode';
 import { SftpConfig, RemoteFile, FileMetadata } from './types';
 import { config } from 'process';
 
+// 개발 모드 여부 (릴리스 시 false로 변경)
+const DEBUG_MODE = false;
+
 export class SftpClient {
     public client: SftpClient2 | null = null;
     private connected: boolean = false;
@@ -14,7 +17,7 @@ export class SftpClient {
         if (this.outputChannel) {
             this.outputChannel.appendLine(message);
         }
-        console.log(message);
+        if (DEBUG_MODE) console.log(message);
     }
 
     setOutputChannel(channel: vscode.OutputChannel): void {
@@ -244,7 +247,7 @@ export class SftpClient {
         try {
             const fileContent = fs.readFileSync(metadataPath, 'utf-8');
             const metadata: FileMetadata = JSON.parse(fileContent);
-this.log(`read metadate info ${metadataPath}\n ${metadata.remotePath} : mtime=${metadata.remoteModifyTime}, size=${metadata.remoteFileSize}`);
+            this.log(`read metadate info ${metadataPath}\n ${metadata.remotePath} : mtime=${metadata.remoteModifyTime}, size=${metadata.remoteFileSize}`);
             return metadata;
         } catch (error) {
             return null;
@@ -264,7 +267,7 @@ this.log(`read metadate info ${metadataPath}\n ${metadata.remotePath} : mtime=${
             return false;
         }
 
-this.log(`compare metadata \nlocal mtime=${localMetadata.remoteModifyTime}, size=${localMetadata.remoteFileSize}\nremote mtime=${remoteMetadata.remoteModifyTime}, size=${remoteMetadata.remoteFileSize}`);        
+        this.log(`compare metadata \nlocal mtime=${localMetadata.remoteModifyTime}, size=${localMetadata.remoteFileSize}\nremote mtime=${remoteMetadata.remoteModifyTime}, size=${remoteMetadata.remoteFileSize}`);        
 
         if(localMetadata.remoteModifyTime == remoteMetadata.remoteModifyTime && localMetadata.remoteFileSize == remoteMetadata.remoteFileSize) return true;
         else return false;

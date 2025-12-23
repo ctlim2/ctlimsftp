@@ -5,6 +5,9 @@ import { SftpClient } from './sftpClient';
 import { SftpConfig, FileMetadata } from './types';
 import { SftpTreeProvider } from './sftpTreeProvider';
 
+// 개발 모드 여부 (릴리스 시 false로 변경)
+const DEBUG_MODE = false;
+
 let sftpClient: SftpClient | null = null;
 let treeProvider: SftpTreeProvider;
 let currentConfig: SftpConfig | null = null;
@@ -13,7 +16,7 @@ let currentConfig: SftpConfig | null = null;
 const documentConfigCache = new WeakMap<vscode.TextDocument, { config: SftpConfig; client: SftpClient; remotePath: string }>();
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('ctlim SFTP extension is now active');
+    if (DEBUG_MODE) console.log('ctlim SFTP extension is now active');
 
     // Register Tree View Provider
     treeProvider = new SftpTreeProvider();
@@ -77,15 +80,15 @@ export function activate(context: vscode.ExtensionContext) {
      */
     const openRemoteFileCommand = vscode.commands.registerCommand('ctlimSftp.openRemoteFile', async (remotePath: string, config: SftpConfig) => {
         try {
-console.log('> ctlimSftp.openRemoteFile');
+            if (DEBUG_MODE) console.log('> ctlimSftp.openRemoteFile');
 
             if (!remotePath || !config) {
                 vscode.window.showErrorMessage('원격 파일 정보가 없습니다.');
                 return;
             }
 
-console.log(`Opening remote file: ${remotePath}`);
-console.log(`Config: ${config.name || `${config.username}@${config.host}`}, remotePath: ${config.remotePath}`);
+            if (DEBUG_MODE) console.log(`Opening remote file: ${remotePath}`);
+            if (DEBUG_MODE) console.log(`Config: ${config.name || `${config.username}@${config.host}`}, remotePath: ${config.remotePath}`);
 
             // Find the connected server for this config
             let connection = treeProvider.getConnectedServer(config.name || `${config.username}@${config.host}`);
@@ -207,7 +210,7 @@ console.log(`Config: ${config.name || `${config.username}@${config.host}`}, remo
      * 리모트에 다른 이름으로 저장 Command
      */
     const saveAsCommand = vscode.commands.registerCommand('ctlimSftp.saveAs', async () => {
-console.log('> ctlimSftp.saveAs');        
+        if (DEBUG_MODE) console.log('> ctlimSftp.saveAs');        
         try {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
@@ -463,7 +466,7 @@ console.log('> ctlimSftp.saveAs');
      * 파일 저장시 자동 업로드
      */
     const saveWatcher = vscode.workspace.onDidSaveTextDocument(async (document) => {
-console.log('> onDidSaveTextDocument');
+        if (DEBUG_MODE) console.log('> onDidSaveTextDocument');
         if (document.uri.scheme !== 'file') {
             return; // 파일이 아니면 무시
         }
@@ -533,12 +536,12 @@ console.log('> onDidSaveTextDocument');
                 const choice = await vscode.window.showWarningMessage(
                     `⚠️ 충돌 감지!\n\n파일이 서버에서 수정되었습니다: ${path.basename(document.uri.fsPath)}\n\n로컬 변경사항으로 덮어쓰시겠습니까?`,
                     { modal: true },
-                    '덕어쓰기',
+                    '덮어쓰기',
                     '취소',
                     '비교'
                 );
                 
-                if (choice === '덕어쓰기') {
+                if (choice === '덮어쓰기') {
                     const forceResult = await sftpClient.uploadFile(document.uri.fsPath, cachedRemotePath, config);
                 } 
                 else if (choice === '비교') {
@@ -566,7 +569,7 @@ console.log('> onDidSaveTextDocument');
                     // Retry upload
                     const retryResult = await sftpClient.uploadFile(document.uri.fsPath, cachedRemotePath, config);
                     if (retryResult) {
-console.log('재연결 후 업로드 성공');                        
+                        if (DEBUG_MODE) console.log('재연결 후 업로드 성공');                        
                         vscode.window.showInformationMessage(`✅ 재연결 후 업로드 성공: ${path.basename(document.uri.fsPath)}`);
                         // Update cache with new client
                         documentConfigCache.set(document, { config, client: sftpClient, remotePath: cachedRemotePath });
@@ -908,7 +911,7 @@ async function ensureConnected(client: SftpClient, config: SftpConfig, serverNam
             return true;
         }
         
-console.log(`연결 끊김 감지, 재연결 시도: ${serverName}`);
+        if (DEBUG_MODE) console.log(`연결 끊김 감지, 재연결 시도: ${serverName}`);
         await client.connect(config);
 
         // treeProvider에 없을 때만 추가 (기존 연결은 보존)
@@ -916,7 +919,7 @@ console.log(`연결 끊김 감지, 재연결 시도: ${serverName}`);
         if (!existingConnection) {
             treeProvider.addConnectedServer(serverName, client, config);
         }
-        console.log(`재연결 성공: ${serverName}`);
+        if (DEBUG_MODE) console.log(`재연결 성공: ${serverName}`);
         return true;
     } catch (error) {
 console.error(`재연결 실패: ${serverName}`, error);
@@ -1189,7 +1192,7 @@ async function refreshFileMetadata(localPath: string, remotePath: string, config
  * 메타데이터가 있는 모든 파일을 확인하고 변경사항이 있으면 사용자에게 알림
  */
 async function checkAndReloadRemoteFiles() {
-console.log('> checkAndReloadRemoteFiles');    
+if (DEBUG_MODE) console.log('> checkAndReloadRemoteFiles');    
     try {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
@@ -1228,12 +1231,11 @@ console.log('> checkAndReloadRemoteFiles');
         }
 
         if (openDocuments.length === 0) {
-console.log('열려있는 문서가 없습니다.');
+            if (DEBUG_MODE) console.log('열려있는 문서가 없습니다.');
             return;
         }
 
-console.log(`${openDocuments.length}개의 열린 문서 발견`);
-
+        if (DEBUG_MODE) console.log(`${openDocuments.length}개의 열린 문서 발견`);  
         // 2단계: 각 열린 문서에 대해 메타데이터 확인 및 서버별 그룹화
         const serverFileMap = new Map<string, Array<{
             document: vscode.TextDocument;
@@ -1271,7 +1273,7 @@ console.log(`${openDocuments.length}개의 열린 문서 발견`);
                     config
                 });
                 
-console.log(`캐시에서 발견: ${path.basename(localPath)} -> ${serverName}`);
+                if (DEBUG_MODE) console.log(`캐시에서 발견: ${path.basename(localPath)} -> ${serverName}`);
                 continue; // Skip metadata file search
             }
             
@@ -1304,21 +1306,21 @@ console.log(`캐시에서 발견: ${path.basename(localPath)} -> ${serverName}`)
                             config
                         });
                         
-console.log(`메타데이터 발견: ${path.basename(localPath)} -> ${serverName}`);
+                        if (DEBUG_MODE) console.log(`메타데이터 발견: ${path.basename(localPath)} -> ${serverName}`);
                         break; // 메타데이터 찾았으면 다음 문서로
                     } catch (error) {
-console.error(`메타데이터 읽기 실패: ${metadataPath}`, error);
+                        console.error(`메타데이터 읽기 실패: ${metadataPath}`, error);
                     }
                 }
             }
         }
 
         if (serverFileMap.size === 0) {
-console.log('메타데이터가 있는 열린 문서가 없습니다.');
+            if (DEBUG_MODE) console.log('메타데이터가 있는 열린 문서가 없습니다.');
             return;
         }
 
-console.log(`${serverFileMap.size}개 서버의 파일 확인 필요`);
+        if (DEBUG_MODE) console.log(`${serverFileMap.size}개 서버의 파일 확인 필요`);
 
         // 3단계: 변경된 파일 목록 수집
         const changedFiles: Array<{
@@ -1346,15 +1348,16 @@ console.log(`${serverFileMap.size}개 서버의 파일 확인 필요`);
                 if (cached && cached.client) {
                     if (cached.client.isConnected()) {
                         client = cached.client;
-console.log(`캐시된 연결 사용: ${serverName}`);
+                        if (DEBUG_MODE) console.log(`캐시된 연결 사용: ${serverName}`);
                         break;
-                    } else {
-console.log(`캐시된 연결이 끊어짐, 재연결 시도: ${serverName}`);
+                    } 
+                    else {
+                        if (DEBUG_MODE) console.log(`캐시된 연결이 끊어짐, 재연결 시도: ${serverName}`);
                         // 재연결 시도
                         const reconnected = await ensureConnected(cached.client, config, serverName);
                         if (reconnected) {
                             client = cached.client;
-console.log(`캐시된 클라이언트 재연결 성공: ${serverName}`);
+                            if (DEBUG_MODE) console.log(`캐시된 클라이언트 재연결 성공: ${serverName}`);
                             break;
                         }
                     }
@@ -1366,7 +1369,7 @@ console.log(`캐시된 클라이언트 재연결 성공: ${serverName}`);
                 const connection = treeProvider.getConnectedServer(serverName);
                 if (connection && connection.client.isConnected()) {
                     client = connection.client;
-console.log(`treeProvider 연결 사용: ${serverName}`);
+                    if (DEBUG_MODE) console.log(`treeProvider 연결 사용: ${serverName}`);
                 }
             }
             
@@ -1374,18 +1377,18 @@ console.log(`treeProvider 연결 사용: ${serverName}`);
             if (!client) {
                 client = new SftpClient();
                 try {
-console.log(`서버 연결 시작: ${serverName}`);
+                    if (DEBUG_MODE) console.log(`서버 연결 시작: ${serverName}`);
                     await client.connect(config);
                     treeProvider.addConnectedServer(serverName, client, config);
-console.log(`서버 연결 성공: ${serverName}`);
+                    if (DEBUG_MODE) console.log(`서버 연결 성공: ${serverName}`);
                 } catch (connectError) {
-console.error(`서버 연결 실패: ${serverName}`, connectError);
+                    console.error(`서버 연결 실패: ${serverName}`, connectError);
                     continue;
                 }
             }
 
             // 이 서버의 파일들 확인
-console.log(`${serverName}: ${fileInfos.length}개 파일 확인 중`);
+            if (DEBUG_MODE) console.log(`${serverName}: ${fileInfos.length}개 파일 확인 중`);
             
             for (const fileInfo of fileInfos) {
                 try {
@@ -1412,7 +1415,7 @@ console.log(`${serverName}: ${fileInfos.length}개 파일 확인 중`);
                             document: fileInfo.document
                         });
                         
-console.log(`변경 감지: ${fileName}`);
+                        if (DEBUG_MODE) console.log(`변경 감지: ${fileName}`);
                     }
                 } catch (remoteError: any) {
                     // 연결이 끊어진 경우 재연결 시도
@@ -1450,7 +1453,7 @@ console.log(`변경 감지: ${fileName}`);
                                         document: fileInfo.document
                                     });
                                     
-console.log(`재연결 후 변경 감지: ${fileName}`);
+                                    if (DEBUG_MODE) console.log(`재연결 후 변경 감지: ${fileName}`);
                                 }
                             } catch (retryError) {
 console.error(`재시도 실패: ${fileInfo.metadata.remotePath}`, retryError);
