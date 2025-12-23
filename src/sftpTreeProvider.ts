@@ -259,6 +259,17 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
         return this.connectedServers.get(serverName);
     }
 
+    /**
+     * 서버 연결을 connectedServers에 추가
+     * @param serverName 서버 이름
+     * @param client SFTP 클라이언트
+     * @param config 서버 설정
+     */
+    addConnectedServer(serverName: string, client: SftpClient, config: SftpConfig): void {
+        this.connectedServers.set(serverName, { client, config });
+        this._onDidChangeTreeData.fire();
+    }
+
     refresh(): void {
         this.loadServerList();
         this._onDidChangeTreeData.fire();

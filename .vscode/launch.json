@@ -14,6 +14,7 @@
             ],
             "preLaunchTask": "compile",
             "sourceMaps": true,
+            "internalConsoleOptions": "openOnSessionStart",
             "env": {
                 "NODE_OPTIONS": "--no-deprecation"
             }

@@ -84,8 +84,8 @@ console.log('> ctlimSftp.openRemoteFile');
                 return;
             }
 
-            console.log(`Opening remote file: ${remotePath}`);
-            console.log(`Config: ${config.name || `${config.username}@${config.host}`}, remotePath: ${config.remotePath}`);
+console.log(`Opening remote file: ${remotePath}`);
+console.log(`Config: ${config.name || `${config.username}@${config.host}`}, remotePath: ${config.remotePath}`);
 
             // Find the connected server for this config
             let connection = treeProvider.getConnectedServer(config.name || `${config.username}@${config.host}`);
@@ -202,6 +202,205 @@ console.log('> ctlimSftp.openRemoteFile');
     });
 
 
+
+    /**
+     * 리모트에 다른 이름으로 저장 Command
+     */
+    const saveAsCommand = vscode.commands.registerCommand('ctlimSftp.saveAs', async () => {
+console.log('> ctlimSftp.saveAs');        
+        try {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showErrorMessage('활성 편집기가 없습니다.');
+                return;
+            }
+
+            const document = editor.document;
+            if (document.uri.scheme !== 'file') {
+                vscode.window.showErrorMessage('파일 시스템의 파일만 업로드할 수 있습니다.');
+                return;
+            }
+
+            const localPath = document.uri.fsPath;
+
+            // Check cache first for opened files
+            const cached = documentConfigCache.get(document);
+            let config: SftpConfig | null = cached?.config || null;
+            let cachedClient: SftpClient | null = cached?.client || null;
+            
+            // Fallback: find config by metadata or file path
+            if (!config) {
+                config = await findConfigByMetadata(localPath);
+            }
+            if (!config) {
+                config = await findConfigForFile(localPath);
+            }
+            if (!config) {
+                const result = await vscode.window.showErrorMessage(
+                    'SFTP 설정을 찾을 수 없습니다. 설정 파일을 생성하시겠습니까?',
+                    '설정',
+                    '취소'
+                );
+                if (result === '설정') {
+                    await vscode.commands.executeCommand('ctlimSftp.config');
+                }
+                return;
+            }
+
+            // Use cached client if available and connected
+            const serverName = config.name || `${config.username}@${config.host}`;
+            let connection: { client: SftpClient; config: SftpConfig } | undefined;
+            
+            if (cachedClient && cachedClient.isConnected()) {
+                connection = { client: cachedClient, config };
+            } else {
+                connection = treeProvider.getConnectedServer(serverName);
+            }
+            
+            if (!connection || !connection.client.isConnected()) {
+                const reconnect = await vscode.window.showWarningMessage(
+                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
+                    '연결',
+                    '취소'
+                );
+                if (reconnect !== '연결') {
+                    return;
+                }
+                
+                try {
+                    const client = new SftpClient();
+                    await client.connect(config);
+                    treeProvider.addConnectedServer(serverName, client, config);
+                    connection = treeProvider.getConnectedServer(serverName);
+                    
+                    if (!connection) {
+                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        return;
+                    }
+                    
+                    vscode.window.showInformationMessage(`서버에 연결되었습니다: ${serverName}`);
+                } catch (connectError) {
+                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    return;
+                }
+            }
+
+            // Calculate default remote path
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+                return;
+            }
+
+            const workspaceRoot = config.workspaceRoot || workspaceFolder.uri.fsPath;
+            const relativePath = path.relative(workspaceRoot, localPath).replace(/\\/g, '/');
+            const defaultRemotePath = path.posix.join(config.remotePath, relativePath);
+
+            // Ask user to choose input method
+            const inputMethod = await vscode.window.showQuickPick([
+                { label: '$(edit) 직접 입력', method: 'input' },
+                { label: '$(folder-opened) 트리에서 선택', method: 'tree' }
+            ], {
+                placeHolder: '원격 경로 입력 방법을 선택하세요'
+            });
+
+            if (!inputMethod) {
+                return; // User cancelled
+            }
+
+            let remotePath: string | undefined;
+
+            if (inputMethod.method === 'input') {
+                // Direct input
+                remotePath = await vscode.window.showInputBox({
+                    prompt: '원격 저장 경로를 입력하세요',
+                    value: defaultRemotePath,
+                    placeHolder: '/var/www/html/file.php',
+                    validateInput: (value) => {
+                        if (!value || value.trim() === '') {
+                            return '경로를 입력해주세요';
+                        }
+                        if (!value.startsWith('/')) {
+                            return '절대 경로로 입력해주세요 (예: /var/www/...)';
+                        }
+                        return null;
+                    }
+                });
+            } else {
+                // Tree selection
+                remotePath = await selectRemotePathFromTree(connection.client, config.remotePath, path.basename(localPath));
+            }
+
+            if (!remotePath) {
+                return; // User cancelled
+            }
+
+            // Save document if modified
+            if (document.isDirty) {
+                await document.save();
+            }
+
+            // Upload to new path
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: `업로드 중: ${path.basename(remotePath)}`,
+                cancellable: false
+            }, async (progress) => {
+                const success = await connection!.client.uploadFile(localPath, remotePath, config!);
+                if (success) {
+                    vscode.window.showInformationMessage(`✅ 업로드 완료: ${remotePath}`);
+                    
+                    // Calculate new local path for the remote file
+                    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                    if (!workspaceFolder) {
+                        return;
+                    }
+                    
+                    const newLocalPath = SftpClient.getDownloadFolder(
+                        remotePath, 
+                        workspaceFolder.uri.fsPath, 
+                        config!, 
+                        true, 
+                        false
+                    );
+                    
+                    if (!newLocalPath) {
+                        return;
+                    }
+                    
+                    // Download the uploaded file from remote
+                    if (connection!.client.client) {
+                        await connection!.client.client.get(remotePath, newLocalPath);
+                        
+                        // Save metadata
+                        await connection!.client.saveRemoteFileMetadata(
+                            remotePath,
+                            newLocalPath,
+                            config!,
+                            config!.workspaceRoot
+                        );
+                        
+                        // Open the downloaded file
+                        const newDoc = await vscode.workspace.openTextDocument(newLocalPath);
+                        await vscode.window.showTextDocument(newDoc);
+                        
+                        // Update cache with new document
+                        documentConfigCache.set(newDoc, {
+                            config: config!,
+                            client: connection!.client,
+                            remotePath: remotePath
+                        });
+                    }
+                } else {
+                    vscode.window.showErrorMessage(`❌ 업로드 실패: ${remotePath}`);
+                }
+            });
+
+        } catch (error) {
+            vscode.window.showErrorMessage(`업로드 실패: ${error}`);
+            console.error('saveAs error:', error);
+        }
+    });
 
     /**
      * 설정 파일 열기 Command
@@ -388,6 +587,7 @@ console.log('재연결 후 업로드 성공');
         configCommand,
         refreshCommand,
         openRemoteFileCommand,
+        saveAsCommand,
         saveWatcher,
         
 //        uploadCommand,
@@ -696,6 +896,35 @@ async function ensureClient(config: SftpConfig): Promise<void> {
 }
 
 /**
+ * SFTP 연결 상태 확인 및 재연결
+ * @param client SFTP 클라이언트
+ * @param config 서버 설정
+ * @param serverName 서버 이름
+ * @returns 연결 성공 여부
+ */
+async function ensureConnected(client: SftpClient, config: SftpConfig, serverName: string): Promise<boolean> {
+    try {
+        if (client.isConnected()) {
+            return true;
+        }
+        
+console.log(`연결 끊김 감지, 재연결 시도: ${serverName}`);
+        await client.connect(config);
+
+        // treeProvider에 없을 때만 추가 (기존 연결은 보존)
+        const existingConnection = treeProvider.getConnectedServer(serverName);
+        if (!existingConnection) {
+            treeProvider.addConnectedServer(serverName, client, config);
+        }
+        console.log(`재연결 성공: ${serverName}`);
+        return true;
+    } catch (error) {
+console.error(`재연결 실패: ${serverName}`, error);
+        return false;
+    }
+}
+
+/**
  * 원격 파일 다운로드 후 에디터에서 새로고침
  * @param remotePath 원격 파일 경로
  * @param localPath 로컬 파일 경로
@@ -752,6 +981,116 @@ async function downloadAndReloadFile(
     } catch (error) {
 console.error(`다운로드 실패: ${localPath}`, error);
         return false;
+    }
+}
+
+/**
+ * 트리 탐색으로 원격 경로 선택
+ * @param client SFTP 클라이언트
+ * @param startPath 시작 경로
+ * @param fileName 저장할 파일 이름
+ * @returns 선택한 원격 경로 또는 undefined
+ */
+async function selectRemotePathFromTree(client: SftpClient, startPath: string, fileName: string): Promise<string | undefined> {
+    let currentPath = startPath;
+    
+    while (true) {
+        try {
+            // 현재 디렉토리의 파일 목록 가져오기
+            const files = await client.listRemoteFiles(currentPath);
+            
+            // QuickPick 아이템 생성
+            const items: Array<{ label: string; description: string; path: string; isDirectory: boolean; isSpecial?: boolean }> = [];
+            
+            // 상위 디렉토리 이동 옵션
+            if (currentPath !== '/') {
+                items.push({
+                    label: '$(arrow-up) ..',
+                    description: '상위 디렉토리로 이동',
+                    path: path.posix.dirname(currentPath),
+                    isDirectory: true,
+                    isSpecial: true
+                });
+            }
+            
+            // 현재 위치에 저장 옵션
+            items.push({
+                label: `$(file) ${fileName}`,
+                description: '현재 디렉토리에 저장',
+                path: path.posix.join(currentPath, fileName),
+                isDirectory: false,
+                isSpecial: true
+            });
+            
+            // 디렉토리 먼저
+            const directories = files.filter(f => f.isDirectory).sort((a, b) => a.name.localeCompare(b.name));
+            for (const dir of directories) {
+                items.push({
+                    label: `$(folder) ${dir.name}`,
+                    description: '디렉토리',
+                    path: dir.path,
+                    isDirectory: true
+                });
+            }
+            
+            // 파일들 (참고용)
+            const regularFiles = files.filter(f => !f.isDirectory).sort((a, b) => a.name.localeCompare(b.name));
+            for (const file of regularFiles) {
+                items.push({
+                    label: `$(file) ${file.name}`,
+                    description: `${(file.size || 0)} bytes`,
+                    path: file.path,
+                    isDirectory: false
+                });
+            }
+            
+            // QuickPick 표시
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: `현재 위치: ${currentPath} - 저장 위치를 선택하세요`,
+                matchOnDescription: true
+            });
+            
+            if (!selected) {
+                return undefined; // 취소
+            }
+            
+            // 특수 항목 처리
+            if (selected.isSpecial) {
+                if (selected.label.startsWith('$(arrow-up)')) {
+                    // 상위 디렉토리로 이동
+                    currentPath = selected.path;
+                    continue;
+                } else if (selected.label.startsWith('$(file)')) {
+                    // 현재 위치에 저장
+                    return selected.path;
+                }
+            }
+            
+            // 디렉토리 선택 시 하위로 이동
+            if (selected.isDirectory) {
+                currentPath = selected.path;
+                continue;
+            }
+            
+            // 파일 선택 시 - 같은 디렉토리에 새 파일명으로 저장
+            const dir = path.posix.dirname(selected.path);
+            const newPath = path.posix.join(dir, fileName);
+            
+            const confirm = await vscode.window.showWarningMessage(
+                `${dir}/ 디렉토리에 ${fileName}로 저장하시겠습니까?`,
+                '저장',
+                '취소'
+            );
+            
+            if (confirm === '저장') {
+                return newPath;
+            }
+            // 취소 시 계속 탐색
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`원격 디렉토리 탐색 실패: ${error}`);
+            return undefined;
+        }
     }
 }
 
@@ -905,7 +1244,38 @@ console.log(`${openDocuments.length}개의 열린 문서 발견`);
         for (const document of openDocuments) {
             const localPath = document.uri.fsPath;
             
-            // 메타데이터 파일명 인코딩
+            // Check cache first
+            const cached = documentConfigCache.get(document);
+            if (cached) {
+                // Use cached config and remotePath
+                const config = cached.config;
+                const serverName = config.name || `${config.username}@${config.host}`;
+                
+                // Create metadata from cache
+                const metadata: FileMetadata = {
+                    remotePath: cached.remotePath,
+                    remoteModifyTime: 0, // Will be checked later
+                    remoteFileSize: 0,   // Will be checked later
+                    localPath: localPath,
+                    downloadTime: Date.now(),
+                    configName: config.name
+                };
+                
+                if (!serverFileMap.has(serverName)) {
+                    serverFileMap.set(serverName, []);
+                }
+                
+                serverFileMap.get(serverName)!.push({
+                    document,
+                    metadata,
+                    config
+                });
+                
+console.log(`캐시에서 발견: ${path.basename(localPath)} -> ${serverName}`);
+                continue; // Skip metadata file search
+            }
+            
+            // Fallback: 메타데이터 파일명 인코딩
             const safeLocalPath = SftpClient.makeMetafileName(localPath);
             
             // 각 config의 workspaceRoot에서 메타데이터 찾기
@@ -914,7 +1284,7 @@ console.log(`${openDocuments.length}개의 열린 문서 발견`);
                     config.workspaceRoot || '', 
                     '.vscode', 
                     '.sftp-metadata', 
-                    `${safeLocalPath}.json`
+                    `${safeLocalPath}`
                 );
                 
                 if (fs.existsSync(metadataPath)) {
@@ -967,23 +1337,49 @@ console.log(`${serverFileMap.size}개 서버의 파일 확인 필요`);
 
             const config = fileInfos[0].config;
             
-            // 서버 연결 확인 및 생성
-            const connection = treeProvider.getConnectedServer(serverName);
-            let client: SftpClient;
+            // 서버 연결 확인: 캐시 → treeProvider → 새 연결
+            let client: SftpClient | null = null;
             
-            if (connection && connection.client.isConnected()) {
-                client = connection.client;
-console.log(`기존 연결 사용: ${serverName}`);
-            } else {
-                // 필요한 서버만 연결
+            // 1. 캐시된 client가 있으면 우선 사용
+            for (const fileInfo of fileInfos) {
+                const cached = documentConfigCache.get(fileInfo.document);
+                if (cached && cached.client) {
+                    if (cached.client.isConnected()) {
+                        client = cached.client;
+console.log(`캐시된 연결 사용: ${serverName}`);
+                        break;
+                    } else {
+console.log(`캐시된 연결이 끊어짐, 재연결 시도: ${serverName}`);
+                        // 재연결 시도
+                        const reconnected = await ensureConnected(cached.client, config, serverName);
+                        if (reconnected) {
+                            client = cached.client;
+console.log(`캐시된 클라이언트 재연결 성공: ${serverName}`);
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // 2. treeProvider에서 찾기
+            if (!client) {
+                const connection = treeProvider.getConnectedServer(serverName);
+                if (connection && connection.client.isConnected()) {
+                    client = connection.client;
+console.log(`treeProvider 연결 사용: ${serverName}`);
+                }
+            }
+            
+            // 3. 새 연결 생성
+            if (!client) {
                 client = new SftpClient();
                 try {
 console.log(`서버 연결 시작: ${serverName}`);
                     await client.connect(config);
+                    treeProvider.addConnectedServer(serverName, client, config);
 console.log(`서버 연결 성공: ${serverName}`);
                 } catch (connectError) {
 console.error(`서버 연결 실패: ${serverName}`, connectError);
-                    // 이 서버의 파일들은 건너뛰기
                     continue;
                 }
             }
@@ -994,6 +1390,13 @@ console.log(`${serverName}: ${fileInfos.length}개 파일 확인 중`);
             for (const fileInfo of fileInfos) {
                 try {
                     const remoteMetadata = await client.getRemoteFileInfo(fileInfo.metadata.remotePath);
+                    
+                    // documentConfigCache 업데이트 (없으면 추가, 있으면 갱신)
+                    documentConfigCache.set(fileInfo.document, {
+                        config: fileInfo.config,
+                        client: client,
+                        remotePath: fileInfo.metadata.remotePath
+                    });
                     
                     // 변경사항 확인 (시간 또는 크기 변경)
                     if (fileInfo.metadata.remoteModifyTime !== remoteMetadata.remoteModifyTime || 
@@ -1012,8 +1415,51 @@ console.log(`${serverName}: ${fileInfos.length}개 파일 확인 중`);
 console.log(`변경 감지: ${fileName}`);
                     }
                 } catch (remoteError: any) {
-                    // 원격 파일이 없거나 접근 불가
+                    // 연결이 끊어진 경우 재연결 시도
+                    if (remoteError.message && (
+                        remoteError.message.includes('Not connected') ||
+                        remoteError.message.includes('No response from server') ||
+                        remoteError.message.includes('ECONNRESET') ||
+                        remoteError.message.includes('ETIMEDOUT')
+                    )) {
+                        // ensureConnected 함수로 재연결
+                        const reconnected = await ensureConnected(client, config, serverName);
+                        
+                        if (reconnected) {
+                            try {
+                                // 작업 재시도
+                                const remoteMetadata = await client.getRemoteFileInfo(fileInfo.metadata.remotePath);
+                                
+                                // documentConfigCache 업데이트
+                                documentConfigCache.set(fileInfo.document, {
+                                    config: fileInfo.config,
+                                    client: client,
+                                    remotePath: fileInfo.metadata.remotePath
+                                });
+                                
+                                if (fileInfo.metadata.remoteModifyTime !== remoteMetadata.remoteModifyTime || 
+                                    fileInfo.metadata.remoteFileSize !== remoteMetadata.remoteFileSize) {
+                                    
+                                    const fileName = path.basename(fileInfo.document.uri.fsPath);
+                                    
+                                    changedFiles.push({
+                                        localPath: fileInfo.document.uri.fsPath,
+                                        remotePath: fileInfo.metadata.remotePath,
+                                        fileName: fileName,
+                                        config: fileInfo.config,
+                                        document: fileInfo.document
+                                    });
+                                    
+console.log(`재연결 후 변경 감지: ${fileName}`);
+                                }
+                            } catch (retryError) {
+console.error(`재시도 실패: ${fileInfo.metadata.remotePath}`, retryError);
+                            }
+                        }
+                    } else {
+                        // 원격 파일이 없거나 기타 오류
 console.error(`원격 파일 확인 실패: ${fileInfo.metadata.remotePath}`, remoteError);
+                    }
                 }
             }
         }
@@ -1026,7 +1472,7 @@ console.error(`원격 파일 확인 실패: ${fileInfo.metadata.remotePath}`, re
 
             const choice = await vscode.window.showInformationMessage(
                 message,
-                { modal: false },
+                { modal: true },
                 '모두 다운로드',
                 '개별 선택',
                 '무시'
@@ -1066,7 +1512,7 @@ console.error(`원격 파일 확인 실패: ${fileInfo.metadata.remotePath}`, re
                     const fileName = fileInfo.fileName;
                     const fileChoice = await vscode.window.showWarningMessage(
                         `⚠️ 파일: ${fileName}\n서버에서 수정되었습니다.`,
-                        { modal: false },
+                        { modal: true },
                         '다운로드',
                         '비교',
                         '건너뛰기'

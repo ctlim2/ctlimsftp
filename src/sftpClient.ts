@@ -78,8 +78,22 @@ export class SftpClient {
             if (config.passphrase) {
                 connectConfig.passphrase = config.passphrase;
             }
-        } else if (config.password) {
-            connectConfig.password = config.password;
+        } else {
+            // Password가 설정에 없으면 사용자에게 입력 요청
+            let password = config.password;
+            if (!password) {
+                password = await vscode.window.showInputBox({
+                    prompt: `${config.host}의 비밀번호를 입력하세요`,
+                    password: true,
+                    placeHolder: '비밀번호',
+                    ignoreFocusOut: true
+                });
+                
+                if (!password) {
+                    throw new Error('비밀번호가 입력되지 않았습니다.');
+                }
+            }
+            connectConfig.password = password;
         }
 
         await this.client.connect(connectConfig);
