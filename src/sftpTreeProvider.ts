@@ -8,15 +8,20 @@ export class SftpTreeItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
         public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-        public readonly itemType: 'server' | 'remoteFile' | 'remoteDirectory' | 'message',
+        public readonly itemType: 'group' | 'server' | 'remoteFile' | 'remoteDirectory' | 'message',
         public readonly remotePath?: string,
         public readonly isDirectory?: boolean,
         public readonly config?: SftpConfig,
-        public readonly serverItem?: ServerListItem
+        public readonly serverItem?: ServerListItem,
+        public readonly groupName?: string
     ) {
         super(label, collapsibleState);
         
-        if (itemType === 'server') {
+        if (itemType === 'group') {
+            this.iconPath = new vscode.ThemeIcon('folder', new vscode.ThemeColor('charts.green'));
+            this.contextValue = 'group';
+            this.tooltip = `그룹: ${label}`;
+        } else if (itemType === 'server') {
             this.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('charts.blue'));
             this.contextValue = 'server';
             this.tooltip = `${serverItem?.host}:${serverItem?.port}`;
@@ -95,6 +100,7 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
                         const serverName = config.name || `${config.username}@${config.host}`;
                         this.serverList.push({
                             name: serverName,
+                            group: config.group,
                             host: config.host,
                             port: config.port || 22,
                             username: config.username,
@@ -189,7 +195,7 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
 
     async getChildren(element?: SftpTreeItem): Promise<SftpTreeItem[]> {
         if (!element) {
-            // Root level - show server list
+            // Root level - show groups or servers
             if (this.serverList.length === 0) {
                 return [
                     new SftpTreeItem('No ctlim SFTP servers configured', vscode.TreeItemCollapsibleState.None, 'message'),
@@ -197,7 +203,79 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
                 ];
             }
 
-            return this.serverList.map(server => {
+            // Group servers by group name
+            const groupedServers = new Map<string, ServerListItem[]>();
+            const ungroupedServers: ServerListItem[] = [];
+
+            for (const server of this.serverList) {
+                if (server.group) {
+                    if (!groupedServers.has(server.group)) {
+                        groupedServers.set(server.group, []);
+                    }
+                    groupedServers.get(server.group)!.push(server);
+                } else {
+                    ungroupedServers.push(server);
+                }
+            }
+
+            const items: SftpTreeItem[] = [];
+
+            // Add grouped servers
+            for (const [groupName, servers] of groupedServers.entries()) {
+                items.push(new SftpTreeItem(
+                    groupName,
+                    vscode.TreeItemCollapsibleState.Collapsed,
+                    'group',
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    groupName
+                ));
+            }
+
+            // Add ungrouped servers
+            for (const server of ungroupedServers) {
+                const isConnected = this.connectedServers.has(server.name);
+                const collapsibleState = isConnected 
+                    ? vscode.TreeItemCollapsibleState.Collapsed 
+                    : vscode.TreeItemCollapsibleState.None;
+                
+                const item = new SftpTreeItem(
+                    server.name,
+                    collapsibleState,
+                    'server',
+                    undefined,
+                    undefined,
+                    undefined,
+                    server
+                );
+                
+                // Change icon color based on connection status
+                if (isConnected) {
+                    item.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('charts.blue'));
+                } else {
+                    item.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('foreground'));
+                }
+                
+                // Only add command if not connected (to avoid double execution)
+                if (!isConnected) {
+                    item.command = {
+                        command: 'ctlimSftp.connectServer',
+                        title: 'Connect to Server',
+                        arguments: [server]
+                    };
+                }
+                
+                items.push(item);
+            }
+
+            return items;
+        } else if (element.itemType === 'group' && element.groupName) {
+            // Show servers in this group
+            const serversInGroup = this.serverList.filter(s => s.group === element.groupName);
+            
+            return serversInGroup.map(server => {
                 const isConnected = this.connectedServers.has(server.name);
                 const collapsibleState = isConnected 
                     ? vscode.TreeItemCollapsibleState.Collapsed 

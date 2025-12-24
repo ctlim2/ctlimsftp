@@ -2,7 +2,7 @@
 
 > 간편하고 강력한 VS Code SFTP/SSH 파일 동기화 확장 프로그램
 
-[![Version](https://img.shields.io/badge/version-0.2.8-blue.svg)](https://github.com/ctlim2/ctlimsftp)
+[![Version](https://img.shields.io/badge/version-0.2.9-blue.svg)](https://github.com/ctlim2/ctlimsftp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 **저장 시 자동 업로드**와 **지능형 충돌 감지**로 원격 서버와 로컬 파일을 안전하게 동기화하세요.
@@ -86,20 +86,21 @@ code --install-extension ctlim.ctlim-sftp
 
 ```
 
-#### 다중 서버 설정
+#### 다중 서버 설정 (그룹 기능 포함)
 ```json
 [
   {
-      "name": "My Development Server",
-      "host": "host ip",
+      "name": "개발 서버 1",
+      "group": "개발 환경",
+      "host": "dev1.example.com",
       "protocol": "sftp",
       "port": 22,
       "username": "username",
       "password": "password",
       "remotePath": "/var/www/html",
-      "context": "d:/MyProject/Project/vss1",
+      "context": "d:/MyProject/Project/dev1",
       "uploadOnSave": true,
-      "downloadOnOpen": true
+      "downloadOnOpen": true,
       "ignore": [
         ".vscode",
         ".git",
@@ -108,16 +109,36 @@ code --install-extension ctlim.ctlim-sftp
       ]
   },
   {
-      "name": "My Development Server",
-      "host": "host ip",
+      "name": "개발 서버 2",
+      "group": "개발 환경",
+      "host": "dev2.example.com",
       "protocol": "sftp",
       "port": 22,
       "username": "username",
       "password": "password",
       "remotePath": "/var/www/html",
-      "context": "d:/MyProject/Project/vss1",
+      "context": "d:/MyProject/Project/dev2",
       "uploadOnSave": true,
-      "downloadOnOpen": true
+      "downloadOnOpen": true,
+      "ignore": [
+        ".vscode",
+        ".git",
+        "node_modules",
+        "*.log"
+      ]
+  },
+  {
+      "name": "운영 서버",
+      "group": "운영 환경",
+      "host": "prod.example.com",
+      "protocol": "sftp",
+      "port": 22,
+      "username": "username",
+      "password": "password",
+      "remotePath": "/var/www/html",
+      "context": "d:/MyProject/Project/prod",
+      "uploadOnSave": false,
+      "downloadOnOpen": true,
       "ignore": [
         ".vscode",
         ".git",
@@ -133,9 +154,18 @@ code --install-extension ctlim.ctlim-sftp
 ### 3️⃣ 서버 연결 및 사용
 
 1. **Activity Bar**에서 ctlim SFTP 아이콘 클릭 (왼쪽 사이드바)
-2. 서버 이름 클릭 → 자동 연결
-3. 파일 트리 탐색 및 파일 클릭 → 자동 다운로드 & 편집
+2. 서버 또는 그룹을 펼쳐서 서버 이름 클릭 → 자동 연결
+3. 파일 트리 탐색 및 파일 더블클릭 → 자동 다운로드 & 편집
 4. 파일 저장 (`Ctrl+S`) → 자동 업로드 ✨
+
+**그룹별 서버 표시**:
+```
+📁 개발 환경
+  ☁ 개발 서버 1
+  ☁ 개발 서버 2
+📁 운영 환경
+  ☁ 운영 서버
+```
 
 ---
 
@@ -144,6 +174,7 @@ code --install-extension ctlim.ctlim-sftp
 | 옵션 | 타입 | 기본값 | 필수 | 설명 |
 |------|------|--------|------|------|
 | `name` | string | - | ❌ | 서버 식별 이름 (트리 뷰에 표시) |
+| `group` | string | - | ❌ | 서버 그룹 이름 (같은 그룹끼리 묶여 표시) |
 | `context` | string | `"./"` | ❌ | 로컬 워크스페이스 루트 (상대/절대 경로) |
 | `host` | string | - | ✅ | SFTP 서버 호스트 주소 |
 | `port` | number | `22` | ❌ | SSH/SFTP 포트 번호 |
@@ -400,20 +431,25 @@ sequenceDiagram
 
 #### 백업 방식
 
-- **저장 위치**: 설정에서 지정한 경로 (상대 경로는 workspaceRoot 기준)
-- **파일명 형식**: `경로__파일명.YYYY-MM-DD_HHMMSS.backup`
+- **저장 위치**: 원격 경로 구조를 그대로 재현
+- **폴더 구조**: 원격 서버의 디렉토리 구조가 백업 폴더에 유지됨
+- **파일명 형식**: `파일명.YYYY-MM-DD_HH-mm-ss.backup`
 - **자동 정리**: 파일당 최근 5개 백업만 유지
 
 #### 예시
 
-원본 파일: `src/controllers/test.php`
+원격 파일: `/var/www/html/data/test.php`
 
 백업 파일:
 ```
 .vscode/.sftp-backup/
-├── src__controllers__test.php.2024-12-24_103045.backup
-├── src__controllers__test.php.2024-12-23_154320.backup
-└── src__controllers__test.php.2024-12-22_091230.backup
+└── var/
+    └── www/
+        └── html/
+            └── data/
+                ├── test.php.2024-12-24_10-30-45.backup
+                ├── test.php.2024-12-23_15-43-20.backup
+                └── test.php.2024-12-22_09-12-30.backup
 ```
 
 #### 사용 시나리오
@@ -514,5 +550,5 @@ Copyright (c) 2024 ctlim2
 이 프로젝트가 유용하다면 ⭐ Star를 눌러주세요!
 
 **개발자**: ctlim  
-**버전**: 0.2.8  
-**마지막 업데이트**: 2024-12-23
+**버전**: 0.2.9  
+**마지막 업데이트**: 2024-12-24

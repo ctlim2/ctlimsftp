@@ -1,5 +1,6 @@
 export interface SftpConfig {
     name?: string;
+    group?: string;
     context?: string;
     host: string;
     port: number;
@@ -27,6 +28,7 @@ export interface SftpConfig {
 
 export interface ServerListItem {
     name: string;
+    group?: string;
     host: string;
     port: number;
     username: string;
