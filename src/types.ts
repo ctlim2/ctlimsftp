@@ -10,6 +10,7 @@ export interface SftpConfig {
     remotePath: string;
     uploadOnSave?: boolean;
     downloadOnOpen?: boolean | 'confirm';
+    downloadBackup?: string;
     ignore?: string[];
     watcher?: {
         files: string | false;

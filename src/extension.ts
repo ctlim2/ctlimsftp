@@ -6,7 +6,7 @@ import { SftpConfig, FileMetadata } from './types';
 import { SftpTreeProvider } from './sftpTreeProvider';
 
 // 개발 모드 여부 (릴리스 시 false로 변경)
-const DEBUG_MODE = false;
+const DEBUG_MODE = true;
 
 let sftpClient: SftpClient | null = null;
 let treeProvider: SftpTreeProvider;
@@ -29,14 +29,15 @@ export function activate(context: vscode.ExtensionContext) {
     });
     
     /**
-     * Handle single click on tree items
+     * Handle selection on tree items (servers only, files use double-click)
      */
     treeView.onDidChangeSelection(async (e) => {
         if (e.selection.length > 0) {
             const item = e.selection[0];
             
-            // Execute command if item has one
-            if (item.command) {
+            // Only execute command for servers (single click)
+            // Files require double-click (handled by TreeItem.command)
+            if (item.itemType === 'server' && item.command) {
                 await vscode.commands.executeCommand(
                     item.command.command,
                     ...(item.command.arguments || [])
@@ -143,6 +144,17 @@ export function activate(context: vscode.ExtensionContext) {
             if (!localPath) {
                 vscode.window.showErrorMessage('다운로드 경로를 계산할 수 없습니다.');
                 return;
+            }
+
+            // Ensure local directory exists
+            const localDir = path.dirname(localPath);
+            if (!fs.existsSync(localDir)) {
+                fs.mkdirSync(localDir, { recursive: true });
+            }
+
+            // Backup existing file if downloadBackup is enabled
+            if (config.downloadBackup && fs.existsSync(localPath)) {
+                await backupLocalFile(localPath, config);
             }
 
             // Download to local path with metadata
@@ -433,6 +445,7 @@ export function activate(context: vscode.ExtensionContext) {
                 remotePath: "/remote/path",
                 uploadOnSave: true,
                 downloadOnOpen: false,
+                downloadBackup: ".vscode/.sftp-backup",
                 watcher: {
                     files: "**/*.{js,ts,css,html}",
                     autoUpload: false,
@@ -959,6 +972,11 @@ async function downloadAndReloadFile(
                 await vscode.window.showTextDocument(document, { preview: false });
                 await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
             }
+        }
+
+        // Backup existing file if downloadBackup is enabled
+        if (config.downloadBackup && fs.existsSync(localPath)) {
+            await backupLocalFile(localPath, config);
         }
 
         // 파일 다운로드
@@ -1546,6 +1564,87 @@ console.error(`원격 파일 확인 실패: ${fileInfo.metadata.remotePath}`, re
         }
     } catch (error) {
 console.error('원격 파일 확인 중 오류:', error);
+    }
+}
+
+/**
+ * 로컬 파일 백업
+ * @param localPath 백업할 로컬 파일 경로
+ * @param config 서버 설정
+ */
+async function backupLocalFile(localPath: string, config: SftpConfig): Promise<void> {
+    if (DEBUG_MODE) console.log(`백업 ${localPath}`);
+
+    try {
+        const workspaceRoot = config.workspaceRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspaceRoot) {
+            return;
+        }
+
+        if(config.downloadBackup == "" ) return; // 백업 비활성화
+        
+        // Get remote path from metadata
+        let remotePath = '';
+        try {
+            const metadataPath = SftpClient.getMetadataPath(localPath, config);
+            if (fs.existsSync(metadataPath)) {
+                const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+                remotePath = metadata.remotePath || '';
+            }
+        } catch (error) {
+            // Metadata not found or invalid, use local path instead
+        }
+
+        // Create backup directory from config or default
+        const backupConfigPath = config.downloadBackup || '.vscode/.sftp-backup';
+        const backupRootDir = path.isAbsolute(backupConfigPath) 
+            ? backupConfigPath 
+            : path.join(workspaceRoot, backupConfigPath);
+        
+        // Create backup directory structure matching remote path
+        let backupDir = backupRootDir;
+        if (remotePath) {
+            // Use remote path structure (remove leading slash)
+            const remoteDir = path.dirname(remotePath).replace(/^\/+/, '');
+            backupDir = path.join(backupRootDir, remoteDir);
+        }
+        
+        if (!fs.existsSync(backupDir)) {
+            fs.mkdirSync(backupDir, { recursive: true });
+        }
+
+        // Generate backup filename with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').substring(0, 19);
+        const fileName = path.basename(localPath);
+        const backupFileName = `${fileName}.${timestamp}.backup`;
+        const backupFilePath = path.join(backupDir, backupFileName);
+
+        // Copy file to backup
+        fs.copyFileSync(localPath, backupFilePath);
+        
+        if (DEBUG_MODE) console.log(`백업 완료: ${backupFilePath}`);
+        
+        // Optional: Clean old backups (keep last 5)
+        const backupPattern = new RegExp(`^${fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\..*\\.backup$`);
+        const backupFiles = fs.readdirSync(backupDir)
+            .filter(f => backupPattern.test(f))
+            .map(f => ({
+                name: f,
+                path: path.join(backupDir, f),
+                mtime: fs.statSync(path.join(backupDir, f)).mtime.getTime()
+            }))
+            .sort((a, b) => b.mtime - a.mtime);
+        
+        // Keep only last 5 backups
+        if (backupFiles.length > 5) {
+            for (let i = 5; i < backupFiles.length; i++) {
+                fs.unlinkSync(backupFiles[i].path);
+                if (DEBUG_MODE) console.log(`오래된 백업 삭제: ${backupFiles[i].name}`);
+            }
+        }
+    } catch (error) {
+        console.error('백업 실패:', error);
+        // Backup failure should not stop the download
     }
 }
 

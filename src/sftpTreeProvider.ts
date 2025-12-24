@@ -34,8 +34,8 @@ export class SftpTreeItem extends vscode.TreeItem {
         
         this.tooltip = remotePath || label;
         
-        // Single click is handled by onDidChangeSelection in extension.ts
-        // Command is set for files and disconnected servers only
+        // Double-click opens files (command property)
+        // Single-click for servers is handled by onDidChangeSelection in extension.ts
         if (itemType === 'remoteFile' && remotePath) {
             this.command = {
                 command: 'ctlimSftp.openRemoteFile',
