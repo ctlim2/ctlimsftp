@@ -2,7 +2,7 @@
   "name": "ctlim-sftp",
   "displayName": "ctlim SFTP",
   "description": "Simple SFTP sync extension with upload on save and conflict detection",
-  "version": "0.2.9",
+  "version": "0.4.0",
   "publisher": "ctlim",
   "icon": "resources/icon.png",
   "engines": {
@@ -64,6 +64,10 @@
         "title": "ctlim SFTP: Disconnect Server"
       },
       {
+        "command": "ctlimSftp.switchServer",
+        "title": "ctlim SFTP: Switch Server"
+      },
+      {
         "command": "ctlimSftp.upload",
         "title": "ctlim SFTP: Upload File"
       },
@@ -72,8 +76,16 @@
         "title": "ctlim SFTP: Download File"
       },
       {
-        "command": "ctlimSftp.sync",
+        "command": "ctlimSftp.syncUpload",
         "title": "ctlim SFTP: Sync Local -> Remote"
+      },
+      {
+        "command": "ctlimSftp.syncDownload",
+        "title": "ctlim SFTP: Sync Remote -> Local"
+      },
+      {
+        "command": "ctlimSftp.syncBoth",
+        "title": "ctlim SFTP: Sync Both Ways"
       },
       {
         "command": "ctlimSftp.config",
@@ -91,6 +103,14 @@
       {
         "command": "ctlimSftp.deleteRemoteFile",
         "title": "ctlim SFTP: Delete Remote File"
+      },
+      {
+        "command": "ctlimSftp.newFile",
+        "title": "ctlim SFTP: New File"
+      },
+      {
+        "command": "ctlimSftp.newFolder",
+        "title": "ctlim SFTP: New Folder"
       },
       {
         "command": "ctlimSftp.saveAs",
@@ -112,6 +132,31 @@
           "group": "server@1"
         },
         {
+          "command": "ctlimSftp.newFile",
+          "when": "view == ctlimSftpView && viewItem == server",
+          "group": "new@1"
+        },
+        {
+          "command": "ctlimSftp.newFolder",
+          "when": "view == ctlimSftpView && viewItem == server",
+          "group": "new@2"
+        },
+        {
+          "command": "ctlimSftp.syncUpload",
+          "when": "view == ctlimSftpView && viewItem == server",
+          "group": "sync@1"
+        },
+        {
+          "command": "ctlimSftp.syncDownload",
+          "when": "view == ctlimSftpView && viewItem == server",
+          "group": "sync@2"
+        },
+        {
+          "command": "ctlimSftp.syncBoth",
+          "when": "view == ctlimSftpView && viewItem == server",
+          "group": "sync@3"
+        },
+        {
           "command": "ctlimSftp.deleteRemoteFile",
           "when": "view == ctlimSftpView && viewItem == remoteFile",
           "group": "ctlimSftp@1"
@@ -120,6 +165,31 @@
           "command": "ctlimSftp.deleteRemoteFile",
           "when": "view == ctlimSftpView && viewItem == remoteDirectory",
           "group": "ctlimSftp@2"
+        },
+        {
+          "command": "ctlimSftp.newFile",
+          "when": "view == ctlimSftpView && viewItem == remoteDirectory",
+          "group": "new@1"
+        },
+        {
+          "command": "ctlimSftp.newFolder",
+          "when": "view == ctlimSftpView && viewItem == remoteDirectory",
+          "group": "new@2"
+        },
+        {
+          "command": "ctlimSftp.syncUpload",
+          "when": "view == ctlimSftpView && viewItem == remoteDirectory",
+          "group": "sync@1"
+        },
+        {
+          "command": "ctlimSftp.syncDownload",
+          "when": "view == ctlimSftpView && viewItem == remoteDirectory",
+          "group": "sync@2"
+        },
+        {
+          "command": "ctlimSftp.syncBoth",
+          "when": "view == ctlimSftpView && viewItem == remoteDirectory",
+          "group": "sync@3"
         }
       ],
       "explorer/context": [
@@ -132,8 +202,16 @@
           "group": "ctlimSftp@2"
         },
         {
-          "command": "ctlimSftp.sync",
+          "command": "ctlimSftp.syncUpload",
           "group": "ctlimSftp@3"
+        },
+        {
+          "command": "ctlimSftp.syncDownload",
+          "group": "ctlimSftp@4"
+        },
+        {
+          "command": "ctlimSftp.syncBoth",
+          "group": "ctlimSftp@5"
         }
       ],
       "editor/context": [

@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { SftpClient } from './sftpClient';
 import { SftpConfig, FileMetadata } from './types';
-import { SftpTreeProvider } from './sftpTreeProvider';
+import { SftpTreeProvider, SftpDragAndDropController } from './sftpTreeProvider';
 
 // 개발 모드 여부 (릴리스 시 false로 변경)
 const DEBUG_MODE = true;
@@ -11,6 +11,7 @@ const DEBUG_MODE = true;
 let sftpClient: SftpClient | null = null;
 let treeProvider: SftpTreeProvider;
 let currentConfig: SftpConfig | null = null;
+let statusBarItem: vscode.StatusBarItem;
 
 // Cache document-config and client mapping for performance
 const documentConfigCache = new WeakMap<vscode.TextDocument, { config: SftpConfig; client: SftpClient; remotePath: string }>();
@@ -18,14 +19,26 @@ const documentConfigCache = new WeakMap<vscode.TextDocument, { config: SftpConfi
 export function activate(context: vscode.ExtensionContext) {
     if (DEBUG_MODE) console.log('ctlim SFTP extension is now active');
 
-    // Register Tree View Provider
+    // Register Tree View Provider (StatusBar보다 먼저 생성)
     treeProvider = new SftpTreeProvider();
+    
+    // Create Status Bar Item
+    statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    statusBarItem.command = 'ctlimSftp.switchServer';
+    updateStatusBar();
+    statusBarItem.show();
+    context.subscriptions.push(statusBarItem);
+    
+    // Create Drag and Drop Controller
+    const dragAndDropController = new SftpDragAndDropController(treeProvider);
+    
     /**
-     * Create Tree View
+     * Create Tree View with Drag and Drop support
      */
     const treeView = vscode.window.createTreeView('ctlimSftpView', {
         treeDataProvider: treeProvider,
-        showCollapseAll: true
+        showCollapseAll: true,
+        dragAndDropController: dragAndDropController
     });
     
     /**
@@ -58,6 +71,7 @@ export function activate(context: vscode.ExtensionContext) {
      */
     const connectServerCommand = vscode.commands.registerCommand('ctlimSftp.connectServer', async (serverItem) => {
         await treeProvider.connectToServer(serverItem);
+        updateStatusBar();
     });
 
     /**
@@ -66,6 +80,7 @@ export function activate(context: vscode.ExtensionContext) {
     const disconnectServerCommand = vscode.commands.registerCommand('ctlimSftp.disconnectServer', async (item) => {
         if (item && item.serverItem) {
             treeProvider.disconnectServer(item.serverItem.name);
+            updateStatusBar();
         }
     });
 
@@ -74,6 +89,108 @@ export function activate(context: vscode.ExtensionContext) {
      */
     const refreshCommand = vscode.commands.registerCommand('ctlimSftp.refresh', () => {
         treeProvider.refresh();
+        updateStatusBar();
+    });
+
+    /**
+     * Switch server command - Status Bar 클릭 시 실행
+     */
+    const switchServerCommand = vscode.commands.registerCommand('ctlimSftp.switchServer', async () => {
+        try {
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showErrorMessage('워크스페이스가 열려있지 않습니다.');
+                return;
+            }
+
+            const configPath = path.join(workspaceFolder.uri.fsPath, '.vscode', 'ctlim-sftp.json');
+            if (!fs.existsSync(configPath)) {
+                const result = await vscode.window.showErrorMessage(
+                    'SFTP 설정 파일이 없습니다. 생성하시겠습니까?',
+                    '설정'
+                );
+                if (result === '설정') {
+                    await vscode.commands.executeCommand('ctlimSftp.config');
+                }
+                return;
+            }
+
+            // Load server list
+            const configContent = fs.readFileSync(configPath, 'utf-8');
+            const configData = JSON.parse(configContent);
+            const configs: SftpConfig[] = Array.isArray(configData) ? configData : [configData];
+            
+            if (configs.length === 0) {
+                vscode.window.showErrorMessage('설정 파일에 서버 정보가 없습니다.');
+                return;
+            }
+
+            // Get connected servers
+            const connectedServers = treeProvider.getConnectedServerNames();
+
+            // Create QuickPick items
+            interface ServerQuickPickItem extends vscode.QuickPickItem {
+                config: SftpConfig;
+                isConnected: boolean;
+            }
+
+            const items: ServerQuickPickItem[] = configs.map(config => {
+                const serverName = config.name || `${config.username}@${config.host}`;
+                const isConnected = connectedServers.includes(serverName);
+                
+                return {
+                    label: isConnected ? `$(check) ${serverName}` : `$(circle-outline) ${serverName}`,
+                    description: `${config.host}:${config.port}`,
+                    detail: isConnected ? '연결됨 - 클릭하여 연결 해제' : '연결 안 됨 - 클릭하여 연결',
+                    config: config,
+                    isConnected: isConnected
+                };
+            });
+
+            // Show QuickPick
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: '서버를 선택하여 연결/해제하세요',
+                matchOnDescription: true,
+                matchOnDetail: true
+            });
+
+            if (!selected) {
+                return;
+            }
+
+            const serverName = selected.config.name || `${selected.config.username}@${selected.config.host}`;
+            
+            if (selected.isConnected) {
+                // Disconnect
+                treeProvider.disconnectServer(serverName);
+                vscode.window.showInformationMessage(`🔌 서버 연결 해제: ${serverName}`);
+            } else {
+                // Connect
+                const contextPath = selected.config.context || './';
+                const workspaceRoot = path.isAbsolute(contextPath) 
+                    ? contextPath 
+                    : path.join(workspaceFolder.uri.fsPath, contextPath);
+                selected.config.workspaceRoot = workspaceRoot;
+
+                const serverItem = {
+                    name: serverName,
+                    host: selected.config.host,
+                    port: selected.config.port || 22,
+                    username: selected.config.username,
+                    remotePath: selected.config.remotePath || '/',
+                    configPath: configPath
+                };
+
+                await treeProvider.connectToServer(serverItem);
+                vscode.window.showInformationMessage(`✅ 서버 연결 성공: ${serverName}`);
+            }
+            
+            updateStatusBar();
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`서버 전환 실패: ${error}`);
+            console.error('switchServer error:', error);
+        }
     });
 
     /**
@@ -97,7 +214,7 @@ export function activate(context: vscode.ExtensionContext) {
                 const reconnect = await vscode.window.showWarningMessage(
                     '서버에 연결되어 있지 않습니다. 다시 연결하시겠습니까?',
                     '연결',
-                    '취소'
+//                    '취소'
                 );
                 if (reconnect === '연결') {
                     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -168,7 +285,7 @@ export function activate(context: vscode.ExtensionContext) {
                 const reconnect = await vscode.window.showWarningMessage(
                     '서버 연결이 끊어졌습니다. 다시 연결하시겠습니까?',
                     '연결',
-                    '취소'
+//                    '취소'
                 );
                 if (reconnect === '연결') {
                     try {
@@ -254,7 +371,7 @@ export function activate(context: vscode.ExtensionContext) {
                 const result = await vscode.window.showErrorMessage(
                     'SFTP 설정을 찾을 수 없습니다. 설정 파일을 생성하시겠습니까?',
                     '설정',
-                    '취소'
+//                    '취소'
                 );
                 if (result === '설정') {
                     await vscode.commands.executeCommand('ctlimSftp.config');
@@ -276,7 +393,7 @@ export function activate(context: vscode.ExtensionContext) {
                 const reconnect = await vscode.window.showWarningMessage(
                     '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
                     '연결',
-                    '취소'
+//                    '취소'
                 );
                 if (reconnect !== '연결') {
                     return;
@@ -418,6 +535,483 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     /**
+     * 공통 동기화 로직
+     */
+    async function performSync(uriOrItem: vscode.Uri | any | undefined, direction: 'local-to-remote' | 'remote-to-local' | 'both', commandName: string) {
+        if (DEBUG_MODE) console.log(`> ${commandName}`);
+        
+        try {
+            let syncFolder: string;
+            let remotePath: string;
+            let config: SftpConfig | null = null;
+
+            // TreeView에서 호출된 경우 (SftpTreeItem)
+            if (uriOrItem && uriOrItem.config && (uriOrItem.itemType === 'server' || uriOrItem.itemType === 'remoteDirectory')) {
+                config = uriOrItem.config;
+                remotePath = uriOrItem.remotePath || config!.remotePath;
+                
+                // 로컬 경로는 config의 context 사용
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                if (!workspaceFolder) {
+                    vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+                    return;
+                }
+                
+//                syncFolder = config!.workspaceRoot || workspaceFolder.uri.fsPath;
+                syncFolder = path.join(uriOrItem.config.workspaceRoot,remotePath);
+
+                if (DEBUG_MODE) console.log(`TreeView 동기화: ${remotePath} <-> ${syncFolder}`);
+            }
+            // Explorer 컨텍스트 메뉴에서 호출된 경우 (Uri)
+            else if (uriOrItem && uriOrItem.fsPath) {
+                const stats = fs.statSync(uriOrItem.fsPath);
+                syncFolder = stats.isDirectory() ? uriOrItem.fsPath : path.dirname(uriOrItem.fsPath);
+                
+                // Config 찾기
+                config = await findConfigForFile(syncFolder);
+                if (!config) {
+                    config = await loadConfigWithSelection();
+                }
+                if (!config) {
+                    vscode.window.showErrorMessage('SFTP 설정을 찾을 수 없습니다.');
+                    return;
+                }
+                
+                // 원격 경로 계산
+                const workspaceRoot = config.workspaceRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                if (!workspaceRoot) {
+                    vscode.window.showErrorMessage('워크스페이스 루트를 찾을 수 없습니다.');
+                    return;
+                }
+                
+                const relativePath = path.relative(workspaceRoot, syncFolder).replace(/\\/g, '/');
+                remotePath = path.posix.join(config.remotePath, relativePath);
+            }
+            // 커맨드 팔레트에서 호출된 경우
+            else {
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                if (!workspaceFolder) {
+                    vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+                    return;
+                }
+                syncFolder = workspaceFolder.uri.fsPath;
+                
+                config = await loadConfigWithSelection();
+                if (!config) {
+                    vscode.window.showErrorMessage('SFTP 설정을 찾을 수 없습니다.');
+                    return;
+                }
+                
+                remotePath = config.remotePath;
+            }
+
+            // config가 null이 아닌지 최종 확인
+            if (!config) {
+                vscode.window.showErrorMessage('SFTP 설정을 찾을 수 없습니다.');
+                return;
+            }
+
+            // 서버 연결 확인
+            const serverName = config.name || `${config.username}@${config.host}`;
+            let connection = treeProvider.getConnectedServer(serverName);
+            
+            if (!connection || !connection.client.isConnected()) {
+                const reconnect = await vscode.window.showWarningMessage(
+                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
+                    '연결',
+//                    '취소'
+                );
+                if (reconnect !== '연결') {
+                    return;
+                }
+                
+                try {
+                    const client = new SftpClient();
+                    await client.connect(config);
+                    treeProvider.addConnectedServer(serverName, client, config);
+                    connection = treeProvider.getConnectedServer(serverName);
+                    
+                    if (!connection) {
+                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        return;
+                    }
+                } catch (connectError) {
+                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    return;
+                }
+            }
+
+            // 삭제 옵션
+            const deleteChoice = await vscode.window.showQuickPick([
+                { label: '삭제하지 않음', value: false },
+                { label: '⚠️ 삭제된 파일도 동기화', value: true }
+            ], {
+                placeHolder: '삭제된 파일 처리 방법을 선택하세요'
+            });
+
+            if (!deleteChoice) {
+                return;
+            }
+
+            // 방향에 따른 라벨
+            const directionLabel = direction === 'local-to-remote' ? '로컬 → 원격' :
+                                   direction === 'remote-to-local' ? '원격 → 로컬' :
+                                   '양방향 동기화';
+
+            // 확인 대화상자
+            const confirmMessage = `동기화 설정:\n\n` +
+                `로컬: ${syncFolder}\n` +
+                `원격: ${remotePath}\n` +
+                `방향: ${directionLabel}\n` +
+                `삭제: ${deleteChoice.value ? '예' : '아니오'}\n\n` +
+                `계속하시겠습니까?`;
+
+            const confirm = await vscode.window.showWarningMessage(
+                confirmMessage,
+                { modal: true },
+                '동기화 시작',
+//                '취소'
+            );
+
+            if (confirm !== '동기화 시작') {
+                return;
+            }
+
+            // 동기화 실행
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: '폴더 동기화 중...',
+                cancellable: false
+            }, async (progress) => {
+                progress.report({ message: '동기화 준비 중...' });
+
+                const result = await connection!.client.syncFolder(
+                    syncFolder,
+                    remotePath,
+                    config!,
+                    direction,
+                    deleteChoice.value,
+                    (current, total, fileName) => {
+                        if (total > 0) {
+                            progress.report({
+                                message: `${fileName} (${current}/${total})`,
+                                increment: (1 / total) * 100
+                            });
+                        } else {
+                            progress.report({ message: `${fileName} 처리 중...` });
+                        }
+                    }
+                );
+
+                const summary = [
+                    `✅ 동기화 완료!`,
+                    ``,
+                    `📤 업로드: ${result.uploaded}개`,
+                    `📥 다운로드: ${result.downloaded}개`,
+                    `🗑️ 삭제: ${result.deleted}개`,
+                    result.failed.length > 0 ? `❌ 실패: ${result.failed.length}개` : ''
+                ].filter(line => line).join('\n');
+
+                if (result.failed.length > 0) {
+                    const viewDetails = await vscode.window.showWarningMessage(
+                        summary,
+                        '실패 목록 보기'
+                    );
+                    
+                    if (viewDetails) {
+                        const failedList = result.failed.join('\n');
+                        vscode.window.showInformationMessage(
+                            `실패한 파일:\n\n${failedList}`,
+                            { modal: true }
+                        );
+                    }
+                } else {
+                    vscode.window.showInformationMessage(summary);
+                }
+
+                // TreeView 새로고침
+                treeProvider.refresh();
+            });
+
+        } catch (error) {
+            vscode.window.showErrorMessage(`동기화 실패: ${error}`);
+            console.error('sync error:', error);
+        }
+    }
+
+    /**
+     * 폴더 동기화 Command - 로컬 → 원격
+     */
+    const syncUploadCommand = vscode.commands.registerCommand('ctlimSftp.syncUpload', async (uri?: vscode.Uri) => {
+        await performSync(uri, 'local-to-remote', 'ctlimSftp.syncUpload');
+    });
+
+    /**
+     * 폴더 동기화 Command - 원격 → 로컬
+     */
+    const syncDownloadCommand = vscode.commands.registerCommand('ctlimSftp.syncDownload', async (uri?: vscode.Uri) => {
+        await performSync(uri, 'remote-to-local', 'ctlimSftp.syncDownload');
+    });
+
+    /**
+     * 폴더 동기화 Command - 양방향
+     */
+    const syncBothCommand = vscode.commands.registerCommand('ctlimSftp.syncBoth', async (uri?: vscode.Uri) => {
+        await performSync(uri, 'both', 'ctlimSftp.syncBoth');
+    });
+
+    /**
+     * 원격에 새 파일 생성 Command
+     */
+    const newFileCommand = vscode.commands.registerCommand('ctlimSftp.newFile', async (item?: any) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.newFile');
+        
+        try {
+            // TreeView item에서 서버 정보 가져오기
+            let remotePath: string;
+            let config: SftpConfig;
+            
+            if (item && item.config) {
+                config = item.config;
+                remotePath = item.remotePath || config.remotePath;
+            } else {
+                vscode.window.showErrorMessage('서버 정보를 찾을 수 없습니다.');
+                return;
+            }
+            
+            // 파일명 입력 받기
+            const fileName = await vscode.window.showInputBox({
+                prompt: '생성할 파일 이름을 입력하세요',
+                placeHolder: 'example.txt',
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return '파일 이름을 입력해주세요';
+                    }
+                    if (value.includes('/') || value.includes('\\')) {
+                        return '파일 이름에 경로 구분자를 포함할 수 없습니다';
+                    }
+                    return null;
+                }
+            });
+            
+            if (!fileName) {
+                return; // User cancelled
+            }
+            
+            // 서버 연결 확인
+            const serverName = config.name || `${config.username}@${config.host}`;
+            let connection = treeProvider.getConnectedServer(serverName);
+            
+            if (!connection || !connection.client.isConnected()) {
+                const reconnect = await vscode.window.showWarningMessage(
+                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
+                    '연결',
+//                    '취소'
+                );
+                if (reconnect !== '연결') {
+                    return;
+                }
+                
+                try {
+                    const client = new SftpClient();
+                    await client.connect(config);
+                    treeProvider.addConnectedServer(serverName, client, config);
+                    connection = treeProvider.getConnectedServer(serverName);
+                    
+                    if (!connection) {
+                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        return;
+                    }
+                } catch (connectError) {
+                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    return;
+                }
+            }
+            
+            // 파일 생성
+            const newFilePath = path.posix.join(remotePath, fileName);
+            await connection.client.createRemoteFile(newFilePath);
+            
+            vscode.window.showInformationMessage(`✅ 파일 생성 완료: ${fileName}`);
+            
+            // TreeView 새로고침
+            treeProvider.refresh();
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`파일 생성 실패: ${error}`);
+            console.error('newFile error:', error);
+        }
+    });
+
+    /**
+     * 원격에 새 폴더 생성 Command
+     */
+    const newFolderCommand = vscode.commands.registerCommand('ctlimSftp.newFolder', async (item?: any) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.newFolder');
+        
+        try {
+            // TreeView item에서 서버 정보 가져오기
+            let remotePath: string;
+            let config: SftpConfig;
+            
+            if (item && item.config) {
+                config = item.config;
+                remotePath = item.remotePath || config.remotePath;
+            } else {
+                vscode.window.showErrorMessage('서버 정보를 찾을 수 없습니다.');
+                return;
+            }
+            
+            // 폴더명 입력 받기
+            const folderName = await vscode.window.showInputBox({
+                prompt: '생성할 폴더 이름을 입력하세요',
+                placeHolder: 'newfolder',
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return '폴더 이름을 입력해주세요';
+                    }
+                    if (value.includes('/') || value.includes('\\')) {
+                        return '폴더 이름에 경로 구분자를 포함할 수 없습니다';
+                    }
+                    return null;
+                }
+            });
+            
+            if (!folderName) {
+                return; // User cancelled
+            }
+            
+            // 서버 연결 확인
+            const serverName = config.name || `${config.username}@${config.host}`;
+            let connection = treeProvider.getConnectedServer(serverName);
+            
+            if (!connection || !connection.client.isConnected()) {
+                const reconnect = await vscode.window.showWarningMessage(
+                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
+                    '연결',
+//                    '취소'
+                );
+                if (reconnect !== '연결') {
+                    return;
+                }
+                
+                try {
+                    const client = new SftpClient();
+                    await client.connect(config);
+                    treeProvider.addConnectedServer(serverName, client, config);
+                    connection = treeProvider.getConnectedServer(serverName);
+                    
+                    if (!connection) {
+                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        return;
+                    }
+                } catch (connectError) {
+                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    return;
+                }
+            }
+            
+            // 폴더 생성
+            const newFolderPath = path.posix.join(remotePath, folderName);
+            await connection.client.createRemoteFolder(newFolderPath);
+            
+            vscode.window.showInformationMessage(`✅ 폴더 생성 완료: ${folderName}`);
+            
+            // TreeView 새로고침
+            treeProvider.refresh();
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`폴더 생성 실패: ${error}`);
+            console.error('newFolder error:', error);
+        }
+    });
+
+    /**
+     * 원격 파일/폴더 삭제 Command
+     */
+    const deleteRemoteFileCommand = vscode.commands.registerCommand('ctlimSftp.deleteRemoteFile', async (item?: any) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.deleteRemoteFile');
+        
+        try {
+            // TreeView item에서 정보 가져오기
+            let remotePath: string;
+            let isDirectory: boolean;
+            let config: SftpConfig;
+            
+            if (item && item.config && item.remotePath) {
+                config = item.config;
+                remotePath = item.remotePath;
+                isDirectory = item.isDirectory || false;
+            } else {
+                vscode.window.showErrorMessage('파일 정보를 찾을 수 없습니다.');
+                return;
+            }
+            
+            // 삭제 확인
+            const fileName = path.basename(remotePath);
+            const confirmMessage = isDirectory 
+                ? `폴더 "${fileName}"와 모든 하위 항목을 삭제하시겠습니까?`
+                : `파일 "${fileName}"을 삭제하시겠습니까?`;
+            
+            const confirm = await vscode.window.showWarningMessage(
+                confirmMessage,
+                { modal: true },
+                '삭제',
+//                '취소'
+            );
+            
+            if (confirm !== '삭제') {
+                return;
+            }
+            
+            // 서버 연결 확인
+            const serverName = config.name || `${config.username}@${config.host}`;
+            let connection = treeProvider.getConnectedServer(serverName);
+            
+            if (!connection || !connection.client.isConnected()) {
+                const reconnect = await vscode.window.showWarningMessage(
+                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
+                    '연결',
+                    '취소'
+                );
+                if (reconnect !== '연결') {
+                    return;
+                }
+                
+                try {
+                    const client = new SftpClient();
+                    await client.connect(config);
+                    treeProvider.addConnectedServer(serverName, client, config);
+                    connection = treeProvider.getConnectedServer(serverName);
+                    
+                    if (!connection) {
+                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        return;
+                    }
+                } catch (connectError) {
+                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    return;
+                }
+            }
+            
+            // 삭제 실행
+            await connection.client.deleteRemoteFile(remotePath, isDirectory);
+            
+            const successMessage = isDirectory 
+                ? `✅ 폴더 삭제 완료: ${fileName}`
+                : `✅ 파일 삭제 완료: ${fileName}`;
+            vscode.window.showInformationMessage(successMessage);
+            
+            // TreeView 새로고침
+            treeProvider.refresh();
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`삭제 실패: ${error}`);
+            console.error('deleteRemoteFile error:', error);
+        }
+    });
+
+    /**
      * 설정 파일 열기 Command
      */
     const configCommand = vscode.commands.registerCommand('ctlimSftp.config', async () => {
@@ -446,6 +1040,10 @@ export function activate(context: vscode.ExtensionContext) {
                 uploadOnSave: true,
                 downloadOnOpen: false,
                 downloadBackup: ".vscode/.sftp-backup",
+                connectTimeout: 10000,
+                readyTimeout: 20000,
+                keepaliveInterval: 10000,
+                keepaliveCountMax: 3,
                 watcher: {
                     files: "**/*.{js,ts,css,html}",
                     autoUpload: false,
@@ -601,13 +1199,19 @@ export function activate(context: vscode.ExtensionContext) {
         disconnectServerCommand,
         configCommand,
         refreshCommand,
+        switchServerCommand,
         openRemoteFileCommand,
         saveAsCommand,
-        saveWatcher,
+        syncUploadCommand,
+        syncDownloadCommand,
+        syncBothCommand,
+        newFileCommand,
+        newFolderCommand,
+        deleteRemoteFileCommand,
+        saveWatcher
         
 //        uploadCommand,
 //        downloadCommand,
-//        syncCommand,  // 나중에 추가 할 것
 //        openWatcher   // 나중에 추가 할 것
     );
 }
@@ -633,7 +1237,7 @@ async function loadConfig(): Promise<SftpConfig | null> {
         const result = await vscode.window.showErrorMessage(
             'ctlim SFTP 설정 파일이 없습니다. 생성하시겠습니까?',
             '생성',
-            '취소'
+//            '취소'
         );
         if (result === '생성') {
             await vscode.commands.executeCommand('ctlimSftp.config');
@@ -688,7 +1292,7 @@ async function loadConfigWithSelection(): Promise<SftpConfig | null> {
         const result = await vscode.window.showErrorMessage(
             'ctlim SFTP 설정 파일이 없습니다. 생성하시겠습니까?',
             '생성',
-            '취소'
+//            '취소'
         );
         if (result === '생성') {
             await vscode.commands.executeCommand('ctlimSftp.config');
@@ -1099,7 +1703,7 @@ async function selectRemotePathFromTree(client: SftpClient, startPath: string, f
             const confirm = await vscode.window.showWarningMessage(
                 `${dir}/ 디렉토리에 ${fileName}로 저장하시겠습니까?`,
                 '저장',
-                '취소'
+//                '취소'
             );
             
             if (confirm === '저장') {
@@ -1645,6 +2249,27 @@ async function backupLocalFile(localPath: string, config: SftpConfig): Promise<v
     } catch (error) {
         console.error('백업 실패:', error);
         // Backup failure should not stop the download
+    }
+}
+
+/**
+ * StatusBar 업데이트
+ */
+function updateStatusBar(): void {
+    const connectedServers = treeProvider.getConnectedServerNames();
+    
+    if (connectedServers.length === 0) {
+        statusBarItem.text = '$(cloud-upload) SFTP: 연결 안 됨';
+        statusBarItem.tooltip = '클릭하여 서버 선택';
+        statusBarItem.backgroundColor = undefined;
+    } else if (connectedServers.length === 1) {
+        statusBarItem.text = `$(cloud) SFTP: ${connectedServers[0]}`;
+        statusBarItem.tooltip = `연결됨: ${connectedServers[0]}\n클릭하여 전환/해제`;
+        statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.prominentBackground');
+    } else {
+        statusBarItem.text = `$(cloud) SFTP: ${connectedServers.length}개 서버`;
+        statusBarItem.tooltip = `연결된 서버:\n${connectedServers.join('\n')}\n\n클릭하여 관리`;
+        statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.prominentBackground');
     }
 }
 

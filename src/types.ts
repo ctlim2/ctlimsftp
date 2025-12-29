@@ -24,6 +24,11 @@ export interface SftpConfig {
     defaultProfile?: string;
     workspaceRoot?: string;
     metadataPath?: string;
+    // 연결 타임아웃 및 Keep-Alive 설정
+    connectTimeout?: number;        // 연결 타임아웃 (밀리초, 기본 10000)
+    readyTimeout?: number;          // 준비 타임아웃 (밀리초, 기본 20000)
+    keepaliveInterval?: number;     // Keep-Alive 간격 (밀리초, 기본 10000)
+    keepaliveCountMax?: number;     // Keep-Alive 최대 재시도 (기본 3)
 }
 
 export interface ServerListItem {

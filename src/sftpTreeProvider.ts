@@ -4,6 +4,32 @@ import * as fs from 'fs';
 import { SftpClient } from './sftpClient';
 import { SftpConfig, RemoteFile, ServerListItem } from './types';
 
+// 개발 모드 여부 (릴리스 시 false로 변경)
+const DEBUG_MODE = true;
+
+/**
+ * 파일 크기를 사람이 읽기 쉬운 형식으로 변환
+ */
+function formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+}
+
+/**
+ * 날짜를 로컬 시간으로 포맷
+ */
+function formatDateTime(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
 export class SftpTreeItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
@@ -13,7 +39,9 @@ export class SftpTreeItem extends vscode.TreeItem {
         public readonly isDirectory?: boolean,
         public readonly config?: SftpConfig,
         public readonly serverItem?: ServerListItem,
-        public readonly groupName?: string
+        public readonly groupName?: string,
+        public readonly fileSize?: number,
+        public readonly modifyTime?: Date
     ) {
         super(label, collapsibleState);
         
@@ -29,15 +57,38 @@ export class SftpTreeItem extends vscode.TreeItem {
         } else if (isDirectory) {
             this.iconPath = new vscode.ThemeIcon('folder', new vscode.ThemeColor('charts.yellow'));
             this.contextValue = 'remoteDirectory';
+            // 디렉토리는 크기 정보 없음
+            if (modifyTime) {
+                this.tooltip = `${label}\n수정: ${formatDateTime(modifyTime)}`;
+            }
         } else if (itemType === 'remoteFile') {
             // Use resourceUri for Material Icon Theme support
             this.resourceUri = vscode.Uri.file(label);
             this.contextValue = 'remoteFile';
+            
+            // 파일 크기 표시
+            if (fileSize !== undefined) {
+                this.description = formatFileSize(fileSize);
+            }
+            
+            // 툴팁에 상세 정보 표시
+            if (fileSize !== undefined && modifyTime) {
+                this.tooltip = `${label}\n크기: ${formatFileSize(fileSize)}\n수정: ${formatDateTime(modifyTime)}`;
+            } else if (fileSize !== undefined) {
+                this.tooltip = `${label}\n크기: ${formatFileSize(fileSize)}`;
+            } else if (modifyTime) {
+                this.tooltip = `${label}\n수정: ${formatDateTime(modifyTime)}`;
+            } else {
+                this.tooltip = label;
+            }
         } else {
             this.contextValue = 'message';
         }
         
-        this.tooltip = remotePath || label;
+        // Default tooltip if not set
+        if (!this.tooltip) {
+            this.tooltip = remotePath || label;
+        }
         
         // Double-click opens files (command property)
         // Single-click for servers is handled by onDidChangeSelection in extension.ts
@@ -171,6 +222,14 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
 
     getConnectedServer(serverName: string): { client: SftpClient, config: SftpConfig } | undefined {
         return this.connectedServers.get(serverName);
+    }
+
+    /**
+     * 연결된 서버 이름 목록 반환
+     * @returns 연결된 서버 이름 배열
+     */
+    getConnectedServerNames(): string[] {
+        return Array.from(this.connectedServers.keys());
     }
 
     /**
@@ -331,7 +390,11 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
                     file.isDirectory ? 'remoteDirectory' : 'remoteFile',
                     file.path,
                     file.isDirectory,
-                    connection.config
+                    connection.config,
+                    undefined,
+                    undefined,
+                    file.size,
+                    file.modifyTime
                 ));
             } catch (error) {
                 return [
@@ -365,7 +428,11 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
                     file.isDirectory ? 'remoteDirectory' : 'remoteFile',
                     file.path,
                     file.isDirectory,
-                    connection.config
+                    connection.config,
+                    undefined,
+                    undefined,
+                    file.size,
+                    file.modifyTime
                 ));
             } catch (error) {
                 return [];
@@ -382,5 +449,257 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
             }
         }
         return undefined;
+    }
+}
+
+/**
+ * Drag and Drop Controller for SFTP TreeView
+ * Enables dragging files from Explorer to remote directories
+ */
+export class SftpDragAndDropController implements vscode.TreeDragAndDropController<SftpTreeItem> {
+    dropMimeTypes = ['text/uri-list'];
+    dragMimeTypes = ['application/vnd.code.tree.ctlimSftpView'];
+
+    constructor(
+        private treeProvider: SftpTreeProvider,
+        private outputChannel?: vscode.OutputChannel
+    ) {}
+
+    private log(message: string): void {
+        if (this.outputChannel) {
+            this.outputChannel.appendLine(message);
+        }
+        if (DEBUG_MODE) console.log(`[DragDrop] ${message}`);
+    }
+
+    async handleDrop(
+        target: SftpTreeItem | undefined,
+        sources: vscode.DataTransfer,
+        token: vscode.CancellationToken
+    ): Promise<void> {
+        this.log('handleDrop called');
+        
+        // Target must be a server or directory
+        if (!target || (target.itemType !== 'server' && target.itemType !== 'remoteDirectory')) {
+            vscode.window.showWarningMessage('파일은 서버 또는 폴더로만 드래그할 수 있습니다.');
+            return;
+        }
+
+        // Get target remote path
+        const targetRemotePath = target.remotePath || target.config?.remotePath;
+        if (!targetRemotePath || !target.config) {
+            vscode.window.showErrorMessage('대상 경로를 찾을 수 없습니다.');
+            return;
+        }
+
+        // Get dropped files
+        const uriListData = sources.get('text/uri-list');
+        if (!uriListData) {
+            this.log('No uri-list data found');
+            return;
+        }
+
+        const uriListText = uriListData.value;
+        const uris = uriListText
+            .split('\n')
+            .map((line: string) => line.trim())
+            .filter((line: string) => line.length > 0)
+            .map((line: string) => vscode.Uri.parse(line));
+
+        if (uris.length === 0) {
+            return;
+        }
+
+        this.log(`Dropping ${uris.length} item(s) to ${targetRemotePath}`);
+
+        // Get server connection
+        const serverName = target.config.name || `${target.config.username}@${target.config.host}`;
+        const connection = this.treeProvider.getConnectedServer(serverName);
+
+        if (!connection || !connection.client.isConnected()) {
+            vscode.window.showErrorMessage('서버에 연결되어 있지 않습니다.');
+            return;
+        }
+
+        // Process each dropped file/folder
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: '파일 업로드 중...',
+            cancellable: false
+        }, async (progress) => {
+            let completed = 0;
+            const total = uris.length;
+
+            for (const uri of uris) {
+                if (token.isCancellationRequested) {
+                    break;
+                }
+
+                const localPath = uri.fsPath;
+                const fileName = path.basename(localPath);
+                
+                progress.report({
+                    message: `${fileName} (${completed + 1}/${total})`,
+                    increment: (1 / total) * 100
+                });
+
+                try {
+                    const stats = fs.statSync(localPath);
+                    
+                    if (stats.isDirectory()) {
+                        // Upload folder
+                        this.log(`Uploading folder: ${localPath}`);
+                        const remoteFolderPath = path.posix.join(targetRemotePath, fileName);
+                        
+                        await connection.client.syncFolder(
+                            localPath,
+                            remoteFolderPath,
+                            target.config!,
+                            'local-to-remote',
+                            false
+                        );
+                    } else {
+                        // Upload file
+                        this.log(`Uploading file: ${localPath}`);
+                        const remoteFilePath = path.posix.join(targetRemotePath, fileName);
+                        
+                        await connection.client.uploadFile(
+                            localPath,
+                            remoteFilePath,
+                            target.config!
+                        );
+                    }
+                    
+                    completed++;
+                } catch (error) {
+                    this.log(`Upload failed: ${localPath} - ${error}`);
+                    vscode.window.showErrorMessage(`업로드 실패: ${fileName} - ${error}`);
+                }
+            }
+
+            if (completed > 0) {
+                vscode.window.showInformationMessage(`✅ ${completed}개 항목 업로드 완료`);
+                this.treeProvider.refresh();
+            }
+        });
+    }
+
+    async handleDrag(
+        source: readonly SftpTreeItem[],
+        dataTransfer: vscode.DataTransfer,
+        token: vscode.CancellationToken
+    ): Promise<void> {
+        this.log(`handleDrag called with ${source.length} item(s)`);
+        
+        // Filter only files and directories (not servers or messages)
+        const validItems = source.filter(item => 
+            (item.itemType === 'remoteFile' || item.itemType === 'remoteDirectory') && 
+            item.remotePath && 
+            item.config
+        );
+
+        if (validItems.length === 0) {
+            this.log('No valid items to drag');
+            return;
+        }
+
+        // Get server connection
+        const firstItem = validItems[0];
+        const serverName = firstItem.config!.name || `${firstItem.config!.username}@${firstItem.config!.host}`;
+        const connection = this.treeProvider.getConnectedServer(serverName);
+
+        if (!connection || !connection.client.isConnected()) {
+            vscode.window.showWarningMessage('서버에 연결되어 있지 않습니다.');
+            return;
+        }
+
+        // Get workspace folder
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            vscode.window.showWarningMessage('워크스페이스를 찾을 수 없습니다.');
+            return;
+        }
+
+        const uris: vscode.Uri[] = [];
+
+        try {
+            for (const item of validItems) {
+                if (token.isCancellationRequested) {
+                    break;
+                }
+
+                try {
+                    if (item.isDirectory) {
+                        // For directories, prepare folder structure
+                        this.log(`Preparing directory drag: ${item.remotePath}`);
+                        const localPath = SftpClient.getDownloadFolder(
+                            item.remotePath!,
+                            workspaceFolder.uri.fsPath,
+                            item.config!,
+                            true,
+                            true
+                        );
+                        if (localPath) {
+                            uris.push(vscode.Uri.file(localPath));
+                        }
+                    } else {
+                        // Download file with metadata (same as openRemoteFile)
+                        this.log(`Downloading for drag: ${item.remotePath}`);
+                        
+                        // Calculate proper local path based on config.context
+                        const localPath = SftpClient.getDownloadFolder(
+                            item.remotePath!,
+                            workspaceFolder.uri.fsPath,
+                            item.config!,
+                            true,
+                            false
+                        );
+                        
+                        if (!localPath) {
+                            this.log(`Failed to calculate local path for ${item.remotePath}`);
+                            continue;
+                        }
+
+                        // Ensure directory exists
+                        const localDir = path.dirname(localPath);
+                        if (!fs.existsSync(localDir)) {
+                            fs.mkdirSync(localDir, { recursive: true });
+                        }
+
+                        // Download file
+                        if (connection.client.client) {
+                            await connection.client.client.get(item.remotePath!, localPath);
+                            
+                            // Save metadata (same as openRemoteFile)
+                            await connection.client.saveRemoteFileMetadata(
+                                item.remotePath!,
+                                localPath,
+                                item.config!,
+                                item.config!.workspaceRoot
+                            );
+                            
+                            // Backup existing file if downloadBackup is enabled
+                            if (item.config!.downloadBackup && fs.existsSync(localPath)) {
+                                await connection.client.backupLocalFile(localPath, item.config!);
+                            }
+
+                            uris.push(vscode.Uri.file(localPath));
+                            this.log(`Downloaded and saved metadata: ${localPath}`);
+                        }
+                    }
+                } catch (error) {
+                    this.log(`Failed to prepare drag for ${item.remotePath}: ${error}`);
+                }
+            }
+
+            if (uris.length > 0) {
+                // Set URIs in DataTransfer
+                const uriList = uris.map(uri => uri.toString()).join('\n');
+                dataTransfer.set('text/uri-list', new vscode.DataTransferItem(uriList));
+                this.log(`Drag prepared with ${uris.length} file(s)`);
+            }
+        } catch (error) {
+            this.log(`Drag preparation error: ${error}`);
+        }
     }
 }

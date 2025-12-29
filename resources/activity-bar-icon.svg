@@ -1,15 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <!-- Folder icon -->
-  <path d="M 3 4 L 10 4 L 12 6 L 21 6 L 21 20 L 3 20 Z" 
+  <!-- Upload arrow -->
+  <path d="M 12 3 L 8 7 L 10.5 7 L 10.5 12 L 13.5 12 L 13.5 7 L 16 7 Z" 
+        fill="currentColor"/>
+  
+  <!-- Server/Lock -->
+  <rect x="15" y="8" width="5" height="4" rx="0.5"
         fill="none"
         stroke="currentColor"
-        stroke-width="1.5"/>
+        stroke-width="1"/>
+  <circle cx="17.5" cy="10" r="0.8" fill="currentColor"/>
   
-  <!-- FTP text -->
-  <text x="12" y="15" 
+  <!-- Shield with $ -->
+  <path d="M 5 8 L 8 6 L 11 8 L 11 12 C 11 13.5 9.5 14.5 8 15 C 6.5 14.5 5 13.5 5 12 Z" 
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1"/>
+  <text x="8" y="12.5" 
         font-family="Arial, sans-serif" 
-        font-size="7" 
+        font-size="4" 
         font-weight="bold" 
         text-anchor="middle" 
-        fill="currentColor">FTP</text>
+        fill="currentColor">$</text>
+  
+  <!-- Download arrow -->
+  <path d="M 12 21 L 8 17 L 10.5 17 L 10.5 13 L 13.5 13 L 13.5 17 L 16 17 Z" 
+        fill="currentColor"/>
+  
+  <!-- SFTP text -->
+  <text x="12" y="22.5" 
+        font-family="Arial, sans-serif" 
+        font-size="3" 
+        font-weight="bold" 
+        text-anchor="middle" 
+        fill="currentColor">SFTP</text>
 </svg>

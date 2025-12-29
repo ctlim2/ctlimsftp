@@ -184,6 +184,10 @@ code --install-extension ctlim.ctlim-sftp
 | `uploadOnSave` | boolean | `false` | ❌ | 저장 시 자동 업로드 활성화 |
 | `downloadBackup` | string | - | ❌ | 다운로드 시 백업 경로 (상대/절대 경로) |
 | `ignore` | string[] | `[]` | ❌ | 업로드 제외 패턴 (glob 지원) |
+| `connectTimeout` | number | `10000` | ❌ | 연결 타임아웃 (밀리초) |
+| `readyTimeout` | number | `20000` | ❌ | 준비 타임아웃 (밀리초) |
+| `keepaliveInterval` | number | `10000` | ❌ | Keep-Alive 간격 (밀리초) |
+| `keepaliveCountMax` | number | `3` | ❌ | Keep-Alive 최대 재시도 횟수 |
 
 ### 🔒 인증 방법 선택
 
@@ -272,7 +276,37 @@ sequenceDiagram
 
 ---
 
-## 💡 사용 시나리오
+## � 자동 재연결 시스템
+
+ctlim SFTP는 안정적인 연결 유지를 위해 자동 재연결 기능을 제공합니다.
+
+### Keep-Alive 메커니즘
+
+1. **주기적 연결 확인**: 설정된 간격(기본 10초)마다 서버 연결 상태 체크
+2. **자동 재연결**: 연결 끊김 감지 시 자동으로 재연결 시도
+3. **사용자 알림**: 재연결 성공/실패 시 알림 메시지 표시
+
+### 연결 설정 옵션
+
+```json
+{
+  "connectTimeout": 10000,        // 연결 시도 타임아웃 (10초)
+  "readyTimeout": 20000,          // 연결 준비 타임아웃 (20초)
+  "keepaliveInterval": 10000,     // Keep-Alive 체크 간격 (10초)
+  "keepaliveCountMax": 3          // 최대 재시도 횟수
+}
+```
+
+### 재연결 동작
+
+- **연결 끊김 감지**: Keep-Alive 체크 실패 시
+- **자동 재연결 시도**: 백그라운드에서 즉시 시도
+- **성공 시**: "🔄 SFTP 재연결 성공" 알림
+- **실패 시**: "⚠️ SFTP 재연결 실패" 경고 + 수동 재연결 안내
+
+---
+
+## �💡 사용 시나리오
 
 ### 시나리오 1: 개발 서버 실시간 테스트
 
