@@ -287,7 +287,7 @@ export class SftpClient {
                 `🔄 SFTP 재연결 성공: ${this.lastConfig.name || this.lastConfig.host}`
             );
         } catch (error) {
-            this.log(`❌❌❌❌❌❌❌❌ 자동 재연결 실패: ${error}`);
+            this.log(`❌ 자동 재연결 실패 (attemptReconnect): ${error}`);
             this.connected = false;
             this.client = null;
             

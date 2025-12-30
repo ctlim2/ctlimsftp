@@ -41,16 +41,24 @@ export class SftpTreeItem extends vscode.TreeItem {
         public readonly serverItem?: ServerListItem,
         public readonly groupName?: string,
         public readonly fileSize?: number,
-        public readonly modifyTime?: Date
+        public readonly modifyTime?: Date,
+        public readonly connectionStatus?: 'connected' | 'disconnected' | 'error'
     ) {
         super(label, collapsibleState);
         
         if (itemType === 'group') {
-            this.iconPath = new vscode.ThemeIcon('folder', new vscode.ThemeColor('charts.green'));
+            this.iconPath = new vscode.ThemeIcon('folder');
             this.contextValue = 'group';
             this.tooltip = `그룹: ${label}`;
         } else if (itemType === 'server') {
-            this.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('charts.blue'));
+            // 연결 상태별 아이콘 색상
+            if (connectionStatus === 'connected') {
+                this.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('testing.iconPassed'));
+            } else if (connectionStatus === 'error') {
+                this.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('testing.iconFailed'));
+            } else {
+                this.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('descriptionForeground'));
+            }
             this.contextValue = 'server';
             this.tooltip = `${serverItem?.host}:${serverItem?.port}`;
             this.description = `${serverItem?.username}@${serverItem?.host}`;
@@ -300,6 +308,8 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
                     ? vscode.TreeItemCollapsibleState.Collapsed 
                     : vscode.TreeItemCollapsibleState.None;
                 
+                const connectionStatus = isConnected ? 'connected' : 'disconnected';
+                
                 const item = new SftpTreeItem(
                     server.name,
                     collapsibleState,
@@ -307,15 +317,12 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
                     undefined,
                     undefined,
                     undefined,
-                    server
+                    server,
+                    undefined,
+                    undefined,
+                    undefined,
+                    connectionStatus as 'connected' | 'disconnected'
                 );
-                
-                // Change icon color based on connection status
-                if (isConnected) {
-                    item.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('charts.blue'));
-                } else {
-                    item.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('foreground'));
-                }
                 
                 // Only add command if not connected (to avoid double execution)
                 if (!isConnected) {
@@ -340,6 +347,8 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
                     ? vscode.TreeItemCollapsibleState.Collapsed 
                     : vscode.TreeItemCollapsibleState.None;
                 
+                const connectionStatus = isConnected ? 'connected' : 'disconnected';
+                
                 const item = new SftpTreeItem(
                     server.name,
                     collapsibleState,
@@ -347,15 +356,12 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
                     undefined,
                     undefined,
                     undefined,
-                    server
+                    server,
+                    undefined,
+                    undefined,
+                    undefined,
+                    connectionStatus as 'connected' | 'disconnected'
                 );
-                
-                // Change icon color based on connection status
-                if (isConnected) {
-                    item.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('charts.blue'));
-                } else {
-                    item.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('foreground'));
-                }
                 
                 // Only add command if not connected (to avoid double execution)
                 if (!isConnected) {

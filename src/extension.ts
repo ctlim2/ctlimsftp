@@ -2,8 +2,9 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { SftpClient } from './sftpClient';
-import { SftpConfig, FileMetadata, RemoteFile } from './types';
+import { SftpConfig, FileMetadata, RemoteFile, TransferHistory } from './types';
 import { SftpTreeProvider, SftpDragAndDropController } from './sftpTreeProvider';
+import { TransferHistoryManager, createTransferHistory } from './transferHistory';
 
 // 개발 모드 여부 (릴리스 시 false로 변경)
 const DEBUG_MODE = true;
@@ -12,6 +13,7 @@ let sftpClient: SftpClient | null = null;
 let treeProvider: SftpTreeProvider;
 let currentConfig: SftpConfig | null = null;
 let statusBarItem: vscode.StatusBarItem;
+let transferHistoryManager: TransferHistoryManager | null = null;
 
 // Cache document-config and client mapping for performance
 const documentConfigCache = new WeakMap<vscode.TextDocument, { config: SftpConfig; client: SftpClient; remotePath: string }>();
@@ -21,6 +23,12 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register Tree View Provider (StatusBar보다 먼저 생성)
     treeProvider = new SftpTreeProvider();
+    
+    // Initialize Transfer History Manager
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (workspaceFolder) {
+        transferHistoryManager = new TransferHistoryManager(workspaceFolder.uri.fsPath);
+    }
     
     // Create Status Bar Item
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
@@ -293,7 +301,7 @@ export function activate(context: vscode.ExtensionContext) {
                         await connection.client.connect(config);
                         vscode.window.showInformationMessage('서버에 다시 연결되었습니다.');
                     } catch (error) {
-                        vscode.window.showErrorMessage(`재연결 실패: ${error}`);
+                        vscode.window.showErrorMessage(`재연결 실패(ctlimSftp.openRemoteFile): ${error}`);
                         return;
                     }
                 } else {
@@ -1789,6 +1797,254 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     /**
+     * 전송 히스토리 보기 Command
+     */
+    const viewTransferHistoryCommand = vscode.commands.registerCommand('ctlimSftp.viewTransferHistory', async () => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.viewTransferHistory');
+        
+        if (!transferHistoryManager) {
+            vscode.window.showErrorMessage('전송 히스토리를 사용할 수 없습니다.');
+            return;
+        }
+        
+        try {
+            const histories = transferHistoryManager.loadHistories();
+            
+            if (histories.length === 0) {
+                vscode.window.showInformationMessage('📋 전송 기록이 없습니다.');
+                return;
+            }
+            
+            // QuickPick 아이템 생성
+            interface HistoryQuickPickItem extends vscode.QuickPickItem {
+                history: typeof histories[0];
+            }
+            
+            const items: HistoryQuickPickItem[] = histories.map(h => {
+                const date = new Date(h.timestamp);
+                const timeStr = date.toLocaleString('ko-KR');
+                const fileName = path.basename(h.localPath);
+                const sizeStr = formatFileSize(h.fileSize);
+                const speedStr = h.transferSpeed ? `${formatFileSize(h.transferSpeed)}/s` : 'N/A';
+                
+                let icon = '$(check)';
+                let statusText = '성공';
+                if (h.status === 'failed') {
+                    icon = '$(error)';
+                    statusText = '실패';
+                } else if (h.status === 'cancelled') {
+                    icon = '$(circle-slash)';
+                    statusText = '취소';
+                }
+                
+                const typeIcon = h.type === 'upload' ? '$(cloud-upload)' : '$(cloud-download)';
+                
+                return {
+                    label: `${icon} ${typeIcon} ${fileName}`,
+                    description: `${h.serverName} | ${sizeStr} | ${speedStr}`,
+                    detail: `${statusText} | ${timeStr}${h.errorMessage ? ` | ❌ ${h.errorMessage}` : ''}`,
+                    history: h
+                };
+            });
+            
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: `전송 기록 (${histories.length}개) - 선택하여 재시도하거나 통계 확인`,
+                matchOnDescription: true,
+                matchOnDetail: true
+            });
+            
+            if (selected && selected.history.status === 'failed') {
+                // 실패한 전송 재시도 옵션
+                const action = await vscode.window.showWarningMessage(
+                    `실패한 전송을 재시도하시겠습니까?\n\n파일: ${path.basename(selected.history.localPath)}\n에러: ${selected.history.errorMessage || '알 수 없음'}`,
+                    { modal: true },
+                    '재시도',
+                    '취소'
+                );
+                
+                if (action === '재시도') {
+                    await retryFailedTransfer(selected.history);
+                }
+            }
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`히스토리 조회 실패: ${error}`);
+            console.error('viewTransferHistory error:', error);
+        }
+    });
+
+    /**
+     * 전송 통계 보기 Command
+     */
+    const viewTransferStatisticsCommand = vscode.commands.registerCommand('ctlimSftp.viewTransferStatistics', async () => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.viewTransferStatistics');
+        
+        if (!transferHistoryManager) {
+            vscode.window.showErrorMessage('전송 통계를 사용할 수 없습니다.');
+            return;
+        }
+        
+        try {
+            // 서버 선택
+            const connectedServers = treeProvider.getConnectedServerNames();
+            const allOption = '전체 서버';
+            const serverOptions = [allOption, ...connectedServers];
+            
+            const selectedServer = await vscode.window.showQuickPick(serverOptions, {
+                placeHolder: '통계를 볼 서버를 선택하세요'
+            });
+            
+            if (!selectedServer) {
+                return;
+            }
+            
+            const stats = selectedServer === allOption 
+                ? transferHistoryManager.getStatistics()
+                : transferHistoryManager.getStatistics(selectedServer);
+            
+            const totalTransfers = stats.totalUploads + stats.totalDownloads;
+            const successRate = totalTransfers > 0 
+                ? ((stats.successCount / totalTransfers) * 100).toFixed(1)
+                : '0';
+            
+            const message = [
+                `📊 전송 통계 ${selectedServer !== allOption ? `(${selectedServer})` : ''}`,
+                ``,
+                `📤 업로드: ${stats.totalUploads}개`,
+                `📥 다운로드: ${stats.totalDownloads}개`,
+                `✅ 성공: ${stats.successCount}개`,
+                `❌ 실패: ${stats.failedCount}개`,
+                `📈 성공률: ${successRate}%`,
+                `💾 총 전송량: ${formatFileSize(stats.totalBytes)}`,
+                `⚡ 평균 속도: ${stats.averageSpeed > 0 ? formatFileSize(stats.averageSpeed) + '/s' : 'N/A'}`
+            ].join('\n');
+            
+            vscode.window.showInformationMessage(message, { modal: true });
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`통계 조회 실패: ${error}`);
+            console.error('viewTransferStatistics error:', error);
+        }
+    });
+
+    /**
+     * 전송 히스토리 삭제 Command
+     */
+    const clearTransferHistoryCommand = vscode.commands.registerCommand('ctlimSftp.clearTransferHistory', async () => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.clearTransferHistory');
+        
+        if (!transferHistoryManager) {
+            vscode.window.showErrorMessage('전송 히스토리를 사용할 수 없습니다.');
+            return;
+        }
+        
+        try {
+            const confirm = await vscode.window.showWarningMessage(
+                '모든 전송 히스토리를 삭제하시겠습니까?',
+                { modal: true },
+                '삭제',
+                '취소'
+            );
+            
+            if (confirm === '삭제') {
+                transferHistoryManager.clearHistory();
+                vscode.window.showInformationMessage('✅ 전송 히스토리가 삭제되었습니다.');
+            }
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`히스토리 삭제 실패: ${error}`);
+            console.error('clearTransferHistory error:', error);
+        }
+    });
+
+    /**
+     * 원격 경로 복사 Command
+     */
+    const copyRemotePathCommand = vscode.commands.registerCommand('ctlimSftp.copyRemotePath', async (item?: any) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.copyRemotePath');
+        
+        try {
+            if (!item || !item.remotePath) {
+                vscode.window.showErrorMessage('원격 경로를 찾을 수 없습니다.');
+                return;
+            }
+            
+            // 클립보드에 복사
+            await vscode.env.clipboard.writeText(item.remotePath);
+            vscode.window.showInformationMessage(`📋 경로 복사됨: ${item.remotePath}`);
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`경로 복사 실패: ${error}`);
+            console.error('copyRemotePath error:', error);
+        }
+    });
+
+    /**
+     * 브라우저에서 열기 Command
+     */
+    const openInBrowserCommand = vscode.commands.registerCommand('ctlimSftp.openInBrowser', async (item?: any) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.openInBrowser');
+        
+        try {
+            if (!item || !item.remotePath || !item.config) {
+                vscode.window.showErrorMessage('파일 정보를 찾을 수 없습니다.');
+                return;
+            }
+            
+            // 설정에서 웹 URL 확인
+            let webUrl = item.config.webUrl;
+            
+            if (!webUrl) {
+                // 웹 URL이 없으면 입력 요청
+                webUrl = await vscode.window.showInputBox({
+                    prompt: '웹 서버 기본 URL을 입력하세요 (예: http://example.com)',
+                    placeHolder: 'http://example.com',
+                    validateInput: (value) => {
+                        if (!value || value.trim() === '') {
+                            return 'URL을 입력해주세요';
+                        }
+                        if (!value.startsWith('http://') && !value.startsWith('https://')) {
+                            return 'http:// 또는 https://로 시작해야 합니다';
+                        }
+                        return null;
+                    }
+                });
+                
+                if (!webUrl) {
+                    return;
+                }
+                
+                // 설정에 저장할지 물어보기
+                const save = await vscode.window.showInformationMessage(
+                    `이 URL을 서버 설정에 저장하시겠습니까?\n${webUrl}`,
+                    '저장',
+                    '이번만 사용'
+                );
+                
+                if (save === '저장') {
+                    // TODO: 설정 파일 업데이트
+                    vscode.window.showInformationMessage('💡 다음 버전에서 자동 저장 기능이 추가됩니다.');
+                }
+            }
+            
+            // 원격 경로를 웹 URL로 변환
+            const relativePath = item.remotePath.startsWith(item.config.remotePath)
+                ? item.remotePath.substring(item.config.remotePath.length)
+                : item.remotePath;
+            
+            const fullUrl = webUrl.replace(/\/$/, '') + relativePath;
+            
+            // 브라우저에서 열기
+            await vscode.env.openExternal(vscode.Uri.parse(fullUrl));
+            vscode.window.showInformationMessage(`🌐 브라우저 열기: ${fullUrl}`);
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`브라우저 열기 실패: ${error}`);
+            console.error('openInBrowser error:', error);
+        }
+    });
+
+    /**
      * 설정 파일 열기 Command
      */
     const configCommand = vscode.commands.registerCommand('ctlimSftp.config', async () => {
@@ -1932,9 +2188,44 @@ export function activate(context: vscode.ExtensionContext) {
                 
                 if (choice === '덮어쓰기 (로컬 → 서버)') {
                     // 로컬 파일로 서버 덮어쓰기
-                    const forceResult = await sftpClient.uploadFile(document.uri.fsPath, cachedRemotePath, config);
-                    if (forceResult) {
-                        vscode.window.showInformationMessage(`✅ 서버 파일 덮어쓰기 완료: ${path.basename(document.uri.fsPath)}`);
+                    const startTime = Date.now();
+                    const fileSize = fs.statSync(document.uri.fsPath).size;
+                    
+                    try {
+                        const forceResult = await sftpClient.uploadFile(document.uri.fsPath, cachedRemotePath, config);
+                        const duration = Date.now() - startTime;
+                        
+                        if (forceResult && transferHistoryManager) {
+                            const serverName = config.name || `${config.username}@${config.host}`;
+                            const history = createTransferHistory(
+                                'upload',
+                                'success',
+                                document.uri.fsPath,
+                                cachedRemotePath,
+                                fileSize,
+                                duration,
+                                serverName
+                            );
+                            transferHistoryManager.addHistory(history);
+                            vscode.window.showInformationMessage(`✅ 서버 파일 덮어쓰기 완료: ${path.basename(document.uri.fsPath)}`);
+                        }
+                    } catch (uploadError: any) {
+                        const duration = Date.now() - startTime;
+                        if (transferHistoryManager) {
+                            const serverName = config.name || `${config.username}@${config.host}`;
+                            const history = createTransferHistory(
+                                'upload',
+                                'failed',
+                                document.uri.fsPath,
+                                cachedRemotePath,
+                                fileSize,
+                                duration,
+                                serverName,
+                                uploadError.message || String(uploadError)
+                            );
+                            transferHistoryManager.addHistory(history);
+                        }
+                        throw uploadError;
                     }
                 } 
                 else if (choice === '다운로드 (서버 → 로컬)') {
@@ -1962,7 +2253,44 @@ export function activate(context: vscode.ExtensionContext) {
             }
             // 리모트와 로칼이 같을 때
             else {
-                const forceResult = await sftpClient.uploadFile(document.uri.fsPath, cachedRemotePath, config);
+                const startTime = Date.now();
+                const fileSize = fs.statSync(document.uri.fsPath).size;
+                
+                try {
+                    const forceResult = await sftpClient.uploadFile(document.uri.fsPath, cachedRemotePath, config);
+                    const duration = Date.now() - startTime;
+                    
+                    if (forceResult && transferHistoryManager) {
+                        const serverName = config.name || `${config.username}@${config.host}`;
+                        const history = createTransferHistory(
+                            'upload',
+                            'success',
+                            document.uri.fsPath,
+                            cachedRemotePath,
+                            fileSize,
+                            duration,
+                            serverName
+                        );
+                        transferHistoryManager.addHistory(history);
+                    }
+                } catch (uploadError: any) {
+                    const duration = Date.now() - startTime;
+                    if (transferHistoryManager) {
+                        const serverName = config.name || `${config.username}@${config.host}`;
+                        const history = createTransferHistory(
+                            'upload',
+                            'failed',
+                            document.uri.fsPath,
+                            cachedRemotePath,
+                            fileSize,
+                            duration,
+                            serverName,
+                            uploadError.message || String(uploadError)
+                        );
+                        transferHistoryManager.addHistory(history);
+                    }
+                    throw uploadError;
+                }
             }
         } catch (error: any) {
             // 연결이 끊어졌습니다
@@ -1973,18 +2301,60 @@ export function activate(context: vscode.ExtensionContext) {
                 // Reconnect
                 await ensureClient(config);
                 if (sftpClient) {
-                    // Retry upload
-                    const retryResult = await sftpClient.uploadFile(document.uri.fsPath, cachedRemotePath, config);
-                    if (retryResult) {
-                        if (DEBUG_MODE) console.log('재연결 후 업로드 성공');                        
-                        vscode.window.showInformationMessage(`✅ 재연결 후 업로드 성공: ${path.basename(document.uri.fsPath)}`);
-                        // Update cache with new client
-                        documentConfigCache.set(document, { config, client: sftpClient, remotePath: cachedRemotePath });
+                    const startTime = Date.now();
+                    const fileSize = fs.statSync(document.uri.fsPath).size;
+                    const serverName = config.name || `${config.username}@${config.host}`;
+                    
+                    try {
+                        // Retry upload
+                        const retryResult = await sftpClient.uploadFile(document.uri.fsPath, cachedRemotePath, config);
+                        const duration = Date.now() - startTime;
+                        
+                        if (retryResult) {
+                            if (DEBUG_MODE) console.log('재연결 후 업로드 성공');
+                            
+                            // 전송 히스토리 기록
+                            if (transferHistoryManager) {
+                                const history = createTransferHistory(
+                                    'upload',
+                                    'success',
+                                    document.uri.fsPath,
+                                    cachedRemotePath,
+                                    fileSize,
+                                    duration,
+                                    serverName
+                                );
+                                transferHistoryManager.addHistory(history);
+                            }
+                            
+                            vscode.window.showInformationMessage(`✅ 재연결 후 업로드 성공: ${path.basename(document.uri.fsPath)}`);
+                            // Update cache with new client
+                            documentConfigCache.set(document, { config, client: sftpClient, remotePath: cachedRemotePath });
+                        }
+                    } catch (retryError: any) {
+                        const duration = Date.now() - startTime;
+                        
+                        // 전송 히스토리 기록
+                        if (transferHistoryManager) {
+                            const history = createTransferHistory(
+                                'upload',
+                                'failed',
+                                document.uri.fsPath,
+                                cachedRemotePath,
+                                fileSize,
+                                duration,
+                                serverName,
+                                retryError.message || String(retryError)
+                            );
+                            transferHistoryManager.addHistory(history);
+                        }
+                        
+                        throw retryError;
                     }
                 }
             } 
             catch (retryError) {
-                vscode.window.showErrorMessage(`❌ 재연결 실패: ${retryError}`);
+                vscode.window.showErrorMessage(`❌ 재연결 실패(onDidSaveTextDocument : ${document.uri.fsPath}): ${retryError}`);
             }
 
         }
@@ -2011,6 +2381,11 @@ export function activate(context: vscode.ExtensionContext) {
         searchInRemoteFilesCommand,
         openSSHTerminalCommand,
         changePermissionsCommand,
+        viewTransferHistoryCommand,
+        viewTransferStatisticsCommand,
+        clearTransferHistoryCommand,
+        copyRemotePathCommand,
+        openInBrowserCommand,
         saveWatcher
         
 //        uploadCommand,
@@ -2024,6 +2399,131 @@ export function activate(context: vscode.ExtensionContext) {
 
 
 //#region functions
+/**
+ * 실패한 전송 재시도
+ * @param history 실패한 전송 기록
+ */
+async function retryFailedTransfer(history: TransferHistory): Promise<void> {
+    try {
+        if (!transferHistoryManager) {
+            return;
+        }
+        
+        const config = await findConfigByName(history.serverName);
+        if (!config) {
+            vscode.window.showErrorMessage(`서버 설정을 찾을 수 없습니다: ${history.serverName}`);
+            return;
+        }
+        
+        // 서버 연결 확인
+        let connection = treeProvider.getConnectedServer(history.serverName);
+        if (!connection || !connection.client.isConnected()) {
+            const reconnect = await vscode.window.showWarningMessage(
+                '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
+                '연결'
+            );
+            if (reconnect !== '연결') {
+                return;
+            }
+            
+            try {
+                const client = new SftpClient();
+                await client.connect(config);
+                treeProvider.addConnectedServer(history.serverName, client, config);
+                connection = treeProvider.getConnectedServer(history.serverName);
+                
+                if (!connection) {
+                    vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                    return;
+                }
+            } catch (connectError) {
+                vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                return;
+            }
+        }
+        
+        const startTime = Date.now();
+        
+        try {
+            if (history.type === 'upload') {
+                // 재업로드
+                if (!fs.existsSync(history.localPath)) {
+                    vscode.window.showErrorMessage(`로컬 파일을 찾을 수 없습니다: ${history.localPath}`);
+                    return;
+                }
+                
+                const fileSize = fs.statSync(history.localPath).size;
+                const success = await connection.client.uploadFile(history.localPath, history.remotePath, config);
+                const duration = Date.now() - startTime;
+                
+                if (success) {
+                    const newHistory = createTransferHistory(
+                        'upload',
+                        'success',
+                        history.localPath,
+                        history.remotePath,
+                        fileSize,
+                        duration,
+                        history.serverName
+                    );
+                    transferHistoryManager.addHistory(newHistory);
+                    vscode.window.showInformationMessage(`✅ 재업로드 성공: ${path.basename(history.localPath)}`);
+                }
+            } else if (history.type === 'download') {
+                // 재다운로드
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                if (!workspaceFolder) {
+                    vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+                    return;
+                }
+                
+                if (connection.client.client) {
+                    await connection.client.client.get(history.remotePath, history.localPath);
+                    await connection.client.saveRemoteFileMetadata(
+                        history.remotePath,
+                        history.localPath,
+                        config,
+                        config.workspaceRoot
+                    );
+                    
+                    const duration = Date.now() - startTime;
+                    const fileSize = fs.existsSync(history.localPath) ? fs.statSync(history.localPath).size : 0;
+                    
+                    const newHistory = createTransferHistory(
+                        'download',
+                        'success',
+                        history.localPath,
+                        history.remotePath,
+                        fileSize,
+                        duration,
+                        history.serverName
+                    );
+                    transferHistoryManager.addHistory(newHistory);
+                    vscode.window.showInformationMessage(`✅ 재다운로드 성공: ${path.basename(history.localPath)}`);
+                }
+            }
+        } catch (retryError: any) {
+            const duration = Date.now() - startTime;
+            const newHistory = createTransferHistory(
+                history.type,
+                'failed',
+                history.localPath,
+                history.remotePath,
+                history.fileSize,
+                duration,
+                history.serverName,
+                retryError.message || String(retryError)
+            );
+            transferHistoryManager.addHistory(newHistory);
+            vscode.window.showErrorMessage(`재시도 실패: ${retryError}`);
+        }
+        
+    } catch (error) {
+        console.error('retryFailedTransfer error:', error);
+        vscode.window.showErrorMessage(`재시도 실패: ${error}`);
+    }
+}
+
 /**
  * 파일 크기를 사람이 읽기 쉬운 형식으로 변환
  */
@@ -2364,7 +2864,7 @@ async function ensureConnected(client: SftpClient, config: SftpConfig, serverNam
         if (DEBUG_MODE) console.log(`재연결 성공: ${serverName}`);
         return true;
     } catch (error) {
-console.error(`재연결 실패: ${serverName}`, error);
+console.error(`재연결 실패(ensureConnected): ${serverName}`, error);
         return false;
     }
 }
@@ -2384,10 +2884,11 @@ async function downloadAndReloadFile(
     document?: vscode.TextDocument,
     preserveFocus: boolean = true
 ): Promise<boolean> {
+    const serverName = config.name || `${config.username}@${config.host}`;
+    const startTime = Date.now();
+    
     try {
-        const connection = treeProvider.getConnectedServer(
-            config.name || `${config.username}@${config.host}`
-        );
+        const connection = treeProvider.getConnectedServer(serverName);
         
         if (!connection || !connection.client.client) {
             return false;
@@ -2418,6 +2919,23 @@ async function downloadAndReloadFile(
             config.workspaceRoot
         );
 
+        // 다운로드 성공 - 전송 히스토리 기록
+        const duration = Date.now() - startTime;
+        const fileSize = fs.existsSync(localPath) ? fs.statSync(localPath).size : 0;
+        
+        if (transferHistoryManager) {
+            const history = createTransferHistory(
+                'download',
+                'success',
+                localPath,
+                remotePath,
+                fileSize,
+                duration,
+                serverName
+            );
+            transferHistoryManager.addHistory(history);
+        }
+
         // 다시 열기
         if (document) {
             const newDoc = await vscode.workspace.openTextDocument(localPath);
@@ -2428,8 +2946,25 @@ async function downloadAndReloadFile(
         }
 
         return true;
-    } catch (error) {
-console.error(`다운로드 실패: ${localPath}`, error);
+    } catch (error: any) {
+        // 다운로드 실패 - 전송 히스토리 기록
+        const duration = Date.now() - startTime;
+        
+        if (transferHistoryManager) {
+            const history = createTransferHistory(
+                'download',
+                'failed',
+                localPath,
+                remotePath,
+                0,
+                duration,
+                serverName,
+                error.message || String(error)
+            );
+            transferHistoryManager.addHistory(history);
+        }
+        
+        console.error(`다운로드 실패: ${localPath}`, error);
         return false;
     }
 }

@@ -59,3 +59,26 @@ export interface FileMetadata {
     workspaceRoot?: string;
 
 }
+
+export interface TransferHistory {
+    id: string;
+    type: 'upload' | 'download' | 'sync';
+    status: 'success' | 'failed' | 'cancelled';
+    localPath: string;
+    remotePath: string;
+    fileSize: number;
+    transferSpeed?: number;  // bytes per second
+    duration: number;  // milliseconds
+    timestamp: number;
+    errorMessage?: string;
+    serverName: string;
+}
+
+export interface TransferStatistics {
+    totalUploads: number;
+    totalDownloads: number;
+    totalBytes: number;
+    successCount: number;
+    failedCount: number;
+    averageSpeed: number;
+}

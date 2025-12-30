@@ -143,6 +143,31 @@
         "command": "ctlimSftp.changePermissions",
         "title": "ctlim SFTP: Change Permissions",
         "icon": "$(lock)"
+      },
+      {
+        "command": "ctlimSftp.viewTransferHistory",
+        "title": "ctlim SFTP: View Transfer History",
+        "icon": "$(history)"
+      },
+      {
+        "command": "ctlimSftp.viewTransferStatistics",
+        "title": "ctlim SFTP: View Transfer Statistics",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "ctlimSftp.clearTransferHistory",
+        "title": "ctlim SFTP: Clear Transfer History",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "ctlimSftp.copyRemotePath",
+        "title": "ctlim SFTP: Copy Remote Path",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "ctlimSftp.openInBrowser",
+        "title": "ctlim SFTP: Open in Browser",
+        "icon": "$(globe)"
       }
     ],
     "menus": {
@@ -154,6 +179,11 @@
         },
         {
           "command": "ctlimSftp.searchRemoteFiles",
+          "when": "view == ctlimSftpView",
+          "group": "navigation"
+        },
+        {
+          "command": "ctlimSftp.viewTransferHistory",
           "when": "view == ctlimSftpView",
           "group": "navigation"
         }
@@ -205,6 +235,16 @@
           "group": "terminal@1"
         },
         {
+          "command": "ctlimSftp.viewTransferHistory",
+          "when": "view == ctlimSftpView && viewItem == server",
+          "group": "history@1"
+        },
+        {
+          "command": "ctlimSftp.viewTransferStatistics",
+          "when": "view == ctlimSftpView && viewItem == server",
+          "group": "history@2"
+        },
+        {
           "command": "ctlimSftp.changePermissions",
           "when": "view == ctlimSftpView && viewItem == remoteFile",
           "group": "ctlimSftp@1"
@@ -223,6 +263,16 @@
           "command": "ctlimSftp.deleteMultipleFiles",
           "when": "view == ctlimSftpView && viewItem == remoteFile",
           "group": "ctlimSftp@4"
+        },
+        {
+          "command": "ctlimSftp.copyRemotePath",
+          "when": "view == ctlimSftpView && viewItem == remoteFile",
+          "group": "ctlimSftp@5"
+        },
+        {
+          "command": "ctlimSftp.openInBrowser",
+          "when": "view == ctlimSftpView && viewItem == remoteFile",
+          "group": "ctlimSftp@6"
         },
         {
           "command": "ctlimSftp.changePermissions",
@@ -268,6 +318,11 @@
           "command": "ctlimSftp.syncBoth",
           "when": "view == ctlimSftpView && viewItem == remoteDirectory",
           "group": "sync@3"
+        },
+        {
+          "command": "ctlimSftp.copyRemotePath",
+          "when": "view == ctlimSftpView && viewItem == remoteDirectory",
+          "group": "utility@1"
         }
       ],
       "explorer/context": [
