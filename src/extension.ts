@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { SftpClient } from './sftpClient';
-import { SftpConfig, FileMetadata } from './types';
+import { SftpConfig, FileMetadata, RemoteFile } from './types';
 import { SftpTreeProvider, SftpDragAndDropController } from './sftpTreeProvider';
 
 // 개발 모드 여부 (릴리스 시 false로 변경)
@@ -38,6 +38,7 @@ export function activate(context: vscode.ExtensionContext) {
     const treeView = vscode.window.createTreeView('ctlimSftpView', {
         treeDataProvider: treeProvider,
         showCollapseAll: true,
+        canSelectMany: true,
         dragAndDropController: dragAndDropController
     });
     
@@ -333,6 +334,219 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    /**
+     * 다중 선택 파일 다운로드 Command
+     */
+    const downloadMultipleFilesCommand = vscode.commands.registerCommand('ctlimSftp.downloadMultipleFiles', async (item?: any, selectedItems?: any[]) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.downloadMultipleFiles');
+        
+        try {
+            // Get selected items (if called from context menu, use selectedItems array)
+            const items = selectedItems && selectedItems.length > 0 ? selectedItems : (item ? [item] : []);
+            
+            if (items.length === 0) {
+                vscode.window.showErrorMessage('다운로드할 파일을 선택하세요.');
+                return;
+            }
+            
+            // Filter only files (not directories or servers)
+            const fileItems = items.filter((i: any) => 
+                i.itemType === 'remoteFile' && i.remotePath && i.config
+            );
+            
+            if (fileItems.length === 0) {
+                vscode.window.showErrorMessage('다운로드 가능한 파일이 없습니다.');
+                return;
+            }
+            
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+                return;
+            }
+            
+            // Download files with progress
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: `${fileItems.length}개 파일 다운로드 중...`,
+                cancellable: false
+            }, async (progress) => {
+                let completed = 0;
+                let succeeded = 0;
+                let failed = 0;
+                
+                for (const fileItem of fileItems) {
+                    const fileName = path.basename(fileItem.remotePath);
+                    progress.report({
+                        message: `${fileName} (${completed + 1}/${fileItems.length})`,
+                        increment: (1 / fileItems.length) * 100
+                    });
+                    
+                    try {
+                        const serverName = fileItem.config.name || `${fileItem.config.username}@${fileItem.config.host}`;
+                        let connection = treeProvider.getConnectedServer(serverName);
+                        
+                        if (!connection || !connection.client.isConnected()) {
+                            if (DEBUG_MODE) console.log(`서버 연결 안 됨: ${serverName}`);
+                            failed++;
+                            completed++;
+                            continue;
+                        }
+                        
+                        const localPath = SftpClient.getDownloadFolder(
+                            fileItem.remotePath,
+                            workspaceFolder.uri.fsPath,
+                            fileItem.config,
+                            true,
+                            false
+                        );
+                        
+                        if (!localPath) {
+                            failed++;
+                            completed++;
+                            continue;
+                        }
+                        
+                        // Ensure directory exists
+                        const localDir = path.dirname(localPath);
+                        if (!fs.existsSync(localDir)) {
+                            fs.mkdirSync(localDir, { recursive: true });
+                        }
+                        
+                        // Backup existing file if downloadBackup is enabled
+                        if (fileItem.config.downloadBackup && fs.existsSync(localPath)) {
+                            await connection.client.backupLocalFile(localPath, fileItem.config);
+                        }
+                        
+                        // Download file
+                        if (connection.client.client) {
+                            await connection.client.client.get(fileItem.remotePath, localPath);
+                            
+                            // Save metadata
+                            await connection.client.saveRemoteFileMetadata(
+                                fileItem.remotePath,
+                                localPath,
+                                fileItem.config,
+                                fileItem.config.workspaceRoot
+                            );
+                            
+                            succeeded++;
+                        }
+                    } catch (error) {
+                        console.error(`다운로드 실패: ${fileItem.remotePath}`, error);
+                        failed++;
+                    }
+                    
+                    completed++;
+                }
+                
+                // Show summary
+                if (failed === 0) {
+                    vscode.window.showInformationMessage(`✅ ${succeeded}개 파일 다운로드 완료`);
+                } else {
+                    vscode.window.showWarningMessage(`⚠️ 다운로드 완료: 성공 ${succeeded}개, 실패 ${failed}개`);
+                }
+            });
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`다운로드 실패: ${error}`);
+            console.error('downloadMultipleFiles error:', error);
+        }
+    });
+
+    /**
+     * 다중 선택 파일 삭제 Command
+     */
+    const deleteMultipleFilesCommand = vscode.commands.registerCommand('ctlimSftp.deleteMultipleFiles', async (item?: any, selectedItems?: any[]) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.deleteMultipleFiles');
+        
+        try {
+            // Get selected items
+            const items = selectedItems && selectedItems.length > 0 ? selectedItems : (item ? [item] : []);
+            
+            if (items.length === 0) {
+                vscode.window.showErrorMessage('삭제할 파일을 선택하세요.');
+                return;
+            }
+            
+            // Filter valid items
+            const validItems = items.filter((i: any) => 
+                (i.itemType === 'remoteFile' || i.itemType === 'remoteDirectory') && i.remotePath && i.config
+            );
+            
+            if (validItems.length === 0) {
+                vscode.window.showErrorMessage('삭제 가능한 파일이 없습니다.');
+                return;
+            }
+            
+            // Confirmation
+            const confirm = await vscode.window.showWarningMessage(
+                `${validItems.length}개 항목을 삭제하시겠습니까?`,
+                { modal: true },
+                '삭제'
+            );
+            
+            if (confirm !== '삭제') {
+                return;
+            }
+            
+            // Delete files with progress
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: `${validItems.length}개 항목 삭제 중...`,
+                cancellable: false
+            }, async (progress) => {
+                let completed = 0;
+                let succeeded = 0;
+                let failed = 0;
+                
+                for (const validItem of validItems) {
+                    const fileName = path.basename(validItem.remotePath);
+                    progress.report({
+                        message: `${fileName} (${completed + 1}/${validItems.length})`,
+                        increment: (1 / validItems.length) * 100
+                    });
+                    
+                    try {
+                        const serverName = validItem.config.name || `${validItem.config.username}@${validItem.config.host}`;
+                        let connection = treeProvider.getConnectedServer(serverName);
+                        
+                        if (!connection || !connection.client.isConnected()) {
+                            failed++;
+                            completed++;
+                            continue;
+                        }
+                        
+                        await connection.client.deleteRemoteFile(
+                            validItem.remotePath,
+                            validItem.isDirectory || false
+                        );
+                        
+                        succeeded++;
+                    } catch (error) {
+                        console.error(`삭제 실패: ${validItem.remotePath}`, error);
+                        failed++;
+                    }
+                    
+                    completed++;
+                }
+                
+                // Show summary
+                if (failed === 0) {
+                    vscode.window.showInformationMessage(`✅ ${succeeded}개 항목 삭제 완료`);
+                } else {
+                    vscode.window.showWarningMessage(`⚠️ 삭제 완료: 성공 ${succeeded}개, 실패 ${failed}개`);
+                }
+                
+                // Refresh TreeView
+                treeProvider.refresh();
+            });
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`삭제 실패: ${error}`);
+            console.error('deleteMultipleFiles error:', error);
+        }
+    });
 
 
     /**
@@ -1012,6 +1226,569 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     /**
+     * 원격 파일명 검색 Command
+     */
+    const searchRemoteFilesCommand = vscode.commands.registerCommand('ctlimSftp.searchRemoteFiles', async (item?: any) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.searchRemoteFiles');
+        
+        try {
+            // TreeView item에서 서버 정보 가져오기
+            let remotePath: string;
+            let config: SftpConfig;
+            
+            if (item && item.config) {
+                config = item.config;
+                remotePath = item.remotePath || config.remotePath;
+            } else {
+                // 연결된 서버 선택
+                const connectedServers = treeProvider.getConnectedServerNames();
+                
+                if (connectedServers.length === 0) {
+                    vscode.window.showErrorMessage('연결된 서버가 없습니다.');
+                    return;
+                }
+                
+                let serverName: string;
+                if (connectedServers.length === 1) {
+                    serverName = connectedServers[0];
+                } else {
+                    const selected = await vscode.window.showQuickPick(connectedServers, {
+                        placeHolder: '검색할 서버를 선택하세요'
+                    });
+                    
+                    if (!selected) {
+                        return;
+                    }
+                    serverName = selected;
+                }
+                
+                const connection = treeProvider.getConnectedServer(serverName);
+                if (!connection) {
+                    vscode.window.showErrorMessage('서버 연결 정보를 찾을 수 없습니다.');
+                    return;
+                }
+                
+                config = connection.config;
+                remotePath = config.remotePath;
+            }
+            
+            // 검색 패턴 입력
+            const searchPattern = await vscode.window.showInputBox({
+                prompt: '검색할 파일명을 입력하세요 (정규식 지원: /pattern/)',
+                placeHolder: '예: test.php 또는 /\\.php$/',
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return '검색 패턴을 입력해주세요';
+                    }
+                    return null;
+                }
+            });
+            
+            if (!searchPattern) {
+                return;
+            }
+            
+            // 정규식 패턴 확인
+            let pattern = searchPattern;
+            let isRegex = false;
+            
+            if (searchPattern.startsWith('/') && searchPattern.lastIndexOf('/') > 0) {
+                // 정규식 형식: /pattern/
+                pattern = searchPattern.substring(1, searchPattern.lastIndexOf('/'));
+                isRegex = true;
+            }
+            
+            // 서버 연결 확인
+            const serverName = config.name || `${config.username}@${config.host}`;
+            let connection = treeProvider.getConnectedServer(serverName);
+            
+            if (!connection || !connection.client.isConnected()) {
+                vscode.window.showErrorMessage('서버에 연결되어 있지 않습니다.');
+                return;
+            }
+            
+            // 검색 실행
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: '원격 파일 검색 중...',
+                cancellable: false
+            }, async (progress) => {
+                progress.report({ message: `"${pattern}" 검색 중...` });
+                
+                const results = await connection!.client.searchRemoteFilesByName(
+                    remotePath,
+                    pattern,
+                    isRegex,
+                    100
+                );
+                
+                if (results.length === 0) {
+                    vscode.window.showInformationMessage(`검색 결과 없음: "${searchPattern}"`);
+                    return;
+                }
+                
+                // 결과를 QuickPick으로 표시
+                interface FileQuickPickItem extends vscode.QuickPickItem {
+                    file: RemoteFile;
+                }
+                
+                const items: FileQuickPickItem[] = results.map(file => ({
+                    label: `$(file) ${file.name}`,
+                    description: file.path,
+                    detail: `크기: ${formatFileSize(file.size || 0)} | 수정: ${file.modifyTime ? formatDateTime(file.modifyTime) : 'N/A'}`,
+                    file: file
+                }));
+                
+                const selected = await vscode.window.showQuickPick(items, {
+                    placeHolder: `${results.length}개 파일 발견 - 열 파일을 선택하세요`,
+                    matchOnDescription: true,
+                    matchOnDetail: true
+                });
+                
+                if (selected) {
+                    // 선택한 파일 열기
+                    await vscode.commands.executeCommand('ctlimSftp.openRemoteFile', selected.file.path, config);
+                }
+            });
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`파일 검색 실패: ${error}`);
+            console.error('searchRemoteFiles error:', error);
+        }
+    });
+
+    /**
+     * 원격 파일 내용 검색 Command
+     */
+    const searchInRemoteFilesCommand = vscode.commands.registerCommand('ctlimSftp.searchInRemoteFiles', async (item?: any) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.searchInRemoteFiles');
+        
+        try {
+            // TreeView item에서 서버 정보 가져오기
+            let remotePath: string;
+            let config: SftpConfig;
+            
+            if (item && item.config) {
+                config = item.config;
+                remotePath = item.remotePath || config.remotePath;
+            } else {
+                // 연결된 서버 선택
+                const connectedServers = treeProvider.getConnectedServerNames();
+                
+                if (connectedServers.length === 0) {
+                    vscode.window.showErrorMessage('연결된 서버가 없습니다.');
+                    return;
+                }
+                
+                let serverName: string;
+                if (connectedServers.length === 1) {
+                    serverName = connectedServers[0];
+                } else {
+                    const selected = await vscode.window.showQuickPick(connectedServers, {
+                        placeHolder: '검색할 서버를 선택하세요'
+                    });
+                    
+                    if (!selected) {
+                        return;
+                    }
+                    serverName = selected;
+                }
+                
+                const connection = treeProvider.getConnectedServer(serverName);
+                if (!connection) {
+                    vscode.window.showErrorMessage('서버 연결 정보를 찾을 수 없습니다.');
+                    return;
+                }
+                
+                config = connection.config;
+                remotePath = config.remotePath;
+            }
+            
+            // 검색 텍스트 입력
+            const searchText = await vscode.window.showInputBox({
+                prompt: '검색할 텍스트를 입력하세요 (정규식 지원: /pattern/)',
+                placeHolder: '예: function test 또는 /function\\s+\\w+/',
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return '검색 텍스트를 입력해주세요';
+                    }
+                    return null;
+                }
+            });
+            
+            if (!searchText) {
+                return;
+            }
+            
+            // 파일 패턴 입력
+            const filePattern = await vscode.window.showInputBox({
+                prompt: '검색할 파일 패턴을 입력하세요 (* = 모든 파일)',
+                value: '*',
+                placeHolder: '예: *.php, *.js, config.*'
+            });
+            
+            if (!filePattern) {
+                return;
+            }
+            
+            // 정규식 패턴 확인
+            let pattern = searchText;
+            let isRegex = false;
+            
+            if (searchText.startsWith('/') && searchText.lastIndexOf('/') > 0) {
+                // 정규식 형식: /pattern/
+                pattern = searchText.substring(1, searchText.lastIndexOf('/'));
+                isRegex = true;
+            }
+            
+            // 서버 연결 확인
+            const serverName = config.name || `${config.username}@${config.host}`;
+            let connection = treeProvider.getConnectedServer(serverName);
+            
+            if (!connection || !connection.client.isConnected()) {
+                vscode.window.showErrorMessage('서버에 연결되어 있지 않습니다.');
+                return;
+            }
+            
+            // 검색 실행
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: '파일 내용 검색 중...',
+                cancellable: false
+            }, async (progress) => {
+                progress.report({ message: `"${pattern}" 검색 중 (${filePattern})...` });
+                
+                const results = await connection!.client.searchInRemoteFiles(
+                    remotePath,
+                    pattern,
+                    isRegex,
+                    filePattern,
+                    50
+                );
+                
+                if (results.length === 0) {
+                    vscode.window.showInformationMessage(`검색 결과 없음: "${searchText}"`);
+                    return;
+                }
+                
+                // 결과를 QuickPick으로 표시
+                interface ContentQuickPickItem extends vscode.QuickPickItem {
+                    file: RemoteFile;
+                    line?: number;
+                }
+                
+                const items: ContentQuickPickItem[] = [];
+                
+                for (const result of results) {
+                    // 파일 헤더
+                    items.push({
+                        label: `$(file) ${result.file.name}`,
+                        description: result.file.path,
+                        detail: `${result.matches.length}개 일치`,
+                        file: result.file,
+                        kind: vscode.QuickPickItemKind.Separator
+                    } as any);
+                    
+                    // 각 매칭 줄
+                    for (const match of result.matches) {
+                        items.push({
+                            label: `  Line ${match.line}`,
+                            description: match.text.substring(0, 80),
+                            file: result.file,
+                            line: match.line
+                        });
+                    }
+                }
+                
+                const selected = await vscode.window.showQuickPick(items, {
+                    placeHolder: `${results.length}개 파일에서 발견 - 열 파일을 선택하세요`,
+                    matchOnDescription: true
+                });
+                
+                if (selected && selected.file) {
+                    // 선택한 파일 열기
+                    await vscode.commands.executeCommand('ctlimSftp.openRemoteFile', selected.file.path, config);
+                    
+                    // 특정 줄로 이동
+                    if (selected.line) {
+                        setTimeout(() => {
+                            const editor = vscode.window.activeTextEditor;
+                            if (editor) {
+                                const position = new vscode.Position(selected.line! - 1, 0);
+                                editor.selection = new vscode.Selection(position, position);
+                                editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+                            }
+                        }, 500);
+                    }
+                }
+            });
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`내용 검색 실패: ${error}`);
+            console.error('searchInRemoteFiles error:', error);
+        }
+    });
+
+    /**
+     * 파일 권한 변경 Command
+     */
+    const changePermissionsCommand = vscode.commands.registerCommand('ctlimSftp.changePermissions', async (item?: any) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.changePermissions');
+        
+        try {
+            // TreeView item에서 정보 가져오기
+            let remotePath: string;
+            let isDirectory: boolean;
+            let config: SftpConfig;
+            
+            if (item && item.config && item.remotePath) {
+                config = item.config;
+                remotePath = item.remotePath;
+                isDirectory = item.isDirectory || false;
+            } else {
+                vscode.window.showErrorMessage('파일 정보를 찾을 수 없습니다.');
+                return;
+            }
+            
+            // 서버 연결 확인
+            const serverName = config.name || `${config.username}@${config.host}`;
+            let connection = treeProvider.getConnectedServer(serverName);
+            
+            if (!connection || !connection.client.isConnected()) {
+                const reconnect = await vscode.window.showWarningMessage(
+                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
+                    '연결'
+                );
+                if (reconnect !== '연결') {
+                    return;
+                }
+                
+                try {
+                    const client = new SftpClient();
+                    await client.connect(config);
+                    treeProvider.addConnectedServer(serverName, client, config);
+                    connection = treeProvider.getConnectedServer(serverName);
+                    
+                    if (!connection) {
+                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        return;
+                    }
+                } catch (connectError) {
+                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    return;
+                }
+            }
+            
+            // 현재 권한 조회
+            let currentMode = '';
+            try {
+                currentMode = await connection.client.getFilePermissions(remotePath);
+                if (DEBUG_MODE) console.log(`현재 권한: ${currentMode}`);
+            } catch (error) {
+                console.error('권한 조회 실패:', error);
+            }
+            
+            // 권한 선택 QuickPick
+            interface PermissionQuickPickItem extends vscode.QuickPickItem {
+                mode: string;
+            }
+            
+            const fileName = path.basename(remotePath);
+            const items: PermissionQuickPickItem[] = [
+                {
+                    label: '$(file-code) 755',
+                    description: 'rwxr-xr-x - 실행 파일, 디렉토리 (소유자:모든권한, 그룹/기타:읽기+실행)',
+                    detail: isDirectory ? '디렉토리 권장 권한' : '실행 파일 권장 권한',
+                    mode: '755'
+                },
+                {
+                    label: '$(file) 644',
+                    description: 'rw-r--r-- - 일반 파일 (소유자:읽기+쓰기, 그룹/기타:읽기만)',
+                    detail: isDirectory ? '' : '일반 파일 권장 권한',
+                    mode: '644'
+                },
+                {
+                    label: '$(lock) 600',
+                    description: 'rw------- - 개인 파일 (소유자만 읽기+쓰기)',
+                    detail: '비밀 파일 권장 권한 (SSH key 등)',
+                    mode: '600'
+                },
+                {
+                    label: '$(warning) 777',
+                    description: 'rwxrwxrwx - 모든 권한 (보안 위험!)',
+                    detail: '⚠️ 보안상 권장하지 않음',
+                    mode: '777'
+                },
+                {
+                    label: '$(file-directory) 700',
+                    description: 'rwx------ - 개인 디렉토리 (소유자만 모든 권한)',
+                    detail: isDirectory ? '개인 디렉토리 권장 권한' : '',
+                    mode: '700'
+                },
+                {
+                    label: '$(edit) 커스텀 입력',
+                    description: '직접 권한 코드 입력 (예: 754)',
+                    mode: 'custom'
+                }
+            ];
+            
+            const placeHolder = currentMode 
+                ? `${fileName}의 권한 변경 (현재: ${currentMode})`
+                : `${fileName}의 권한 설정`;
+            
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: placeHolder,
+                matchOnDescription: true,
+                matchOnDetail: true
+            });
+            
+            if (!selected) {
+                return;
+            }
+            
+            let mode = selected.mode;
+            
+            // 커스텀 입력
+            if (mode === 'custom') {
+                const customMode = await vscode.window.showInputBox({
+                    prompt: '권한 모드를 입력하세요 (8진수 3자리)',
+                    value: currentMode || '644',
+                    placeHolder: '예: 755, 644, 600',
+                    validateInput: (value) => {
+                        if (!/^[0-7]{3}$/.test(value)) {
+                            return '올바른 권한 모드를 입력하세요 (000-777)';
+                        }
+                        return null;
+                    }
+                });
+                
+                if (!customMode) {
+                    return;
+                }
+                
+                mode = customMode;
+            }
+            
+            // 777 경고
+            if (mode === '777') {
+                const confirm = await vscode.window.showWarningMessage(
+                    `⚠️ 보안 경고\n\n777 권한은 모든 사용자에게 모든 권한을 부여합니다.\n파일: ${fileName}\n\n정말 변경하시겠습니까?`,
+                    { modal: true },
+                    '변경',
+                    '취소'
+                );
+                
+                if (confirm !== '변경') {
+                    return;
+                }
+            }
+            
+            // 권한 변경 실행
+            await connection.client.changeFilePermissions(remotePath, mode);
+            
+            vscode.window.showInformationMessage(`✅ 권한 변경 완료: ${fileName} -> ${mode}`);
+            
+            // TreeView 새로고침
+            treeProvider.refresh();
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`권한 변경 실패: ${error}`);
+            console.error('changePermissions error:', error);
+        }
+    });
+
+    /**
+     * SSH 터미널 열기 Command
+     */
+    const openSSHTerminalCommand = vscode.commands.registerCommand('ctlimSftp.openSSHTerminal', async (item?: any) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.openSSHTerminal');
+        
+        try {
+            let config: SftpConfig;
+            let serverName: string;
+            
+            // TreeView item에서 서버 정보 가져오기
+            if (item && item.serverItem) {
+                // Server item
+                const serverItem = item.serverItem;
+                serverName = serverItem.name;
+                
+                // Config 파일에서 정보 로드
+                const configContent = fs.readFileSync(serverItem.configPath, 'utf-8');
+                const configData = JSON.parse(configContent);
+                const configs: SftpConfig[] = Array.isArray(configData) ? configData : [configData];
+                
+                const foundConfig = configs.find(c => {
+                    const name = c.name || `${c.username}@${c.host}`;
+                    return name === serverName;
+                });
+                
+                if (!foundConfig) {
+                    vscode.window.showErrorMessage(`서버 설정을 찾을 수 없습니다: ${serverName}`);
+                    return;
+                }
+                
+                config = foundConfig;
+            } else {
+                // Command Palette에서 호출된 경우
+                const connectedServers = treeProvider.getConnectedServerNames();
+                
+                if (connectedServers.length === 0) {
+                    vscode.window.showErrorMessage('연결된 서버가 없습니다.');
+                    return;
+                }
+                
+                if (connectedServers.length === 1) {
+                    serverName = connectedServers[0];
+                } else {
+                    const selected = await vscode.window.showQuickPick(connectedServers, {
+                        placeHolder: 'SSH 터미널을 열 서버를 선택하세요'
+                    });
+                    
+                    if (!selected) {
+                        return;
+                    }
+                    serverName = selected;
+                }
+                
+                const connection = treeProvider.getConnectedServer(serverName);
+                if (!connection) {
+                    vscode.window.showErrorMessage('서버 연결 정보를 찾을 수 없습니다.');
+                    return;
+                }
+                
+                config = connection.config;
+            }
+            
+            // SSH 명령 생성
+            let sshCommand: string;
+            
+            if (config.privateKey) {
+                // Private key 인증
+                sshCommand = `ssh -i "${config.privateKey}" -p ${config.port || 22} ${config.username}@${config.host}`;
+            } else {
+                // Password 인증 (터미널에서 수동 입력)
+                sshCommand = `ssh -p ${config.port || 22} ${config.username}@${config.host}`;
+            }
+            
+            // 터미널 생성 및 명령 실행
+            const terminal = vscode.window.createTerminal({
+                name: `SSH: ${serverName}`,
+                iconPath: new vscode.ThemeIcon('terminal'),
+            });
+            
+            terminal.show();
+            terminal.sendText(sshCommand);
+            
+            vscode.window.showInformationMessage(`🔌 SSH 터미널 시작: ${serverName}`);
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`SSH 터미널 열기 실패: ${error}`);
+            console.error('openSSHTerminal error:', error);
+        }
+    });
+
+    /**
      * 설정 파일 열기 Command
      */
     const configCommand = vscode.commands.registerCommand('ctlimSftp.config', async () => {
@@ -1145,22 +1922,42 @@ export function activate(context: vscode.ExtensionContext) {
             // 리모트와 로칼이 다를 때
             if(!fSameMetadata){ 
                 const choice = await vscode.window.showWarningMessage(
-                    `⚠️ 충돌 감지!\n\n파일이 서버에서 수정되었습니다: ${path.basename(document.uri.fsPath)}\n\n로컬 변경사항으로 덮어쓰시겠습니까?`,
+                    `⚠️ 충돌 감지!\n\n파일이 서버에서 수정되었습니다: ${path.basename(document.uri.fsPath)}\n\n어떻게 처리하시겠습니까?`,
                     { modal: true },
-                    '덮어쓰기',
-                    '비교'
+                    '덮어쓰기 (로컬 → 서버)',
+                    '다운로드 (서버 → 로컬)',
+                    '비교 및 병합',
+                    '취소'
                 );
                 
-                if (choice === '덮어쓰기') {
+                if (choice === '덮어쓰기 (로컬 → 서버)') {
+                    // 로컬 파일로 서버 덮어쓰기
                     const forceResult = await sftpClient.uploadFile(document.uri.fsPath, cachedRemotePath, config);
+                    if (forceResult) {
+                        vscode.window.showInformationMessage(`✅ 서버 파일 덮어쓰기 완료: ${path.basename(document.uri.fsPath)}`);
+                    }
                 } 
-                else if (choice === '비교') {
-// 확인 요망
+                else if (choice === '다운로드 (서버 → 로컬)') {
+                    // 서버 파일로 로컬 덮어쓰기
+                    const confirmed = await vscode.window.showWarningMessage(
+                        `⚠️ 로컬 변경사항이 손실됩니다!\n\n서버 파일로 덮어쓰시겠습니까?`,
+                        { modal: true },
+                        '확인',
+                        '취소'
+                    );
+                    
+                    if (confirmed === '확인') {
+                        await downloadAndReloadFile(cachedRemotePath, document.uri.fsPath, config, document, false);
+                        vscode.window.showInformationMessage(`✅ 서버 파일 다운로드 완료: ${path.basename(document.uri.fsPath)}`);
+                    }
+                }
+                else if (choice === '비교 및 병합') {
+                    // Diff 뷰 열기 및 병합 옵션 제공
                     let metadataDirTemp = workspaceFolder.uri.fsPath;
                     if(config.workspaceRoot){
                         metadataDirTemp = config.workspaceRoot;
                     }
-                    await showDiff(document.uri.fsPath, cachedRemotePath, config, metadataDirTemp);
+                    await showDiffWithMergeOptions(document.uri.fsPath, cachedRemotePath, config, metadataDirTemp, document);
                 }
             }
             // 리모트와 로칼이 같을 때
@@ -1201,6 +1998,8 @@ export function activate(context: vscode.ExtensionContext) {
         refreshCommand,
         switchServerCommand,
         openRemoteFileCommand,
+        downloadMultipleFilesCommand,
+        deleteMultipleFilesCommand,
         saveAsCommand,
         syncUploadCommand,
         syncDownloadCommand,
@@ -1208,6 +2007,10 @@ export function activate(context: vscode.ExtensionContext) {
         newFileCommand,
         newFolderCommand,
         deleteRemoteFileCommand,
+        searchRemoteFilesCommand,
+        searchInRemoteFilesCommand,
+        openSSHTerminalCommand,
+        changePermissionsCommand,
         saveWatcher
         
 //        uploadCommand,
@@ -1221,6 +2024,29 @@ export function activate(context: vscode.ExtensionContext) {
 
 
 //#region functions
+/**
+ * 파일 크기를 사람이 읽기 쉬운 형식으로 변환
+ */
+function formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+}
+
+/**
+ * 날짜를 로컬 시간으로 포맷
+ */
+function formatDateTime(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
 /**
  *      
  * @returns 
@@ -1715,6 +2541,88 @@ async function selectRemotePathFromTree(client: SftpClient, startPath: string, f
             vscode.window.showErrorMessage(`원격 디렉토리 탐색 실패: ${error}`);
             return undefined;
         }
+    }
+}
+
+/**
+ * Diff 뷰와 함께 병합 옵션 제공
+ * @param localPath 로컬 파일 경로
+ * @param remotePath 원격 파일 경로
+ * @param config 서버 설정
+ * @param workspaceFolder 워크스페이스 폴더
+ * @param document 현재 문서
+ */
+async function showDiffWithMergeOptions(
+    localPath: string, 
+    remotePath: string, 
+    config: SftpConfig, 
+    workspaceFolder: string,
+    document?: vscode.TextDocument
+): Promise<void> {
+    try {
+        const connection = treeProvider.getConnectedServer(
+            config.name || `${config.username}@${config.host}`
+        );
+        
+        if (!connection || !connection.client.client) {
+            vscode.window.showErrorMessage('서버에 연결되어 있지 않습니다.');
+            return;
+        }
+
+        // Create temp directory for remote file
+        const tempDir = path.join(workspaceFolder, '.vscode', '.sftp-tmp');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        // Download remote file to temp location
+        const fileName = path.basename(remotePath);
+        const tempRemotePath = path.join(tempDir, `${fileName}.remote`);
+        
+        await connection.client.client.get(remotePath, tempRemotePath);
+
+        // Open diff view
+        const localUri = vscode.Uri.file(localPath);
+        const remoteUri = vscode.Uri.file(tempRemotePath);
+        
+        await vscode.commands.executeCommand(
+            'vscode.diff',
+            remoteUri,
+            localUri,
+            `${fileName} (서버) ↔ ${fileName} (로컬)`
+        );
+
+        // Show merge action options
+        const action = await vscode.window.showInformationMessage(
+            `📊 변경사항을 확인하세요\n\n파일: ${fileName}\n\n병합 후 어떻게 처리하시겠습니까?`,
+            { modal: false },
+            '로컬 파일 유지',
+            '서버 파일 사용',
+            '수동 병합 후 업로드',
+            '나중에'
+        );
+
+        if (action === '로컬 파일 유지') {
+            // 로컬 파일로 서버 덮어쓰기
+            if (connection.client) {
+                await connection.client.uploadFile(localPath, remotePath, config);
+                vscode.window.showInformationMessage(`✅ 로컬 변경사항 업로드 완료: ${fileName}`);
+            }
+        } else if (action === '서버 파일 사용') {
+            // 서버 파일로 로컬 덮어쓰기
+            await downloadAndReloadFile(remotePath, localPath, config, document, false);
+            vscode.window.showInformationMessage(`✅ 서버 파일 다운로드 완료: ${fileName}`);
+        } else if (action === '수동 병합 후 업로드') {
+            // 사용자에게 안내
+            vscode.window.showInformationMessage(
+                `📝 병합 안내\n\n1. Diff 뷰에서 변경사항을 확인하세요\n2. 로컬 파일을 직접 편집하여 병합하세요\n3. 저장(Ctrl+S)하면 자동 업로드됩니다`,
+                '확인'
+            );
+        }
+        
+    } catch (error) {
+        vscode.window.showErrorMessage(`Diff 표시 실패: ${error}`);
+        console.error('showDiffWithMergeOptions error:', error);
     }
 }
 

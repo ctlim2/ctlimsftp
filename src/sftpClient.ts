@@ -287,7 +287,7 @@ export class SftpClient {
                 `🔄 SFTP 재연결 성공: ${this.lastConfig.name || this.lastConfig.host}`
             );
         } catch (error) {
-            this.log(`❌ 자동 재연결 실패: ${error}`);
+            this.log(`❌❌❌❌❌❌❌❌ 자동 재연결 실패: ${error}`);
             this.connected = false;
             this.client = null;
             
@@ -579,15 +579,63 @@ export class SftpClient {
         
         return result;
     }
+    
+    /**
+     * 원격 디렉토리를 재귀적으로 생성
+     * @param remotePath 생성할 디렉토리 경로
+     */
     private async ensureRemoteDir(remotePath: string): Promise<void> {
         if (!this.client) {
             return;
         }
 
         try {
+            // 먼저 디렉토리가 존재하는지 확인
+            const exists = await this.client.exists(remotePath);
+            if (exists) {
+                if (DEBUG_MODE) console.log(`remote dir exists: ${remotePath}`);
+                return;
+            }
+
+            // 재귀적으로 디렉토리 생성
+            if (DEBUG_MODE) console.log(`creating remote dir: ${remotePath}`);
             await this.client.mkdir(remotePath, true);
-        } catch (error) {
-            // 디렉토리가 이미 존재하면 무시
+            if (DEBUG_MODE) console.log(`remote mkdir success: ${remotePath}`);
+        } catch (error: any) {
+            // "File already exists" 에러는 무시 (경쟁 조건)
+            if (error.message && error.message.includes('already exists')) {
+                if (DEBUG_MODE) console.log(`remote dir already exists: ${remotePath}`);
+                return;
+            }
+            
+            // 다른 에러는 로그 출력하고 재시도
+            this.log(`mkdir 실패 (${remotePath}): ${error.message || error}`);
+            
+            // 부모 디렉토리부터 순차적으로 생성 시도
+            try {
+                const parts = remotePath.split('/').filter(p => p);
+                let currentPath = '/';
+                
+                for (const part of parts) {
+                    currentPath = path.posix.join(currentPath, part);
+                    
+                    try {
+                        const exists = await this.client.exists(currentPath);
+                        if (!exists) {
+                            await this.client.mkdir(currentPath, false);
+                            if (DEBUG_MODE) console.log(`created: ${currentPath}`);
+                        }
+                    } catch (mkdirError: any) {
+                        // 이미 존재하면 무시
+                        if (!mkdirError.message?.includes('already exists')) {
+                            throw mkdirError;
+                        }
+                    }
+                }
+            } catch (fallbackError) {
+                this.log(`재귀적 mkdir 실패: ${fallbackError}`);
+                throw fallbackError;
+            }
         }
     }
 
@@ -657,6 +705,180 @@ export class SftpClient {
     }
 
     /**
+     * 원격 파일명 검색 (재귀적)
+     * @param remotePath 검색 시작 경로
+     * @param pattern 검색 패턴 (문자열 또는 정규식)
+     * @param isRegex 정규식 사용 여부
+     * @param maxResults 최대 결과 개수
+     * @returns 검색된 파일 목록
+     */
+    async searchRemoteFilesByName(
+        remotePath: string,
+        pattern: string,
+        isRegex: boolean = false,
+        maxResults: number = 100
+    ): Promise<RemoteFile[]> {
+        if (!this.client) {
+            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+        }
+
+        const results: RemoteFile[] = [];
+        const regex = isRegex ? new RegExp(pattern, 'i') : null;
+
+        const searchRecursive = async (currentPath: string): Promise<void> => {
+            if (results.length >= maxResults) {
+                return;
+            }
+
+            try {
+                const files = await this.client!.list(currentPath);
+
+                for (const fileInfo of files) {
+                    if (results.length >= maxResults) {
+                        break;
+                    }
+
+                    const filePath = path.posix.join(currentPath, fileInfo.name);
+                    
+                    // 검색 패턴 매칭
+                    const matches = regex 
+                        ? regex.test(fileInfo.name)
+                        : fileInfo.name.toLowerCase().includes(pattern.toLowerCase());
+
+                    if (matches && fileInfo.type !== 'd') {
+                        results.push({
+                            name: fileInfo.name,
+                            path: filePath,
+                            isDirectory: false,
+                            size: fileInfo.size,
+                            modifyTime: new Date(fileInfo.modifyTime)
+                        });
+                    }
+
+                    // 디렉토리면 재귀 탐색
+                    if (fileInfo.type === 'd' && fileInfo.name !== '.' && fileInfo.name !== '..') {
+                        await searchRecursive(filePath);
+                    }
+                }
+            } catch (error) {
+                this.log(`검색 중 오류 (${currentPath}): ${error}`);
+            }
+        };
+
+        await searchRecursive(remotePath);
+        return results;
+    }
+
+    /**
+     * 원격 파일 내용 검색 (재귀적)
+     * @param remotePath 검색 시작 경로
+     * @param searchText 검색할 텍스트
+     * @param isRegex 정규식 사용 여부
+     * @param filePattern 검색할 파일 패턴 (예: *.php, *.js)
+     * @param maxResults 최대 결과 개수
+     * @returns 검색된 파일 목록 (일치하는 줄 번호 포함)
+     */
+    async searchInRemoteFiles(
+        remotePath: string,
+        searchText: string,
+        isRegex: boolean = false,
+        filePattern: string = '*',
+        maxResults: number = 50
+    ): Promise<Array<{ file: RemoteFile; matches: Array<{ line: number; text: string }> }>> {
+        if (!this.client) {
+            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+        }
+
+        const results: Array<{ file: RemoteFile; matches: Array<{ line: number; text: string }> }> = [];
+        const regex = isRegex ? new RegExp(searchText, 'gi') : null;
+        
+        // 파일 패턴을 정규식으로 변환
+        const fileRegex = new RegExp(
+            filePattern
+                .replace(/\./g, '\\.')
+                .replace(/\*/g, '.*')
+                .replace(/\?/g, '.'),
+            'i'
+        );
+
+        const searchRecursive = async (currentPath: string): Promise<void> => {
+            if (results.length >= maxResults) {
+                return;
+            }
+
+            try {
+                const files = await this.client!.list(currentPath);
+
+                for (const fileInfo of files) {
+                    if (results.length >= maxResults) {
+                        break;
+                    }
+
+                    const filePath = path.posix.join(currentPath, fileInfo.name);
+
+                    if (fileInfo.type === 'd' && fileInfo.name !== '.' && fileInfo.name !== '..') {
+                        await searchRecursive(filePath);
+                    } else if (fileInfo.type !== 'd') {
+                        // 파일 패턴 확인
+                        if (!fileRegex.test(fileInfo.name)) {
+                            continue;
+                        }
+
+                        try {
+                            // 파일 다운로드 (메모리로)
+                            const buffer = await this.client!.get(filePath);
+                            const content = buffer.toString('utf-8');
+                            const lines = content.split('\n');
+                            const matches: Array<{ line: number; text: string }> = [];
+
+                            // 각 줄 검색
+                            for (let i = 0; i < lines.length; i++) {
+                                const lineText = lines[i];
+                                const hasMatch = regex
+                                    ? regex.test(lineText)
+                                    : lineText.toLowerCase().includes(searchText.toLowerCase());
+
+                                if (hasMatch) {
+                                    matches.push({
+                                        line: i + 1,
+                                        text: lineText.trim()
+                                    });
+
+                                    // 너무 많은 매칭은 제한
+                                    if (matches.length >= 10) {
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (matches.length > 0) {
+                                results.push({
+                                    file: {
+                                        name: fileInfo.name,
+                                        path: filePath,
+                                        isDirectory: false,
+                                        size: fileInfo.size,
+                                        modifyTime: new Date(fileInfo.modifyTime)
+                                    },
+                                    matches
+                                });
+                            }
+                        } catch (fileError) {
+                            // 바이너리 파일이나 읽기 실패 파일 무시
+                            if (DEBUG_MODE) console.log(`파일 읽기 실패: ${filePath}`);
+                        }
+                    }
+                }
+            } catch (error) {
+                this.log(`내용 검색 중 오류 (${currentPath}): ${error}`);
+            }
+        };
+
+        await searchRecursive(remotePath);
+        return results;
+    }
+
+    /**
      * 원격에 새 파일 생성
      */
     async createRemoteFile(remotePath: string, content: string = ''): Promise<void> {
@@ -679,6 +901,43 @@ export class SftpClient {
 
         await this.client.mkdir(remotePath, false);
         this.log(`폴더 생성 완료: ${remotePath}`);
+    }
+
+    /**
+     * 원격 파일/폴더 권한 변경 (chmod)
+     * @param remotePath 원격 경로
+     * @param mode 권한 모드 (8진수 문자열: '755', '644' 등)
+     */
+    async changeFilePermissions(remotePath: string, mode: string): Promise<void> {
+        if (!this.client) {
+            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+        }
+
+        // 8진수 문자열을 숫자로 변환
+        const modeNumber = parseInt(mode, 8);
+        
+        if (isNaN(modeNumber)) {
+            throw new Error(`잘못된 권한 모드: ${mode}`);
+        }
+
+        await this.client.chmod(remotePath, modeNumber);
+        this.log(`권한 변경 완료: ${remotePath} -> ${mode}`);
+    }
+
+    /**
+     * 원격 파일/폴더 권한 조회
+     * @param remotePath 원격 경로
+     * @returns 권한 모드 (8진수 문자열)
+     */
+    async getFilePermissions(remotePath: string): Promise<string> {
+        if (!this.client) {
+            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+        }
+
+        const stats = await this.client.stat(remotePath);
+        // mode를 8진수 문자열로 변환 (마지막 3자리만)
+        const mode = (stats.mode & parseInt('777', 8)).toString(8).padStart(3, '0');
+        return mode;
     }
 
 // #region metadata functions    
@@ -873,6 +1132,10 @@ export class SftpClient {
 
         // 원격 디렉토리 생성
   */  
+        // 원격 디렉토리가 존재하는지 확인하고 없으면 생성
+        const remoteDir = path.posix.dirname(remotePath);
+        await this.ensureRemoteDir(remoteDir);
+        
         this.log(`업로드 중: ${localPath} -> ${remotePath}`);
         await this.client.put(localPath, remotePath);
         this.log(`업로드 완료: '${remotePath}`);

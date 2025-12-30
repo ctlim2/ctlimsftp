@@ -101,6 +101,14 @@
         "title": "ctlim SFTP: Open Remote File"
       },
       {
+        "command": "ctlimSftp.downloadMultipleFiles",
+        "title": "ctlim SFTP: Download Multiple Files"
+      },
+      {
+        "command": "ctlimSftp.deleteMultipleFiles",
+        "title": "ctlim SFTP: Delete Multiple Files"
+      },
+      {
         "command": "ctlimSftp.deleteRemoteFile",
         "title": "ctlim SFTP: Delete Remote File"
       },
@@ -115,12 +123,37 @@
       {
         "command": "ctlimSftp.saveAs",
         "title": "ctlim SFTP: Save As Remote Path"
+      },
+      {
+        "command": "ctlimSftp.searchRemoteFiles",
+        "title": "ctlim SFTP: Search Remote Files by Name",
+        "icon": "$(search)"
+      },
+      {
+        "command": "ctlimSftp.searchInRemoteFiles",
+        "title": "ctlim SFTP: Search in Remote Files",
+        "icon": "$(search)"
+      },
+      {
+        "command": "ctlimSftp.openSSHTerminal",
+        "title": "ctlim SFTP: Open SSH Terminal",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "ctlimSftp.changePermissions",
+        "title": "ctlim SFTP: Change Permissions",
+        "icon": "$(lock)"
       }
     ],
     "menus": {
       "view/title": [
         {
           "command": "ctlimSftp.refresh",
+          "when": "view == ctlimSftpView",
+          "group": "navigation"
+        },
+        {
+          "command": "ctlimSftp.searchRemoteFiles",
           "when": "view == ctlimSftpView",
           "group": "navigation"
         }
@@ -157,14 +190,59 @@
           "group": "sync@3"
         },
         {
+          "command": "ctlimSftp.searchRemoteFiles",
+          "when": "view == ctlimSftpView && viewItem == server",
+          "group": "search@1"
+        },
+        {
+          "command": "ctlimSftp.searchInRemoteFiles",
+          "when": "view == ctlimSftpView && viewItem == server",
+          "group": "search@2"
+        },
+        {
+          "command": "ctlimSftp.openSSHTerminal",
+          "when": "view == ctlimSftpView && viewItem == server",
+          "group": "terminal@1"
+        },
+        {
+          "command": "ctlimSftp.changePermissions",
+          "when": "view == ctlimSftpView && viewItem == remoteFile",
+          "group": "ctlimSftp@1"
+        },
+        {
           "command": "ctlimSftp.deleteRemoteFile",
           "when": "view == ctlimSftpView && viewItem == remoteFile",
+          "group": "ctlimSftp@2"
+        },
+        {
+          "command": "ctlimSftp.downloadMultipleFiles",
+          "when": "view == ctlimSftpView && viewItem == remoteFile",
+          "group": "ctlimSftp@3"
+        },
+        {
+          "command": "ctlimSftp.deleteMultipleFiles",
+          "when": "view == ctlimSftpView && viewItem == remoteFile",
+          "group": "ctlimSftp@4"
+        },
+        {
+          "command": "ctlimSftp.changePermissions",
+          "when": "view == ctlimSftpView && viewItem == remoteDirectory",
           "group": "ctlimSftp@1"
         },
         {
           "command": "ctlimSftp.deleteRemoteFile",
           "when": "view == ctlimSftpView && viewItem == remoteDirectory",
           "group": "ctlimSftp@2"
+        },
+        {
+          "command": "ctlimSftp.downloadMultipleFiles",
+          "when": "view == ctlimSftpView && viewItem == remoteDirectory",
+          "group": "ctlimSftp@3"
+        },
+        {
+          "command": "ctlimSftp.deleteMultipleFiles",
+          "when": "view == ctlimSftpView && viewItem == remoteDirectory",
+          "group": "ctlimSftp@4"
         },
         {
           "command": "ctlimSftp.newFile",
