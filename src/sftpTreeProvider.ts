@@ -552,12 +552,21 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
             }
         } else if (element.itemType === 'remoteDirectory' && element.remotePath) {
             // Show subdirectory contents
-            const serverItem = this.findServerByRemotePath(element.remotePath);
-            if (!serverItem) {
-                return [];
+            // Use element.config if available (most accurate)
+            let connection: { client: SftpClient, config: SftpConfig } | undefined;
+            
+            if (element.config) {
+                // Find connection by config name
+                const serverName = element.config.name || `${element.config.username}@${element.config.host}`;
+                connection = this.connectedServers.get(serverName);
+            } else {
+                // Fallback to path-based search
+                const serverItem = this.findServerByRemotePath(element.remotePath);
+                if (serverItem) {
+                    connection = this.connectedServers.get(serverItem.name);
+                }
             }
-
-            const connection = this.connectedServers.get(serverItem.name);
+            
             if (!connection) {
                 return [];
             }
@@ -592,6 +601,9 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
     }
 
     private findServerByRemotePath(remotePath: string): ServerListItem | undefined {
+        // Try to find server by matching remotePath
+        // If multiple servers have the same remotePath, return the first match
+        // (This is a fallback - element.config should be used when available)
         for (const [serverName, connection] of this.connectedServers.entries()) {
             if (remotePath.startsWith(connection.config.remotePath)) {
                 return this.serverList.find(s => s.name === serverName);
