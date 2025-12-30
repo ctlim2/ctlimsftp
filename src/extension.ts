@@ -6,6 +6,7 @@ import { SftpConfig, FileMetadata, RemoteFile, TransferHistory, Bookmark } from 
 import { SftpTreeProvider, SftpDragAndDropController, SftpTreeItem } from './sftpTreeProvider';
 import { TransferHistoryManager, createTransferHistory } from './transferHistory';
 import { BookmarkManager } from './bookmarkManager';
+import { TemplateManager } from './templateManager';
 
 // 개발 모드 여부 (릴리스 시 false로 변경)
 const DEBUG_MODE = true;
@@ -16,6 +17,7 @@ let currentConfig: SftpConfig | null = null;
 let statusBarItem: vscode.StatusBarItem;
 let transferHistoryManager: TransferHistoryManager | null = null;
 let bookmarkManager: BookmarkManager | null = null;
+let templateManager: TemplateManager | null = null;
 let sftpTreeView: vscode.TreeView<SftpTreeItem> | null = null;
 
 // Cache document-config and client mapping for performance
@@ -32,6 +34,7 @@ export function activate(context: vscode.ExtensionContext) {
     if (workspaceFolder) {
         bookmarkManager = new BookmarkManager(workspaceFolder.uri.fsPath);
         transferHistoryManager = new TransferHistoryManager(workspaceFolder.uri.fsPath);
+        templateManager = new TemplateManager(workspaceFolder.uri.fsPath);
     }
     
     // Create Status Bar Item
@@ -202,7 +205,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`서버 전환 실패: ${error}`);
-            console.error('switchServer error:', error);
+            if (DEBUG_MODE) console.error('switchServer error:', error);
         }
     });
 
@@ -341,7 +344,7 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
         } catch (error) {
-            console.error('openRemoteFile error:', error);
+            if (DEBUG_MODE) console.error('openRemoteFile error:', error);
             vscode.window.showErrorMessage(`파일 열기 실패: ${error}`);
         }
     });
@@ -445,7 +448,7 @@ export function activate(context: vscode.ExtensionContext) {
                             succeeded++;
                         }
                     } catch (error) {
-                        console.error(`다운로드 실패: ${fileItem.remotePath}`, error);
+                        if (DEBUG_MODE) console.error(`다운로드 실패: ${fileItem.remotePath}`, error);
                         failed++;
                     }
                     
@@ -462,7 +465,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`다운로드 실패: ${error}`);
-            console.error('downloadMultipleFiles error:', error);
+            if (DEBUG_MODE) console.error('downloadMultipleFiles error:', error);
         }
     });
 
@@ -536,7 +539,7 @@ export function activate(context: vscode.ExtensionContext) {
                         
                         succeeded++;
                     } catch (error) {
-                        console.error(`삭제 실패: ${validItem.remotePath}`, error);
+                        if (DEBUG_MODE) console.error(`삭제 실패: ${validItem.remotePath}`, error);
                         failed++;
                     }
                     
@@ -556,7 +559,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`삭제 실패: ${error}`);
-            console.error('deleteMultipleFiles error:', error);
+            if (DEBUG_MODE) console.error('deleteMultipleFiles error:', error);
         }
     });
 
@@ -756,7 +759,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         } catch (error) {
             vscode.window.showErrorMessage(`업로드 실패: ${error}`);
-            console.error('saveAs error:', error);
+            if (DEBUG_MODE) console.error('saveAs error:', error);
         }
     });
 
@@ -961,7 +964,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         } catch (error) {
             vscode.window.showErrorMessage(`동기화 실패: ${error}`);
-            console.error('sync error:', error);
+            if (DEBUG_MODE) console.error('sync error:', error);
         }
     }
 
@@ -1065,7 +1068,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`파일 생성 실패: ${error}`);
-            console.error('newFile error:', error);
+            if (DEBUG_MODE) console.error('newFile error:', error);
         }
     });
 
@@ -1148,7 +1151,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`폴더 생성 실패: ${error}`);
-            console.error('newFolder error:', error);
+            if (DEBUG_MODE) console.error('newFolder error:', error);
         }
     });
 
@@ -1233,7 +1236,278 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`삭제 실패: ${error}`);
-            console.error('deleteRemoteFile error:', error);
+            if (DEBUG_MODE) console.error('deleteRemoteFile error:', error);
+        }
+    });
+
+    /**
+     * 원격 파일 복사 (다른 이름으로 저장) Command
+     */
+    const copyRemoteFileCommand = vscode.commands.registerCommand('ctlimSftp.copyRemoteFile', async (item?: any) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.copyRemoteFile');
+        
+        try {
+            // TreeView item에서 정보 가져오기
+            if (!item || !item.config || !item.remotePath || item.isDirectory) {
+                vscode.window.showErrorMessage('파일만 복사할 수 있습니다.');
+                return;
+            }
+            
+            const config = item.config;
+            const sourceRemotePath = item.remotePath;
+            const fileName = path.basename(sourceRemotePath);
+            
+            // 서버 연결 확인
+            const serverName = config.name || `${config.username}@${config.host}`;
+            let connection = treeProvider.getConnectedServer(serverName);
+            
+            if (!connection || !connection.client.isConnected()) {
+                const reconnect = await vscode.window.showWarningMessage(
+                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
+                    '연결'
+                );
+                if (reconnect !== '연결') {
+                    return;
+                }
+                
+                try {
+                    const client = new SftpClient();
+                    await client.connect(config);
+                    treeProvider.addConnectedServer(serverName, client, config);
+                    connection = treeProvider.getConnectedServer(serverName);
+                    
+                    if (!connection) {
+                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        return;
+                    }
+                    
+                    vscode.window.showInformationMessage(`서버에 연결되었습니다: ${serverName}`);
+                } catch (connectError) {
+                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    return;
+                }
+            }
+            
+            // 파일명 입력 받기
+            const remoteDir = path.posix.dirname(sourceRemotePath);
+            const fileExt = path.extname(fileName);
+            const baseName = path.basename(fileName, fileExt);
+            const defaultFileName = `${baseName}.copy${fileExt}`;
+            
+            const newFileName = await vscode.window.showInputBox({
+                prompt: '복사할 파일 이름을 입력하세요',
+                value: defaultFileName,
+                placeHolder: 'file.copy.php',
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return '파일 이름을 입력해주세요';
+                    }
+                    if (value === fileName) {
+                        return '원본과 다른 이름을 입력해주세요';
+                    }
+                    if (value.includes('/') || value.includes('\\')) {
+                        return '파일 이름에 경로 구분자를 포함할 수 없습니다';
+                    }
+                    return null;
+                }
+            });
+
+            if (!newFileName) {
+                return;
+            }
+            
+            const targetRemotePath = path.posix.join(remoteDir, newFileName);
+
+            // 임시 파일로 다운로드 후 새 경로로 업로드
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: `파일 복사 중: ${path.basename(targetRemotePath)}`,
+                cancellable: false
+            }, async (progress) => {
+                progress.report({ message: '원본 다운로드 중...' });
+                
+                // 임시 파일 경로
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                if (!workspaceFolder) {
+                    vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+                    return;
+                }
+                
+                const tempDir = path.join(workspaceFolder.uri.fsPath, '.vscode', '.sftp-tmp');
+                if (!fs.existsSync(tempDir)) {
+                    fs.mkdirSync(tempDir, { recursive: true });
+                }
+                
+                const tempFile = path.join(tempDir, `copy_${Date.now()}_${fileName}`);
+                
+                try {
+                    // 다운로드
+                    if (connection!.client.client) {
+                        await connection!.client.client.get(sourceRemotePath, tempFile);
+                        
+                        progress.report({ message: '새 위치에 업로드 중...' });
+                        
+                        // 업로드
+                        await connection!.client.uploadFile(tempFile, targetRemotePath, config);
+                        
+                        vscode.window.showInformationMessage(`✅ 파일 복사 완료: ${path.basename(targetRemotePath)}`);
+                        
+                        // TreeView 새로고침
+                        treeProvider.refresh();
+                    }
+                } finally {
+                    // 임시 파일 삭제
+                    if (fs.existsSync(tempFile)) {
+                        fs.unlinkSync(tempFile);
+                    }
+                }
+            });
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`파일 복사 실패: ${error}`);
+            if (DEBUG_MODE) console.error('copyRemoteFile error:', error);
+        }
+    });
+
+    /**
+     * 원격 파일 이름 변경 Command
+     */
+    const renameRemoteFileCommand = vscode.commands.registerCommand('ctlimSftp.renameRemoteFile', async (item?: any) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.renameRemoteFile');
+        
+        try {
+            // TreeView item에서 정보 가져오기
+            if (!item || !item.config || !item.remotePath || item.isDirectory) {
+                vscode.window.showErrorMessage('파일만 이름 변경할 수 있습니다.');
+                return;
+            }
+            
+            const config = item.config;
+            const sourceRemotePath = item.remotePath;
+            const fileName = path.basename(sourceRemotePath);
+            
+            // 서버 연결 확인
+            const serverName = config.name || `${config.username}@${config.host}`;
+            let connection = treeProvider.getConnectedServer(serverName);
+            
+            if (!connection || !connection.client.isConnected()) {
+                const reconnect = await vscode.window.showWarningMessage(
+                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
+                    '연결'
+                );
+                if (reconnect !== '연결') {
+                    return;
+                }
+                
+                try {
+                    const client = new SftpClient();
+                    await client.connect(config);
+                    treeProvider.addConnectedServer(serverName, client, config);
+                    connection = treeProvider.getConnectedServer(serverName);
+                    
+                    if (!connection) {
+                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        return;
+                    }
+                    
+                    vscode.window.showInformationMessage(`서버에 연결되었습니다: ${serverName}`);
+                } catch (connectError) {
+                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    return;
+                }
+            }
+            
+            // 새 파일명 입력 받기
+            const remoteDir = path.posix.dirname(sourceRemotePath);
+            
+            const newFileName = await vscode.window.showInputBox({
+                prompt: '새 파일 이름을 입력하세요',
+                value: fileName,
+                placeHolder: 'newfile.php',
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return '파일 이름을 입력해주세요';
+                    }
+                    if (value === fileName) {
+                        return '원본과 다른 이름을 입력해주세요';
+                    }
+                    if (value.includes('/') || value.includes('\\')) {
+                        return '파일 이름에 경로 구분자를 포함할 수 없습니다';
+                    }
+                    return null;
+                }
+            });
+
+            if (!newFileName) {
+                return;
+            }
+            
+            const targetRemotePath = path.posix.join(remoteDir, newFileName);
+
+            // 확인 대화상자
+            const confirm = await vscode.window.showWarningMessage(
+                `파일 이름을 변경하시겠습니까?\n\n${fileName} → ${newFileName}`,
+                { modal: true },
+                '변경'
+            );
+            
+            if (confirm !== '변경') {
+                return;
+            }
+
+            // 임시 파일로 다운로드 후 새 이름으로 업로드, 원본 삭제
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: `파일 이름 변경 중: ${newFileName}`,
+                cancellable: false
+            }, async (progress) => {
+                progress.report({ message: '원본 다운로드 중...' });
+                
+                // 임시 파일 경로
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                if (!workspaceFolder) {
+                    vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+                    return;
+                }
+                
+                const tempDir = path.join(workspaceFolder.uri.fsPath, '.vscode', '.sftp-tmp');
+                if (!fs.existsSync(tempDir)) {
+                    fs.mkdirSync(tempDir, { recursive: true });
+                }
+                
+                const tempFile = path.join(tempDir, `rename_${Date.now()}_${fileName}`);
+                
+                try {
+                    // 다운로드
+                    if (connection!.client.client) {
+                        await connection!.client.client.get(sourceRemotePath, tempFile);
+                        
+                        progress.report({ message: '새 이름으로 업로드 중...' });
+                        
+                        // 새 이름으로 업로드
+                        await connection!.client.uploadFile(tempFile, targetRemotePath, config);
+                        
+                        progress.report({ message: '원본 파일 삭제 중...' });
+                        
+                        // 원본 삭제
+                        await connection!.client.deleteRemoteFile(sourceRemotePath, false);
+                        
+                        vscode.window.showInformationMessage(`✅ 파일 이름 변경 완료: ${newFileName}`);
+                        
+                        // TreeView 새로고침
+                        treeProvider.refresh();
+                    }
+                } finally {
+                    // 임시 파일 삭제
+                    if (fs.existsSync(tempFile)) {
+                        fs.unlinkSync(tempFile);
+                    }
+                }
+            });
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`파일 이름 변경 실패: ${error}`);
+            if (DEBUG_MODE) console.error('renameRemoteFile error:', error);
         }
     });
 
@@ -1365,7 +1639,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`파일 검색 실패: ${error}`);
-            console.error('searchRemoteFiles error:', error);
+            if (DEBUG_MODE) console.error('searchRemoteFiles error:', error);
         }
     });
 
@@ -1537,7 +1811,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`내용 검색 실패: ${error}`);
-            console.error('searchInRemoteFiles error:', error);
+            if (DEBUG_MODE) console.error('searchInRemoteFiles error:', error);
         }
     });
 
@@ -1597,7 +1871,7 @@ export function activate(context: vscode.ExtensionContext) {
                 currentMode = await connection.client.getFilePermissions(remotePath);
                 if (DEBUG_MODE) console.log(`현재 권한: ${currentMode}`);
             } catch (error) {
-                console.error('권한 조회 실패:', error);
+                if (DEBUG_MODE) console.error('권한 조회 실패:', error);
             }
             
             // 권한 선택 QuickPick
@@ -1705,7 +1979,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`권한 변경 실패: ${error}`);
-            console.error('changePermissions error:', error);
+            if (DEBUG_MODE) console.error('changePermissions error:', error);
         }
     });
 
@@ -1796,7 +2070,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`SSH 터미널 열기 실패: ${error}`);
-            console.error('openSSHTerminal error:', error);
+            if (DEBUG_MODE) console.error('openSSHTerminal error:', error);
         }
     });
 
@@ -1873,7 +2147,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`히스토리 조회 실패: ${error}`);
-            console.error('viewTransferHistory error:', error);
+            if (DEBUG_MODE) console.error('viewTransferHistory error:', error);
         }
     });
 
@@ -1927,7 +2201,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`통계 조회 실패: ${error}`);
-            console.error('viewTransferStatistics error:', error);
+            if (DEBUG_MODE) console.error('viewTransferStatistics error:', error);
         }
     });
 
@@ -1957,7 +2231,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`히스토리 삭제 실패: ${error}`);
-            console.error('clearTransferHistory error:', error);
+            if (DEBUG_MODE) console.error('clearTransferHistory error:', error);
         }
     });
 
@@ -1979,7 +2253,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`경로 복사 실패: ${error}`);
-            console.error('copyRemotePath error:', error);
+            if (DEBUG_MODE) console.error('copyRemotePath error:', error);
         }
     });
 
@@ -2044,7 +2318,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`브라우저 열기 실패: ${error}`);
-            console.error('openInBrowser error:', error);
+            if (DEBUG_MODE) console.error('openInBrowser error:', error);
         }
     });
 
@@ -2119,7 +2393,8 @@ export function activate(context: vscode.ExtensionContext) {
                 serverName,
                 remotePath,
                 isDirectory,
-                description
+                description,
+                config.group  // 그룹 정보 추가
             );
             
             vscode.window.showInformationMessage(`⭐ 북마크 추가: ${bookmarkName}`);
@@ -2129,7 +2404,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`북마크 추가 실패: ${error}`);
-            console.error('addBookmark error:', error);
+            if (DEBUG_MODE) console.error('addBookmark error:', error);
         }
     });
 
@@ -2185,7 +2460,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`북마크 조회 실패: ${error}`);
-            console.error('viewBookmarks error:', error);
+            if (DEBUG_MODE) console.error('viewBookmarks error:', error);
         }
     });
 
@@ -2244,7 +2519,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`북마크 삭제 실패: ${error}`);
-            console.error('removeBookmark error:', error);
+            if (DEBUG_MODE) console.error('removeBookmark error:', error);
         }
     });
 
@@ -2285,7 +2560,7 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`북마크 삭제 실패: ${error}`);
-            console.error('deleteBookmark error:', error);
+            if (DEBUG_MODE) console.error('deleteBookmark error:', error);
         }
     });
 
@@ -2335,7 +2610,296 @@ export function activate(context: vscode.ExtensionContext) {
             
         } catch (error) {
             vscode.window.showErrorMessage(`북마크 조회 실패: ${error}`);
-            console.error('frequentBookmarks error:', error);
+            if (DEBUG_MODE) console.error('frequentBookmarks error:', error);
+        }
+    });
+
+    /**
+     * 현재 서버를 템플릿으로 저장 Command
+     */
+    const saveAsTemplateCommand = vscode.commands.registerCommand('ctlimSftp.saveAsTemplate', async (item?: any) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.saveAsTemplate');
+        
+        try {
+            if (!templateManager) {
+                vscode.window.showErrorMessage('템플릿 관리자를 초기화할 수 없습니다.');
+                return;
+            }
+            
+            let config: SftpConfig | undefined;
+            
+            // TreeView에서 호출된 경우
+            if (item && item.itemType === 'server' && item.config) {
+                config = item.config;
+            } else {
+                // Command Palette에서 호출된 경우 - 서버 선택
+                const connectedServers = treeProvider.getConnectedServerNames();
+                
+                if (connectedServers.length === 0) {
+                    vscode.window.showErrorMessage('연결된 서버가 없습니다.');
+                    return;
+                }
+                
+                let serverName: string;
+                if (connectedServers.length === 1) {
+                    serverName = connectedServers[0];
+                } else {
+                    const selected = await vscode.window.showQuickPick(connectedServers, {
+                        placeHolder: '템플릿으로 저장할 서버를 선택하세요'
+                    });
+                    
+                    if (!selected) {
+                        return;
+                    }
+                    serverName = selected;
+                }
+                
+                const connection = treeProvider.getConnectedServer(serverName);
+                if (!connection) {
+                    vscode.window.showErrorMessage('서버 연결 정보를 찾을 수 없습니다.');
+                    return;
+                }
+                
+                config = connection.config;
+            }
+            
+            if (!config) {
+                vscode.window.showErrorMessage('서버 설정을 찾을 수 없습니다.');
+                return;
+            }
+            
+            // 템플릿 이름 입력
+            const templateName = await vscode.window.showInputBox({
+                prompt: '템플릿 이름을 입력하세요',
+                value: config.name || `${config.username}@${config.host}`,
+                placeHolder: '예: Web Server Config',
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return '이름을 입력해주세요';
+                    }
+                    return null;
+                }
+            });
+            
+            if (!templateName) {
+                return;
+            }
+            
+            // 설명 입력 (선택사항)
+            const description = await vscode.window.showInputBox({
+                prompt: '템플릿 설명 (선택사항)',
+                placeHolder: '예: LAMP 서버 기본 설정'
+            });
+            
+            // 템플릿 저장
+            const template = templateManager.addTemplate(templateName, config, description);
+            
+            vscode.window.showInformationMessage(`💾 템플릿 저장: ${templateName}`);
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`템플릿 저장 실패: ${error}`);
+            if (DEBUG_MODE) console.error('saveAsTemplate error:', error);
+        }
+    });
+
+    /**
+     * 템플릿에서 서버 추가 Command
+     */
+    const addServerFromTemplateCommand = vscode.commands.registerCommand('ctlimSftp.addServerFromTemplate', async () => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.addServerFromTemplate');
+        
+        try {
+            if (!templateManager) {
+                vscode.window.showErrorMessage('템플릿 관리자를 초기화할 수 없습니다.');
+                return;
+            }
+            
+            const templates = templateManager.getAllTemplates();
+            
+            if (templates.length === 0) {
+                vscode.window.showInformationMessage('💾 저장된 템플릿이 없습니다.\n먼저 서버를 템플릿으로 저장하세요.');
+                return;
+            }
+            
+            // 템플릿 선택
+            interface TemplateQuickPickItem extends vscode.QuickPickItem {
+                template: typeof templates[0];
+            }
+            
+            const items: TemplateQuickPickItem[] = templates.map(t => ({
+                label: `📋 ${t.name}`,
+                description: `사용횟수: ${t.usageCount}회`,
+                detail: t.description || '설명 없음',
+                template: t
+            }));
+            
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: `${templates.length}개의 템플릿 - 선택하여 서버 추가`,
+                matchOnDescription: true,
+                matchOnDetail: true
+            });
+            
+            if (!selected) {
+                return;
+            }
+            
+            const template = selected.template;
+            
+            // 서버 정보 입력
+            const host = await vscode.window.showInputBox({
+                prompt: '서버 호스트를 입력하세요',
+                placeHolder: 'example.com',
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return '호스트를 입력해주세요';
+                    }
+                    return null;
+                }
+            });
+            
+            if (!host) {
+                return;
+            }
+            
+            const username = await vscode.window.showInputBox({
+                prompt: '사용자명을 입력하세요',
+                placeHolder: 'username',
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return '사용자명을 입력해주세요';
+                    }
+                    return null;
+                }
+            });
+            
+            if (!username) {
+                return;
+            }
+            
+            const password = await vscode.window.showInputBox({
+                prompt: '비밀번호를 입력하세요 (선택사항 - 입력하지 않으면 연결 시 입력)',
+                password: true,
+                placeHolder: '비밀번호'
+            });
+            
+            const serverName = await vscode.window.showInputBox({
+                prompt: '서버 이름을 입력하세요 (선택사항)',
+                value: `${username}@${host}`,
+                placeHolder: 'My Server'
+            });
+            
+            // 템플릿으로 설정 생성
+            const newConfig = templateManager.createConfigFromTemplate(
+                template,
+                host,
+                username,
+                password,
+                serverName
+            );
+            
+            // 설정 파일에 추가
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+                return;
+            }
+            
+            const configPath = path.join(workspaceFolder.uri.fsPath, '.vscode', 'ctlim-sftp.json');
+            
+            let configs: SftpConfig[] = [];
+            
+            if (fs.existsSync(configPath)) {
+                const content = fs.readFileSync(configPath, 'utf-8');
+                const configData = JSON.parse(content);
+                configs = Array.isArray(configData) ? configData : [configData];
+            }
+            
+            configs.push(newConfig);
+            
+            // 설정 파일 저장
+            const vscodeFolder = path.dirname(configPath);
+            if (!fs.existsSync(vscodeFolder)) {
+                fs.mkdirSync(vscodeFolder, { recursive: true });
+            }
+            
+            fs.writeFileSync(configPath, JSON.stringify(configs, null, 2));
+            
+            vscode.window.showInformationMessage(`✅ 서버 추가 완료: ${newConfig.name}\n템플릿: ${template.name}`);
+            
+            // TreeView 새로고침
+            treeProvider.refresh();
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`서버 추가 실패: ${error}`);
+            if (DEBUG_MODE) console.error('addServerFromTemplate error:', error);
+        }
+    });
+
+    /**
+     * 템플릿 관리 Command
+     */
+    const manageTemplatesCommand = vscode.commands.registerCommand('ctlimSftp.manageTemplates', async () => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.manageTemplates');
+        
+        try {
+            if (!templateManager) {
+                vscode.window.showErrorMessage('템플릿 관리자를 초기화할 수 없습니다.');
+                return;
+            }
+            
+            const templates = templateManager.getAllTemplates();
+            
+            if (templates.length === 0) {
+                vscode.window.showInformationMessage('💾 저장된 템플릿이 없습니다.');
+                return;
+            }
+            
+            // 템플릿 목록 표시
+            interface TemplateQuickPickItem extends vscode.QuickPickItem {
+                template: typeof templates[0];
+            }
+            
+            const items: TemplateQuickPickItem[] = templates.map(t => {
+                const createdDate = new Date(t.createdAt);
+                const dateStr = createdDate.toLocaleDateString('ko-KR');
+                
+                return {
+                    label: `📋 ${t.name}`,
+                    description: `Port: ${t.config.port || 22} | 사용: ${t.usageCount}회`,
+                    detail: `${t.description || '설명 없음'} | 생성: ${dateStr}`,
+                    template: t
+                };
+            });
+            
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: `${templates.length}개의 템플릿 - 선택하여 삭제`,
+                matchOnDescription: true,
+                matchOnDetail: true
+            });
+            
+            if (!selected) {
+                return;
+            }
+            
+            const template = selected.template;
+            
+            // 삭제 확인
+            const confirm = await vscode.window.showWarningMessage(
+                `템플릿을 삭제하시겠습니까?\n\n${template.name}`,
+                { modal: true },
+                '삭제'
+            );
+            
+            if (confirm === '삭제') {
+                const success = templateManager.removeTemplate(template.id);
+                if (success) {
+                    vscode.window.showInformationMessage(`🗑️ 템플릿 삭제: ${template.name}`);
+                }
+            }
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`템플릿 관리 실패: ${error}`);
+            if (DEBUG_MODE) console.error('manageTemplates error:', error);
         }
     });
 
@@ -2670,6 +3234,8 @@ export function activate(context: vscode.ExtensionContext) {
         newFileCommand,
         newFolderCommand,
         deleteRemoteFileCommand,
+        copyRemoteFileCommand,
+        renameRemoteFileCommand,
         searchRemoteFilesCommand,
         searchInRemoteFilesCommand,
         openSSHTerminalCommand,
@@ -2685,6 +3251,9 @@ export function activate(context: vscode.ExtensionContext) {
         removeBookmarkCommand,
         deleteBookmarkCommand,
         frequentBookmarksCommand,
+        saveAsTemplateCommand,
+        addServerFromTemplateCommand,
+        manageTemplatesCommand,
         saveWatcher
         
 //        uploadCommand,
@@ -2818,7 +3387,7 @@ async function retryFailedTransfer(history: TransferHistory): Promise<void> {
         }
         
     } catch (error) {
-        console.error('retryFailedTransfer error:', error);
+        if (DEBUG_MODE) console.error('retryFailedTransfer error:', error);
         vscode.window.showErrorMessage(`재시도 실패: ${error}`);
     }
 }
@@ -2862,7 +3431,6 @@ async function loadConfig(): Promise<SftpConfig | null> {
         const result = await vscode.window.showErrorMessage(
             'ctlim SFTP 설정 파일이 없습니다. 생성하시겠습니까?',
             '생성',
-//            '취소'
         );
         if (result === '생성') {
             await vscode.commands.executeCommand('ctlimSftp.config');
@@ -2917,7 +3485,6 @@ async function loadConfigWithSelection(): Promise<SftpConfig | null> {
         const result = await vscode.window.showErrorMessage(
             'ctlim SFTP 설정 파일이 없습니다. 생성하시겠습니까?',
             '생성',
-//            '취소'
         );
         if (result === '생성') {
             await vscode.commands.executeCommand('ctlimSftp.config');
@@ -3064,7 +3631,7 @@ async function findConfigByMetadata(filePath: string): Promise<SftpConfig | null
         
         return null;
     } catch (error) {
-        console.error('Error finding config by metadata:', error);
+        if (DEBUG_MODE) console.error('Error finding config by metadata:', error);
         return null;
     }
 }
@@ -3163,7 +3730,7 @@ async function ensureConnected(client: SftpClient, config: SftpConfig, serverNam
         if (DEBUG_MODE) console.log(`재연결 성공: ${serverName}`);
         return true;
     } catch (error) {
-console.error(`재연결 실패(ensureConnected): ${serverName}`, error);
+        if (DEBUG_MODE) console.error(`재연결 실패(ensureConnected): ${serverName}`, error);
         return false;
     }
 }
@@ -3263,7 +3830,7 @@ async function downloadAndReloadFile(
             transferHistoryManager.addHistory(history);
         }
         
-        console.error(`다운로드 실패: ${localPath}`, error);
+        if (DEBUG_MODE) console.error(`다운로드 실패: ${localPath}`, error);
         return false;
     }
 }
@@ -3363,7 +3930,6 @@ async function selectRemotePathFromTree(client: SftpClient, startPath: string, f
             const confirm = await vscode.window.showWarningMessage(
                 `${dir}/ 디렉토리에 ${fileName}로 저장하시겠습니까?`,
                 '저장',
-//                '취소'
             );
             
             if (confirm === '저장') {
@@ -3456,7 +4022,7 @@ async function showDiffWithMergeOptions(
         
     } catch (error) {
         vscode.window.showErrorMessage(`Diff 표시 실패: ${error}`);
-        console.error('showDiffWithMergeOptions error:', error);
+        if (DEBUG_MODE) console.error('showDiffWithMergeOptions error:', error);
     }
 }
 
@@ -3672,7 +4238,7 @@ if (DEBUG_MODE) console.log('> checkAndReloadRemoteFiles');
                         if (DEBUG_MODE) console.log(`메타데이터 발견: ${path.basename(localPath)} -> ${serverName}`);
                         break; // 메타데이터 찾았으면 다음 문서로
                     } catch (error) {
-                        console.error(`메타데이터 읽기 실패: ${metadataPath}`, error);
+                        if (DEBUG_MODE) console.error(`메타데이터 읽기 실패: ${metadataPath}`, error);
                     }
                 }
             }
@@ -3745,7 +4311,7 @@ if (DEBUG_MODE) console.log('> checkAndReloadRemoteFiles');
                     treeProvider.addConnectedServer(serverName, client, config);
                     if (DEBUG_MODE) console.log(`서버 연결 성공: ${serverName}`);
                 } catch (connectError) {
-                    console.error(`서버 연결 실패: ${serverName}`, connectError);
+                    if (DEBUG_MODE) console.error(`서버 연결 실패: ${serverName}`, connectError);
                     continue;
                 }
             }
@@ -3819,12 +4385,12 @@ if (DEBUG_MODE) console.log('> checkAndReloadRemoteFiles');
                                     if (DEBUG_MODE) console.log(`재연결 후 변경 감지: ${fileName}`);
                                 }
                             } catch (retryError) {
-console.error(`재시도 실패: ${fileInfo.metadata.remotePath}`, retryError);
+                                if (DEBUG_MODE) console.error(`재시도 실패: ${fileInfo.metadata.remotePath}`, retryError);
                             }
                         }
                     } else {
                         // 원격 파일이 없거나 기타 오류
-console.error(`원격 파일 확인 실패: ${fileInfo.metadata.remotePath}`, remoteError);
+                        console.error(`원격 파일 확인 실패: ${fileInfo.metadata.remotePath}`, remoteError);
                     }
                 }
             }
@@ -3909,7 +4475,7 @@ console.error(`원격 파일 확인 실패: ${fileInfo.metadata.remotePath}`, re
             }
         }
     } catch (error) {
-console.error('원격 파일 확인 중 오류:', error);
+        if (DEBUG_MODE) console.error('원격 파일 확인 중 오류:', error);
     }
 }
 
@@ -3975,7 +4541,7 @@ async function findServerTreeItem(serverName: string, remotePath: string): Promi
         
         return currentItem;
     } catch (error) {
-        console.error('findServerTreeItem error:', error);
+        if (DEBUG_MODE) console.error('findServerTreeItem error:', error);
         return undefined;
     }
 }
@@ -3998,7 +4564,6 @@ async function openBookmark(bookmark: Bookmark): Promise<void> {
             const reconnect = await vscode.window.showWarningMessage(
                 `서버에 연결되어 있지 않습니다: ${bookmark.serverName}\n연결하시겠습니까?`,
                 '연결',
-//                '취소'
             );
             if (reconnect !== '연결') {
                 return;
@@ -4046,102 +4611,196 @@ async function openBookmark(bookmark: Bookmark): Promise<void> {
                 
                 if (DEBUG_MODE) console.log(`[북마크] TreeItem 검색 중: ${bookmark.serverName} / ${bookmark.remotePath}`);
                 
-                // 서버 TreeItem 찾기
-                const serverTreeItem = await findServerTreeItem(bookmark.serverName, bookmark.remotePath);
+                // TreeView를 명시적으로 보이게 함
+                await vscode.commands.executeCommand('workbench.view.extension.ctlim-sftp-explorer');
                 
-                if (DEBUG_MODE) console.log(`[북마크] TreeItem 찾기 결과: ${serverTreeItem ? '성공' : '실패'}`);
+                // TreeView가 완전히 로드될 때까지 대기
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
-                if (serverTreeItem) {
-                    if (DEBUG_MODE) console.log(`[북마크] reveal() 호출 중...`);
-                    if (DEBUG_MODE) console.log(`[북마크] TreeItem 정보: label=${serverTreeItem.label}, type=${serverTreeItem.itemType}`);
+                // TreeView 강제 새로고침
+                treeProvider.refresh();
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
+                // 1단계: 그룹 찾기 및 펼치기 (서버가 그룹에 속해 있는 경우)
+                const rootItems = await treeProvider.getChildren();
+                let groupItem: SftpTreeItem | undefined;
+                let serverItem: SftpTreeItem | undefined;
+                
+                // 루트에서 서버 찾기 또는 그룹 찾기
+                for (const item of rootItems) {
+                    if (item.itemType === 'server' && item.serverItem?.name === bookmark.serverName) {
+                        serverItem = item;
+                        if (DEBUG_MODE) console.log(`[북마크] 서버 발견 (그룹 없음): ${bookmark.serverName}`);
+                        break;
+                    } else if (item.itemType === 'group') {
+                        // 저장된 그룹명이 있으면 해당 그룹만 확인, 없으면 모든 그룹 확인
+                        if (bookmark.groupName && item.label !== bookmark.groupName) {
+                            continue;
+                        }
+                        
+                        // 그룹 안에 서버가 있는지 확인
+                        const groupChildren = await treeProvider.getChildren(item);
+                        for (const child of groupChildren) {
+                            if (child.itemType === 'server' && child.serverItem?.name === bookmark.serverName) {
+                                groupItem = item;
+                                serverItem = child;
+                                if (DEBUG_MODE) console.log(`[북마크] 서버 발견 (그룹 내): ${bookmark.serverName} in ${item.label}`);
+                                break;
+                            }
+                        }
+                        if (serverItem) break;
+                    }
+                }
+                
+                if (!serverItem) {
+                    vscode.window.showErrorMessage(`서버를 찾을 수 없습니다: ${bookmark.serverName}`);
+                    return;
+                }
+                
+                // 2단계: 그룹이 있으면 먼저 펼치기
+                if (groupItem && sftpTreeView) {
+                    if (DEBUG_MODE) console.log(`[북마크] 그룹 펼치기: ${groupItem.label}`);
                     
-                    // TreeView를 명시적으로 보이게 함
-                    await vscode.commands.executeCommand('workbench.view.extension.ctlim-sftp-explorer');
-                    
-                    // TreeView가 완전히 로드될 때까지 대기
+                    // TreeView 강제 새로고침 및 대기
+                    treeProvider.refresh();
                     await new Promise(resolve => setTimeout(resolve, 500));
                     
-                    // TreeView 강제 새로고침
-                    treeProvider.refresh();
+                    try {
+                        await sftpTreeView.reveal(groupItem, {
+                            select: false,
+                            focus: false,
+                            expand: true
+                        });
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        if (DEBUG_MODE) console.log(`[북마크] 그룹 펼침 완료`);
+                    } catch (err) {
+                        if (DEBUG_MODE) console.log(`[북마크] 그룹 펼치기 실패 (무시): ${err}`);
+                        // 그룹 펼치기 실패해도 계속 진행
+                    }
+                }
+                
+                // 3단계: 서버 펼치기 (findServerTreeItem으로 안전하게)
+                if (DEBUG_MODE) console.log(`[북마크] 서버 펼치기 시작: ${bookmark.serverName}`);
+                let serverTreeItem: SftpTreeItem | undefined;
+                
+                // 서버 TreeItem 찾기 재시도 (최대 3번)
+                for (let retry = 0; retry < 3; retry++) {
+                    serverTreeItem = await findServerTreeItem(bookmark.serverName, connection.config.remotePath);
+                    if (serverTreeItem) {
+                        if (DEBUG_MODE) console.log(`[북마크] 서버 TreeItem 발견`);
+                        break;
+                    }
+                    if (DEBUG_MODE) console.log(`[북마크] 서버 TreeItem 찾기 재시도 ${retry + 1}/3`);
                     await new Promise(resolve => setTimeout(resolve, 200));
-                    
-                    // 부모 경로들을 순차적으로 펼치기
-                    const pathParts = bookmark.remotePath.replace(connection.config.remotePath, '').split('/').filter(p => p);
-                    let currentPath = connection.config.remotePath;
-                    
-                    if (DEBUG_MODE) console.log(`[북마크] 경로 분해: ${pathParts.length}개 레벨`);
-                    
-                    // 각 레벨별로 TreeItem 찾아서 펼치기
-                    for (let i = 0; i < pathParts.length; i++) {
-                        currentPath = currentPath + '/' + pathParts[i];
-                        const levelItem = await findServerTreeItem(bookmark.serverName, currentPath);
+                }
+                
+                // 서버 펼치기
+                if (serverTreeItem && sftpTreeView) {
+                    try {
+                        await sftpTreeView.reveal(serverTreeItem, {
+                            select: false,
+                            focus: false,
+                            expand: true
+                        });
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        if (DEBUG_MODE) console.log(`[북마크] 서버 펼침 완료`);
+                    } catch (err) {
+                        if (DEBUG_MODE) console.log(`[북마크] 서버 펼치기 실패 (무시): ${err}`);
+                    }
+                }
+                
+                // 4단계: 원격 경로 따라가기
+                const pathParts = bookmark.remotePath.replace(connection.config.remotePath, '').split('/').filter(p => p);
+                let currentPath = connection.config.remotePath;
+                
+                if (DEBUG_MODE) console.log(`[북마크] 경로 분해: ${pathParts.length}개 레벨`);
+                
+                // 각 레벨별로 TreeItem 찾아서 펼치기 (재시도 로직 포함)
+                for (let i = 0; i < pathParts.length; i++) {
+                        currentPath = path.posix.join(currentPath, pathParts[i]);
+                        
+                        if (DEBUG_MODE) console.log(`[북마크] 레벨 ${i + 1} 처리 중: ${currentPath}`);
+                        
+                        // TreeItem 찾기 재시도 (최대 3번)
+                        let levelItem: SftpTreeItem | undefined;
+                        for (let retry = 0; retry < 3; retry++) {
+                            levelItem = await findServerTreeItem(bookmark.serverName, currentPath);
+                            if (levelItem) break;
+                            if (DEBUG_MODE) console.log(`[북마크] TreeItem 찾기 재시도 ${retry + 1}/3`);
+                            await new Promise(resolve => setTimeout(resolve, 200));
+                        }
                         
                         if (levelItem && sftpTreeView) {
                             if (DEBUG_MODE) console.log(`[북마크] 레벨 ${i + 1} 펼치기: ${pathParts[i]}`);
+                            
+                            const isLast = i === pathParts.length - 1;
+                            
                             try {
-                                await sftpTreeView.reveal(levelItem, {
-                                    select: i === pathParts.length - 1, // 마지막만 선택
-                                    focus: i === pathParts.length - 1,  // 마지막만 포커스
-                                    expand: i === pathParts.length - 1 ? 2 : 1  // 마지막은 2레벨, 나머지는 1레벨
-                                });
-                                // 각 레벨마다 충분한 대기 시간
-                                await new Promise(resolve => setTimeout(resolve, 300));
+                                // reveal 재시도 (최대 2번)
+                                let revealSuccess = false;
+                                for (let retry = 0; retry < 2; retry++) {
+                                    try {
+                                        await sftpTreeView.reveal(levelItem, {
+                                            select: isLast,
+                                            focus: isLast,
+                                            expand: true
+                                        });
+                                        revealSuccess = true;
+                                        if (DEBUG_MODE) console.log(`[북마크] reveal 성공: ${pathParts[i]}`);
+                                        break;
+                                    } catch (err) {
+                                        if (retry === 0) {
+                                            if (DEBUG_MODE) console.log(`[북마크] reveal 재시도 중...`);
+                                            await new Promise(resolve => setTimeout(resolve, 300));
+                                        }
+                                    }
+                                }
+                                
+                                if (!revealSuccess) {
+                                    if (DEBUG_MODE) console.log(`[북마크] reveal 실패: ${pathParts[i]}`);
+                                }
+                                
+                                // 마지막 레벨이면 한 번 더 reveal (스크롤 고정)
+                                if (isLast && revealSuccess) {
+                                    await new Promise(resolve => setTimeout(resolve, 200));
+                                    try {
+                                        await sftpTreeView.reveal(levelItem, {
+                                            select: true,
+                                            focus: true,
+                                            expand: true
+                                        });
+                                        if (DEBUG_MODE) console.log(`[북마크] 최종 위치 고정 완료`);
+                                    } catch (err) {
+                                        // 무시
+                                    }
+                                }
+                                
+                                // 다음 레벨 로드 대기
+                                await new Promise(resolve => setTimeout(resolve, 400));
                             } catch (revealError: any) {
                                 if (DEBUG_MODE) console.log(`[북마크] 레벨 ${i + 1} 펼치기 실패: ${revealError.message}`);
                             }
+                        } else {
+                            if (DEBUG_MODE) console.log(`[북마크] TreeItem을 찾을 수 없음: ${pathParts[i]}`);
                         }
                     }
                     
                     if (DEBUG_MODE) console.log(`[북마크] reveal() 완료`);
                     
                     vscode.window.showInformationMessage(
-                        `✅ 북마크 폴더로 이동: ${bookmark.name}`
+                        `✅ 북마크로 이동: ${bookmark.name}`
                     );
-                } else {
-                    if (DEBUG_MODE) console.log(`[북마크] TreeItem을 찾을 수 없음`);
-                    
-                    vscode.window.showWarningMessage(
-                        `⚠️ 북마크 위치를 찾을 수 없습니다.\n\n경로: ${bookmark.remotePath}\n서버: ${bookmark.serverName}\n\n서버가 연결되어 있고 경로가 유효한지 확인하세요.`
-                    );
-                }
             } catch (revealError) {
-                console.error('TreeView reveal error:', revealError);
+                if (DEBUG_MODE) console.error('TreeView reveal error:', revealError);
                 vscode.window.showErrorMessage(
-                    `❌ 북마크 폴더 이동 실패: ${revealError}\n\n경로: ${bookmark.remotePath}`
+                    `❌ 북마크 이동 실패: ${revealError}\n\n경로: ${bookmark.remotePath}`
                 );
             }
-        } else {
-            // 파일인 경우 - TreeView 위치 이동 + 파일 열기
-            try {
-                // TreeView 새로고침
-                treeProvider.refresh();
-                
-                // 서버 TreeItem 찾기
-                const serverTreeItem = await findServerTreeItem(bookmark.serverName, bookmark.remotePath);
-                
-                if (serverTreeItem && sftpTreeView) {
-                    // TreeView에서 해당 위치로 이동
-                    await sftpTreeView.reveal(serverTreeItem, {
-                        select: true,
-                        focus: false,  // 파일은 에디터에 포커스
-                        expand: false
-                    });
-                }
-            } catch (revealError) {
-                console.error('TreeView reveal error:', revealError);
-            }
-            
-            // 파일 열기
-            await vscode.commands.executeCommand(
-                'ctlimSftp.openRemoteFile',
-                bookmark.remotePath,
-                connection.config
-            );
         }
         
     } catch (error) {
         vscode.window.showErrorMessage(`북마크 열기 실패: ${error}`);
-        console.error('openBookmark error:', error);
+        if (DEBUG_MODE) console.error('openBookmark error:', error);
     }
 }
 
@@ -4221,7 +4880,7 @@ async function backupLocalFile(localPath: string, config: SftpConfig): Promise<v
             }
         }
     } catch (error) {
-        console.error('백업 실패:', error);
+        if (DEBUG_MODE) console.error('백업 실패:', error);
         // Backup failure should not stop the download
     }
 }

@@ -65,12 +65,14 @@ export class BookmarkManager {
         serverName: string,
         remotePath: string,
         isDirectory: boolean,
-        description?: string
+        description?: string,
+        groupName?: string
     ): Bookmark {
         const bookmark: Bookmark = {
-            id: this.generateId(),
+            id: Date.now().toString(),
             name,
             serverName,
+            groupName,
             remotePath,
             isDirectory,
             description,

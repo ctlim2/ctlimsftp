@@ -82,6 +82,7 @@ export interface Bookmark {
     id: string;
     name: string;
     serverName: string;
+    groupName?: string;
     remotePath: string;
     isDirectory: boolean;
     description?: string;

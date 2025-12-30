@@ -1,6 +1,6 @@
 {
   "name": "ctlim-sftp",
-  "displayName": "ctlim SFTP",
+  "displayName": "ctlim-SFTP",
   "description": "Simple SFTP sync extension with upload on save and conflict detection",
   "version": "0.4.2",
   "publisher": "ctlim",
@@ -161,8 +161,18 @@
       },
       {
         "command": "ctlimSftp.copyRemotePath",
-        "title": "ctlim SFTP: Copy Remote Path",
+        "title": "ctlim SFTP: Copy Remote Path to Clipboard",
         "icon": "$(copy)"
+      },
+      {
+        "command": "ctlimSftp.copyRemoteFile",
+        "title": "ctlim SFTP: Copy Remote File",
+        "icon": "$(files)"
+      },
+      {
+        "command": "ctlimSftp.renameRemoteFile",
+        "title": "ctlim SFTP: Rename Remote File",
+        "icon": "$(edit)"
       },
       {
         "command": "ctlimSftp.openInBrowser",
@@ -193,6 +203,21 @@
         "command": "ctlimSftp.frequentBookmarks",
         "title": "ctlim SFTP: Frequent Bookmarks",
         "icon": "$(star-full)"
+      },
+      {
+        "command": "ctlimSftp.saveAsTemplate",
+        "title": "ctlim SFTP: Save as Template",
+        "icon": "$(save)"
+      },
+      {
+        "command": "ctlimSftp.addServerFromTemplate",
+        "title": "ctlim SFTP: Add Server from Template",
+        "icon": "$(add)"
+      },
+      {
+        "command": "ctlimSftp.manageTemplates",
+        "title": "ctlim SFTP: Manage Templates",
+        "icon": "$(list-unordered)"
       }
     ],
     "menus": {
@@ -214,6 +239,11 @@
         },
         {
           "command": "ctlimSftp.viewBookmarks",
+          "when": "view == ctlimSftpView",
+          "group": "navigation"
+        },
+        {
+          "command": "ctlimSftp.addServerFromTemplate",
           "when": "view == ctlimSftpView",
           "group": "navigation"
         }
@@ -275,6 +305,11 @@
           "group": "history@2"
         },
         {
+          "command": "ctlimSftp.saveAsTemplate",
+          "when": "view == ctlimSftpView && viewItem == server",
+          "group": "template@1"
+        },
+        {
           "command": "ctlimSftp.changePermissions",
           "when": "view == ctlimSftpView && viewItem == remoteFile",
           "group": "ctlimSftp@1"
@@ -303,6 +338,16 @@
           "command": "ctlimSftp.openInBrowser",
           "when": "view == ctlimSftpView && viewItem == remoteFile",
           "group": "ctlimSftp@6"
+        },
+        {
+          "command": "ctlimSftp.copyRemoteFile",
+          "when": "view == ctlimSftpView && viewItem == remoteFile",
+          "group": "file@1"
+        },
+        {
+          "command": "ctlimSftp.renameRemoteFile",
+          "when": "view == ctlimSftpView && viewItem == remoteFile",
+          "group": "file@2"
         },
         {
           "command": "ctlimSftp.addBookmark",
