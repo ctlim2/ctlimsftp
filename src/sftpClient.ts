@@ -12,7 +12,6 @@ export class SftpClient {
     public client: SftpClient2 | null = null;
     private connected: boolean = false;
     private outputChannel: vscode.OutputChannel | null = null;
-    private keepAliveTimer: NodeJS.Timeout | null = null;
     private lastConfig: SftpConfig | null = null;
     private reconnecting: boolean = false;
 
@@ -36,12 +35,6 @@ export class SftpClient {
             host: config.host,
             port: config.port,
             username: config.username,
-            // 연결 타임아웃 설정 (기본 10초)
-            connectTimeout: config.connectTimeout || 10000,
-            readyTimeout: config.readyTimeout || 20000,
-            // Keep-Alive 설정 (기본 10초 간격)
-            keepaliveInterval: config.keepaliveInterval || 10000,
-            keepaliveCountMax: config.keepaliveCountMax || 3,
             // Add algorithms for compatibility with older SSH servers
             algorithms: {
                 kex: [
@@ -112,9 +105,6 @@ export class SftpClient {
         await this.client.connect(connectConfig);
         this.connected = true;
         
-        // Keep-Alive 타이머 시작
-        this.startKeepAlive(config);
-        
         this.log(`서버 연결 성공: ${config.host}:${config.port}`);
     }
 
@@ -133,9 +123,6 @@ export class SftpClient {
     }
 
     async disconnect(): Promise<void> {
-        // Keep-Alive 타이머 정리
-        this.stopKeepAlive();
-        
         if (this.client) {
             await this.client.end();
             this.connected = false;
@@ -145,61 +132,16 @@ export class SftpClient {
     }
 
     /**
-     * Keep-Alive 타이머 시작 - 주기적으로 연결 상태 확인
+     * 수동 재연결 시도
      */
-    private startKeepAlive(config: SftpConfig): void {
-        // 기존 타이머가 있으면 정리
-        this.stopKeepAlive();
-        
-        const interval = config.keepaliveInterval || 10000;
-        
-        this.keepAliveTimer = setInterval(async () => {
-            if (!this.connected || !this.client) {
-                this.stopKeepAlive();
-                return;
-            }
-            
-            try {
-                // 간단한 stat 명령으로 연결 확인
-                await this.client.list(config.remotePath);
-                if (DEBUG_MODE) console.log(`Keep-Alive: 연결 정상 - ${config.host}`);
-            } catch (error) {
-                this.log(`Keep-Alive 실패: ${error}`);
-                // 연결 끊김 감지 - 자동 재연결 시도
-                if (!this.reconnecting) {
-                    await this.attemptReconnect();
-                }
-            }
-        }, interval);
-        
-        if (DEBUG_MODE) console.log(`Keep-Alive 타이머 시작: ${interval}ms 간격`);
-    }
-
-    /**
-     * Keep-Alive 타이머 중지
-     */
-    private stopKeepAlive(): void {
-        if (this.keepAliveTimer) {
-            clearInterval(this.keepAliveTimer);
-            this.keepAliveTimer = null;
-            if (DEBUG_MODE) console.log('Keep-Alive 타이머 중지');
-        }
-    }
-
-    /**
-     * 자동 재연결 시도
-     */
-    private async attemptReconnect(): Promise<void> {
+    async attemptReconnect(): Promise<void> {
         if (this.reconnecting || !this.lastConfig) {
             return;
         }
         
         this.reconnecting = true;
         this.connected = false;
-        this.log(`자동 재연결 시도 중: ${this.lastConfig.host}...`);
-        
-        // Keep-Alive 타이머 중지 (재연결 시 새로 시작됨)
-        this.stopKeepAlive();
+        this.log(`재연결 시도 중: ${this.lastConfig.host}...`);
         
         try {
             // 기존 연결 정리
@@ -218,10 +160,6 @@ export class SftpClient {
                 host: this.lastConfig.host,
                 port: this.lastConfig.port,
                 username: this.lastConfig.username,
-                connectTimeout: this.lastConfig.connectTimeout || 10000,
-                readyTimeout: this.lastConfig.readyTimeout || 20000,
-                keepaliveInterval: this.lastConfig.keepaliveInterval || 10000,
-                keepaliveCountMax: this.lastConfig.keepaliveCountMax || 3,
                 algorithms: {
                     kex: [
                         'curve25519-sha256',
@@ -277,23 +215,20 @@ export class SftpClient {
             await this.client.connect(connectConfig);
             this.connected = true;
             
-            // Keep-Alive 타이머 재시작
-            this.startKeepAlive(this.lastConfig);
-            
-            this.log(`✅ 자동 재연결 성공: ${this.lastConfig.host}`);
+            this.log(`✅ 재연결 성공: ${this.lastConfig.host}`);
             
             // 사용자에게 알림
             vscode.window.showInformationMessage(
                 `🔄 SFTP 재연결 성공: ${this.lastConfig.name || this.lastConfig.host}`
             );
         } catch (error) {
-            this.log(`❌ 자동 재연결 실패 (attemptReconnect): ${error}`);
+            this.log(`❌ 재연결 실패 (attemptReconnect): ${error}`);
             this.connected = false;
             this.client = null;
             
             // 사용자에게 알림
             vscode.window.showWarningMessage(
-                `⚠️ SFTP 재연결 실패: ${this.lastConfig.name || this.lastConfig.host}\n수동으로 재연결해주세요.`
+                `⚠️ SFTP 재연결 실패: ${this.lastConfig.name || this.lastConfig.host}\n다시 연결해주세요.`
             );
         } finally {
             this.reconnecting = false;

@@ -2,7 +2,7 @@
 
 > 간편하고 강력한 VS Code SFTP/SSH 파일 동기화 확장 프로그램
 
-[![Version](https://img.shields.io/badge/version-0.2.9-blue.svg)](https://github.com/ctlim2/ctlimsftp)
+[![Version](https://img.shields.io/badge/version-0.4.1-blue.svg)](https://github.com/ctlim2/ctlimsftp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 **저장 시 자동 업로드**와 **지능형 충돌 감지**로 원격 서버와 로컬 파일을 안전하게 동기화하세요.
@@ -23,6 +23,7 @@
 - **메타데이터 기반 동기화** - 파일 수정 시간 추적으로 안전한 업로드
 
 ### 💡 개발 편의성
+- **스마트 북마크** - 자주 사용하는 파일/폴더 즐겨찾기
 - **다른 이름으로 저장** - 원격 경로를 직접 입력하거나 트리에서 선택
 - **Diff 비교** - 충돌 시 로컬/원격 파일을 시각적으로 비교
 - **선택적 무시** - `.git`, `node_modules` 등 불필요한 파일 제외
@@ -33,6 +34,12 @@
 - **전송 통계** - 전송량, 속도, 성공률 실시간 분석
 - **실패 재시도** - 실패한 전송을 원클릭으로 재시도
 - **서버별 통계** - 서버별 전송 통계 및 성능 비교
+
+### 🔍 고급 작업
+- **원격 파일 검색** - 파일명 또는 내용으로 검색 (정규식 지원)
+- **권한 관리** - chmod 원클릭 변경 (755, 644 등)
+- **SSH 터미널** - 원격 서버 SSH 터미널 바로 열기
+- **다중 파일 작업** - 여러 파일 동시 다운로드/삭제
 
 ---
 
@@ -384,7 +391,102 @@ ctlim SFTP는 안정적인 연결 유지를 위해 자동 재연결 기능을 �
 
 ## 🛠️ 고급 기능
 
-### 1. 다른 이름으로 저장
+### 1. 북마크 시스템
+
+자주 사용하는 원격 파일이나 폴더를 북마크로 저장하여 빠르게 접근할 수 있습니다.
+
+#### 북마크 추가
+
+**방법 1: 트리 뷰 우클릭**
+1. Activity Bar에서 원격 파일/폴더 우클릭
+2. `Add Bookmark` 선택
+3. 북마크 이름 및 설명 입력
+
+**방법 2: Command Palette**
+- `ctlim SFTP: Add Bookmark`
+
+#### 북마크 사용
+
+**북마크 보기**:
+```
+⭐ 북마크 (5)
+├── 📄 설정 파일
+├── 📁 로그 디렉토리
+├── 📄 데이터베이스 설정
+└── 📁 백업 폴더
+```
+
+**빠른 접근**:
+- Activity Bar에서 북마크 클릭 → 파일 즉시 열기 또는 폴더 이동
+- `ctlim SFTP: View Bookmarks` - 북마크 목록 보기
+- `ctlim SFTP: Frequent Bookmarks` - 자주 사용하는 북마크 (상위 10개)
+
+#### 북마크 관리
+
+**삭제**: 북마크 우클릭 → `Delete Bookmark`
+
+**통계**:
+- 접근 횟수 자동 추적
+- 마지막 접근 시간 기록
+- 자주 사용하는 순으로 정렬
+
+**활용 시나리오**:
+- 설정 파일 빠른 수정
+- 로그 디렉토리 실시간 모니터링
+- 자주 편집하는 코드 파일 즐겨찾기
+
+---
+
+### 2. 원격 파일 검색
+
+#### 파일명 검색
+
+**Command Palette**: `ctlim SFTP: Search Remote Files by Name`
+
+```
+검색 패턴 입력:
+- 일반 텍스트: config.php
+- 정규식: /\.php$/
+```
+
+**검색 결과**:
+```
+$(file) config.php
+  /var/www/html/config.php
+  크기: 2.5 KB | 수정: 2024-12-30 14:30
+
+$(file) app-config.php
+  /var/www/html/includes/app-config.php
+  크기: 5.1 KB | 수정: 2024-12-29 10:15
+```
+
+#### 파일 내용 검색
+
+**Command Palette**: `ctlim SFTP: Search in Remote Files`
+
+```
+검색 텍스트: database_connect
+파일 패턴: *.php
+```
+
+**검색 결과 (매칭 줄 표시)**:
+```
+$(file) config.php (2개 일치)
+  Line 15: function database_connect() {
+  Line 45: $conn = database_connect();
+
+$(file) admin.php (1개 일치)
+  Line 102: require_once('database_connect.php');
+```
+
+**고급 옵션**:
+- 정규식 지원: `/function\s+\w+/`
+- 파일 패턴: `*.php`, `config.*`, `**/*.js`
+- 최대 결과 수 제한
+
+---
+
+### 3. 다른 이름으로 저장
 
 에디터에서 우클릭 → `ctlim SFTP: Save As Remote Path`
 
@@ -405,7 +507,7 @@ ctlim SFTP는 안정적인 연결 유지를 위해 자동 재연결 기능을 �
 
 ---
 
-### 2. 파일 무시 패턴
+### 4. 파일 무시 패턴
 
 ```json
 {
@@ -428,7 +530,7 @@ ctlim SFTP는 안정적인 연결 유지를 위해 자동 재연결 기능을 �
 
 ---
 
-### 3. Context 경로 활용
+### 5. Context 경로 활용
 
 서로 다른 로컬 폴더를 각기 다른 원격 경로에 매핑:
 
@@ -449,7 +551,7 @@ ctlim SFTP는 안정적인 연결 유지를 위해 자동 재연결 기능을 �
 
 ---
 
-### 4. 다운로드 백업 기능
+### 6. 다운로드 백업 기능
 
 원격 파일을 다운로드할 때 기존 로컬 파일을 자동으로 백업합니다.
 
@@ -500,7 +602,7 @@ ctlim SFTP는 안정적인 연결 유지를 위해 자동 재연결 기능을 �
 
 ---
 
-### 5. 전송 히스토리 및 통계
+### 7. 전송 히스토리 및 통계
 
 모든 파일 전송 활동을 자동으로 기록하고 분석합니다.
 
@@ -563,7 +665,109 @@ ctlim SFTP는 안정적인 연결 유지를 위해 자동 재연결 기능을 �
 - **자동 정리**: 오래된 기록 자동 삭제
 
 ---
-### 6. 컨텍스트 메뉴 기능
+
+### 8. 권한 관리
+
+원격 파일의 권한을 쉽게 변경할 수 있습니다.
+
+**사용법**:
+1. 원격 파일/폴더 우클릭
+2. `Change Permissions` 선택
+3. 권한 모드 선택
+
+**권장 권한**:
+```
+$(file-code) 755 - rwxr-xr-x
+  실행 파일, 디렉토리
+  소유자: 모든 권한 | 그룹/기타: 읽기+실행
+
+$(file) 644 - rw-r--r--
+  일반 파일 (HTML, CSS, JS 등)
+  소유자: 읽기+쓰기 | 그룹/기타: 읽기만
+
+$(lock) 600 - rw-------
+  비밀 파일 (SSH key, 설정 파일)
+  소유자만 읽기+쓰기
+
+$(warning) 777 - rwxrwxrwx
+  모든 권한 (⚠️ 보안 위험! 권장하지 않음)
+```
+
+**커스텀 입력**:
+- 직접 권한 코드 입력 (예: 754, 640)
+- 8진수 3자리 형식 (000-777)
+
+**활용 시나리오**:
+- 업로드 후 실행 권한 추가
+- 설정 파일 보안 강화
+- 로그 파일 접근 제한
+
+---
+
+### 9. SSH 터미널
+
+연결된 서버의 SSH 터미널을 VS Code에서 바로 열 수 있습니다.
+
+**사용법**:
+1. 서버 우클릭 → `Open SSH Terminal`
+2. 또는 Command Palette: `ctlim SFTP: Open SSH Terminal`
+
+**자동 명령**:
+```bash
+ssh -p 22 username@example.com
+# Private Key 사용 시
+ssh -i "/path/to/key" -p 22 username@example.com
+```
+
+**활용 시나리오**:
+- 서버 로그 실시간 확인 (`tail -f`)
+- 원격 명령 실행 (재시작, 백업 등)
+- Git 작업 (pull, commit 등)
+- 데이터베이스 직접 접속
+
+---
+
+### 10. 다중 파일 작업
+
+여러 파일을 동시에 선택하여 일괄 작업할 수 있습니다.
+
+#### 다중 선택
+
+- **Ctrl + 클릭**: 개별 파일 추가 선택
+- **Shift + 클릭**: 범위 선택
+
+#### 다중 다운로드
+
+**사용법**:
+1. 여러 파일 선택 (Ctrl/Shift + 클릭)
+2. 우클릭 → `Download Multiple Files`
+3. 진행 상황 표시
+
+**결과**:
+```
+✅ 5개 파일 다운로드 완료
+- config.php
+- database.php
+- functions.php
+- index.php
+- style.css
+```
+
+#### 다중 삭제
+
+**사용법**:
+1. 여러 파일 선택
+2. 우클릭 → `Delete Multiple Files`
+3. 확인 대화상자
+
+**주의사항**:
+- 삭제 전 확인 필수
+- 원격 서버에서 영구 삭제
+- 복구 불가능
+
+---
+
+### 11. 컨텍스트 메뉴 기능
 
 원격 파일/폴더를 우클릭하여 다양한 작업을 수행할 수 있습니다.
 
@@ -634,6 +838,7 @@ ctlim SFTP는 안정적인 연결 유지를 위해 자동 재연결 기능을 �
 - 로컬에서 만들지 않고 원격에 직접 생성
 
 ---
+
 ## ❓ FAQ (자주 묻는 질문)
 
 ### Q1: SSH 연결이 안 돼요
@@ -715,7 +920,7 @@ rm -rf .vscode/.sftp-metadata/
 
 MIT License - 자세한 내용은 [LICENSE](LICENSE) 파일 참조
 
-Copyright (c) 2024 ctlim2
+Copyright (c) 2025 ctlim2
 
 ---
 
@@ -724,5 +929,5 @@ Copyright (c) 2024 ctlim2
 이 프로젝트가 유용하다면 ⭐ Star를 눌러주세요!
 
 **개발자**: ctlim  
-**버전**: 0.2.9  
-**마지막 업데이트**: 2024-12-24
+**버전**: 0.4.1  
+**마지막 업데이트**: 2024-12-30

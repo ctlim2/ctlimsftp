@@ -2,9 +2,10 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { SftpClient } from './sftpClient';
-import { SftpConfig, FileMetadata, RemoteFile, TransferHistory } from './types';
-import { SftpTreeProvider, SftpDragAndDropController } from './sftpTreeProvider';
+import { SftpConfig, FileMetadata, RemoteFile, TransferHistory, Bookmark } from './types';
+import { SftpTreeProvider, SftpDragAndDropController, SftpTreeItem } from './sftpTreeProvider';
 import { TransferHistoryManager, createTransferHistory } from './transferHistory';
+import { BookmarkManager } from './bookmarkManager';
 
 // 개발 모드 여부 (릴리스 시 false로 변경)
 const DEBUG_MODE = true;
@@ -14,6 +15,8 @@ let treeProvider: SftpTreeProvider;
 let currentConfig: SftpConfig | null = null;
 let statusBarItem: vscode.StatusBarItem;
 let transferHistoryManager: TransferHistoryManager | null = null;
+let bookmarkManager: BookmarkManager | null = null;
+let sftpTreeView: vscode.TreeView<SftpTreeItem> | null = null;
 
 // Cache document-config and client mapping for performance
 const documentConfigCache = new WeakMap<vscode.TextDocument, { config: SftpConfig; client: SftpClient; remotePath: string }>();
@@ -22,11 +25,12 @@ export function activate(context: vscode.ExtensionContext) {
     if (DEBUG_MODE) console.log('ctlim SFTP extension is now active');
 
     // Register Tree View Provider (StatusBar보다 먼저 생성)
-    treeProvider = new SftpTreeProvider();
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    treeProvider = new SftpTreeProvider(workspaceFolder?.uri.fsPath);
     
     // Initialize Transfer History Manager
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (workspaceFolder) {
+        bookmarkManager = new BookmarkManager(workspaceFolder.uri.fsPath);
         transferHistoryManager = new TransferHistoryManager(workspaceFolder.uri.fsPath);
     }
     
@@ -43,7 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
     /**
      * Create Tree View with Drag and Drop support
      */
-    const treeView = vscode.window.createTreeView('ctlimSftpView', {
+    sftpTreeView = vscode.window.createTreeView('ctlimSftpView', {
         treeDataProvider: treeProvider,
         showCollapseAll: true,
         canSelectMany: true,
@@ -53,7 +57,7 @@ export function activate(context: vscode.ExtensionContext) {
     /**
      * Handle selection on tree items (servers only, files use double-click)
      */
-    treeView.onDidChangeSelection(async (e) => {
+    sftpTreeView.onDidChangeSelection(async (e) => {
         if (e.selection.length > 0) {
             const item = e.selection[0];
             
@@ -68,7 +72,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
     
-    context.subscriptions.push(treeView);
+    context.subscriptions.push(sftpTreeView);
 
     // Check and reload remote files on startup
     setTimeout(() => checkAndReloadRemoteFiles(), 2000);
@@ -301,7 +305,7 @@ export function activate(context: vscode.ExtensionContext) {
                         await connection.client.connect(config);
                         vscode.window.showInformationMessage('서버에 다시 연결되었습니다.');
                     } catch (error) {
-                        vscode.window.showErrorMessage(`재연결 실패(ctlimSftp.openRemoteFile): ${error}`);
+                        vscode.window.showErrorMessage(`재연결 실패(ctlimSftp.openRemoteFile:${remotePath}): ${error}`);
                         return;
                     }
                 } else {
@@ -2045,6 +2049,297 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     /**
+     * 북마크 열기 Command (트리에서 북마크 클릭 시)
+     */
+    const openBookmarkCommand = vscode.commands.registerCommand('ctlimSftp.openBookmark', async (bookmark: Bookmark) => {
+        await openBookmark(bookmark);
+    });
+
+    /**
+     * 북마크 추가 Command
+     */
+    const addBookmarkCommand = vscode.commands.registerCommand('ctlimSftp.addBookmark', async (item?: any) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.addBookmark');
+        
+        try {
+            if (!bookmarkManager) {
+                vscode.window.showErrorMessage('북마크 관리자를 초기화할 수 없습니다.');
+                return;
+            }
+            
+            let remotePath: string;
+            let serverName: string;
+            let isDirectory: boolean;
+            let config: SftpConfig;
+            
+            // TreeView item에서 정보 가져오기
+            if (item && item.config && item.remotePath) {
+                config = item.config;
+                remotePath = item.remotePath;
+                isDirectory = item.isDirectory || false;
+                serverName = config.name || `${config.username}@${config.host}`;
+            } else {
+                vscode.window.showErrorMessage('북마크 정보를 찾을 수 없습니다.');
+                return;
+            }
+            
+            // 이미 북마크에 있는지 확인
+            if (bookmarkManager.hasBookmark(serverName, remotePath)) {
+                vscode.window.showWarningMessage('이미 북마크에 추가된 경로입니다.');
+                return;
+            }
+            
+            // 북마크 이름 입력
+            const fileName = path.basename(remotePath);
+            const bookmarkName = await vscode.window.showInputBox({
+                prompt: '북마크 이름을 입력하세요',
+                value: fileName,
+                placeHolder: '예: 설정 파일, 로그 디렉토리',
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return '이름을 입력해주세요';
+                    }
+                    return null;
+                }
+            });
+            
+            if (!bookmarkName) {
+                return;
+            }
+            
+            // 설명 입력 (선택사항)
+            const description = await vscode.window.showInputBox({
+                prompt: '북마크 설명 (선택사항)',
+                placeHolder: '예: 개발 서버 설정 파일',
+            });
+            
+            // 북마크 추가
+            const bookmark = bookmarkManager.addBookmark(
+                bookmarkName,
+                serverName,
+                remotePath,
+                isDirectory,
+                description
+            );
+            
+            vscode.window.showInformationMessage(`⭐ 북마크 추가: ${bookmarkName}`);
+            
+            // TreeView 새로고침
+            treeProvider.refresh();
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`북마크 추가 실패: ${error}`);
+            console.error('addBookmark error:', error);
+        }
+    });
+
+    /**
+     * 북마크 보기 Command
+     */
+    const viewBookmarksCommand = vscode.commands.registerCommand('ctlimSftp.viewBookmarks', async () => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.viewBookmarks');
+        
+        try {
+            if (!bookmarkManager) {
+                vscode.window.showErrorMessage('북마크 관리자를 초기화할 수 없습니다.');
+                return;
+            }
+            
+            const bookmarks = bookmarkManager.getAllBookmarks();
+            
+            if (bookmarks.length === 0) {
+                vscode.window.showInformationMessage('⭐ 저장된 북마크가 없습니다.');
+                return;
+            }
+            
+            // QuickPick 아이템 생성
+            interface BookmarkQuickPickItem extends vscode.QuickPickItem {
+                bookmark: Bookmark;
+                action?: 'open' | 'delete' | 'edit';
+            }
+            
+            const items: BookmarkQuickPickItem[] = bookmarks.map(b => {
+                const typeIcon = b.isDirectory ? '📁' : '📄';
+                const accessInfo = b.accessCount > 0 
+                    ? ` | 사용횟수: ${b.accessCount}회`
+                    : '';
+                
+                return {
+                    label: `⭐ ${b.name}`,
+                    description: `${b.serverName} | ${b.remotePath}`,
+                    detail: `${typeIcon} ${b.description || '설명 없음'}${accessInfo}`,
+                    bookmark: b
+                };
+            });
+            
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: `${bookmarks.length}개의 북마크 - 선택하여 열기`,
+                matchOnDescription: true,
+                matchOnDetail: true
+            });
+            
+            if (selected) {
+                // 북마크 열기
+                await openBookmark(selected.bookmark);
+            }
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`북마크 조회 실패: ${error}`);
+            console.error('viewBookmarks error:', error);
+        }
+    });
+
+    /**
+     * 북마크 삭제 Command (Command Palette용)
+     */
+    const removeBookmarkCommand = vscode.commands.registerCommand('ctlimSftp.removeBookmark', async () => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.removeBookmark');
+        
+        try {
+            if (!bookmarkManager) {
+                vscode.window.showErrorMessage('북마크 관리자를 초기화할 수 없습니다.');
+                return;
+            }
+            
+            const bookmarks = bookmarkManager.getAllBookmarks();
+            
+            if (bookmarks.length === 0) {
+                vscode.window.showInformationMessage('삭제할 북마크가 없습니다.');
+                return;
+            }
+            
+            interface BookmarkQuickPickItem extends vscode.QuickPickItem {
+                bookmark: Bookmark;
+            }
+            
+            const items: BookmarkQuickPickItem[] = bookmarks.map(b => ({
+                label: `⭐ ${b.name}`,
+                description: `${b.serverName} | ${b.remotePath}`,
+                detail: b.description || '설명 없음',
+                bookmark: b
+            }));
+            
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: '삭제할 북마크 선택',
+                matchOnDescription: true
+            });
+            
+            if (!selected) {
+                return;
+            }
+            
+            // 확인 대화상자
+            const confirm = await vscode.window.showWarningMessage(
+                `북마크를 삭제하시겠습니까?\n\n${selected.bookmark.name}`,
+                { modal: true },
+                '삭제'
+            );
+            
+            if (confirm === '삭제') {
+                const success = bookmarkManager.removeBookmark(selected.bookmark.id);
+                if (success) {
+                    vscode.window.showInformationMessage(`🗑️ 북마크 삭제: ${selected.bookmark.name}`);
+                }
+            }
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`북마크 삭제 실패: ${error}`);
+            console.error('removeBookmark error:', error);
+        }
+    });
+
+    /**
+     * 북마크 삭제 Command (TreeView 우클릭용)
+     */
+    const deleteBookmarkCommand = vscode.commands.registerCommand('ctlimSftp.deleteBookmark', async (item?: SftpTreeItem) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.deleteBookmark');
+        
+        try {
+            if (!bookmarkManager) {
+                vscode.window.showErrorMessage('북마크 관리자를 초기화할 수 없습니다.');
+                return;
+            }
+            
+            // TreeView에서 호출된 경우
+            if (item && item.itemType === 'bookmark' && item.bookmarkData) {
+                const bookmark = item.bookmarkData;
+                
+                // 확인 대화상자
+                const confirm = await vscode.window.showWarningMessage(
+                    `북마크를 삭제하시겠습니까?\n\n${bookmark.name}`,
+                    { modal: true },
+                    '삭제'
+                );
+                
+                if (confirm === '삭제') {
+                    const success = bookmarkManager.removeBookmark(bookmark.id);
+                    if (success) {
+                        vscode.window.showInformationMessage(`🗑️ 북마크 삭제: ${bookmark.name}`);
+                        treeProvider.refresh();
+                    }
+                }
+            } else {
+                // 다른 경로로 호출된 경우 - QuickPick으로 선택
+                await vscode.commands.executeCommand('ctlimSftp.removeBookmark');
+            }
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`북마크 삭제 실패: ${error}`);
+            console.error('deleteBookmark error:', error);
+        }
+    });
+
+    /**
+     * 자주 사용하는 북마크 Command
+     */
+    const frequentBookmarksCommand = vscode.commands.registerCommand('ctlimSftp.frequentBookmarks', async () => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.frequentBookmarks');
+        
+        try {
+            if (!bookmarkManager) {
+                vscode.window.showErrorMessage('북마크 관리자를 초기화할 수 없습니다.');
+                return;
+            }
+            
+            const bookmarks = bookmarkManager.getFrequentBookmarks(10);
+            
+            if (bookmarks.length === 0) {
+                vscode.window.showInformationMessage('⭐ 자주 사용하는 북마크가 없습니다.');
+                return;
+            }
+            
+            interface BookmarkQuickPickItem extends vscode.QuickPickItem {
+                bookmark: Bookmark;
+            }
+            
+            const items: BookmarkQuickPickItem[] = bookmarks.map((b, index) => {
+                const typeIcon = b.isDirectory ? '📁' : '📄';
+                const medal = index < 3 ? ['🥇', '🥈', '🥉'][index] : '⭐';
+                
+                return {
+                    label: `${medal} ${b.name}`,
+                    description: `${b.serverName} | ${b.remotePath}`,
+                    detail: `${typeIcon} 사용횟수: ${b.accessCount}회 | ${b.description || ''}`,
+                    bookmark: b
+                };
+            });
+            
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: '자주 사용하는 북마크 - 선택하여 열기',
+                matchOnDescription: true
+            });
+            
+            if (selected) {
+                await openBookmark(selected.bookmark);
+            }
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(`북마크 조회 실패: ${error}`);
+            console.error('frequentBookmarks error:', error);
+        }
+    });
+
+    /**
      * 설정 파일 열기 Command
      */
     const configCommand = vscode.commands.registerCommand('ctlimSftp.config', async () => {
@@ -2073,10 +2368,6 @@ export function activate(context: vscode.ExtensionContext) {
                 uploadOnSave: true,
                 downloadOnOpen: false,
                 downloadBackup: ".vscode/.sftp-backup",
-                connectTimeout: 10000,
-                readyTimeout: 20000,
-                keepaliveInterval: 10000,
-                keepaliveCountMax: 3,
                 watcher: {
                     files: "**/*.{js,ts,css,html}",
                     autoUpload: false,
@@ -2137,11 +2428,12 @@ export function activate(context: vscode.ExtensionContext) {
         let cachedClient: SftpClient | null = cached?.client || null;
         let cachedRemotePath: string | null = cached?.remotePath || "";
         
-        // Fallback: find config by file path
+        // 캐시에 없으면 메타데이터로 확인 (원격에서 다운로드한 파일만 메타데이터 존재)
         if (!config) {
-            config = await findConfigForFile(document.uri.fsPath);
+            config = await findConfigByMetadata(document.uri.fsPath);
         }
         
+        // 메타데이터도 없으면 일반 로컬 파일이므로 무시
         if (!config) {
             return;
         }
@@ -2183,7 +2475,7 @@ export function activate(context: vscode.ExtensionContext) {
                     '덮어쓰기 (로컬 → 서버)',
                     '다운로드 (서버 → 로컬)',
                     '비교 및 병합',
-                    '취소'
+//                    '취소'
                 );
                 
                 if (choice === '덮어쓰기 (로컬 → 서버)') {
@@ -2234,7 +2526,7 @@ export function activate(context: vscode.ExtensionContext) {
                         `⚠️ 로컬 변경사항이 손실됩니다!\n\n서버 파일로 덮어쓰시겠습니까?`,
                         { modal: true },
                         '확인',
-                        '취소'
+//                        '취소'
                     );
                     
                     if (confirmed === '확인') {
@@ -2293,7 +2585,8 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             }
         } catch (error: any) {
-            // 연결이 끊어졌습니다
+            
+            // 연결이 끊어졌습니다. 다시 연결 해야 할지 등을 확인 해야 함. 디버깅 필여
             try {
                 // Clear cached client
                 documentConfigCache.delete(document);
@@ -2386,6 +2679,12 @@ export function activate(context: vscode.ExtensionContext) {
         clearTransferHistoryCommand,
         copyRemotePathCommand,
         openInBrowserCommand,
+        openBookmarkCommand,
+        addBookmarkCommand,
+        viewBookmarksCommand,
+        removeBookmarkCommand,
+        deleteBookmarkCommand,
+        frequentBookmarksCommand,
         saveWatcher
         
 //        uploadCommand,
@@ -3611,6 +3910,238 @@ console.error(`원격 파일 확인 실패: ${fileInfo.metadata.remotePath}`, re
         }
     } catch (error) {
 console.error('원격 파일 확인 중 오류:', error);
+    }
+}
+
+/**
+ * 서버 이름과 원격 경로로 TreeItem 찾기
+ * @param serverName 서버 이름
+ * @param remotePath 원격 경로
+ * @returns SftpTreeItem 또는 undefined
+ */
+async function findServerTreeItem(serverName: string, remotePath: string): Promise<SftpTreeItem | undefined> {
+    try {
+        // Get all root items (servers and groups)
+        const rootItems = await treeProvider.getChildren();
+        
+        // Find the server item
+        let serverItem: SftpTreeItem | undefined;
+        
+        for (const item of rootItems) {
+            if (item.itemType === 'server' && item.serverItem?.name === serverName) {
+                serverItem = item;
+                break;
+            } else if (item.itemType === 'group') {
+                // Check servers in group
+                const groupChildren = await treeProvider.getChildren(item);
+                for (const child of groupChildren) {
+                    if (child.itemType === 'server' && child.serverItem?.name === serverName) {
+                        serverItem = child;
+                        break;
+                    }
+                }
+                if (serverItem) break;
+            }
+        }
+        
+        if (!serverItem) {
+            return undefined;
+        }
+        
+        // If remotePath matches server's remotePath, return server item
+        const connection = treeProvider.getConnectedServer(serverName);
+        if (!connection) {
+            return serverItem;
+        }
+        
+        if (remotePath === connection.config.remotePath) {
+            return serverItem;
+        }
+        
+        // Navigate to the remote path
+        const pathParts = remotePath.replace(connection.config.remotePath, '').split('/').filter(p => p);
+        let currentItem = serverItem;
+        
+        for (const part of pathParts) {
+            const children = await treeProvider.getChildren(currentItem);
+            const nextItem = children.find(child => child.label === part);
+            
+            if (!nextItem) {
+                return currentItem; // Return closest match
+            }
+            
+            currentItem = nextItem;
+        }
+        
+        return currentItem;
+    } catch (error) {
+        console.error('findServerTreeItem error:', error);
+        return undefined;
+    }
+}
+
+/**
+ * 북마크 열기
+ * @param bookmark 열 북마크
+ */
+async function openBookmark(bookmark: Bookmark): Promise<void> {
+    try {
+        if (!bookmarkManager) {
+            vscode.window.showErrorMessage('북마크 관리자를 초기화할 수 없습니다.');
+            return;
+        }
+        
+        // 서버 연결 확인
+        let connection = treeProvider.getConnectedServer(bookmark.serverName);
+        
+        if (!connection || !connection.client.isConnected()) {
+            const reconnect = await vscode.window.showWarningMessage(
+                `서버에 연결되어 있지 않습니다: ${bookmark.serverName}\n연결하시겠습니까?`,
+                '연결',
+//                '취소'
+            );
+            if (reconnect !== '연결') {
+                return;
+            }
+            
+            try {
+                // 설정 파일에서 config 찾기
+                const config = await findConfigByName(bookmark.serverName);
+                if (!config) {
+                    vscode.window.showErrorMessage(`서버 설정을 찾을 수 없습니다: ${bookmark.serverName}`);
+                    return;
+                }
+                
+                const client = new SftpClient();
+                await client.connect(config);
+                treeProvider.addConnectedServer(bookmark.serverName, client, config);
+                connection = treeProvider.getConnectedServer(bookmark.serverName);
+                
+                if (!connection) {
+                    vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                    return;
+                }
+            } catch (connectError) {
+                vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                return;
+            }
+        }
+        
+        // 접근 통계 업데이트
+        bookmarkManager.recordAccess(bookmark.id);
+        
+        // 파일/폴더 열기
+        if (bookmark.isDirectory) {
+            // 폴더인 경우 - TreeView에서 해당 경로로 이동
+            try {
+                if (DEBUG_MODE) console.log(`[북마크] 폴더 열기 시작: ${bookmark.remotePath}`);
+                
+                // TreeView 새로고침
+                treeProvider.refresh();
+                
+                if (!sftpTreeView) {
+                    vscode.window.showErrorMessage('SFTP TreeView가 초기화되지 않았습니다.');
+                    return;
+                }
+                
+                if (DEBUG_MODE) console.log(`[북마크] TreeItem 검색 중: ${bookmark.serverName} / ${bookmark.remotePath}`);
+                
+                // 서버 TreeItem 찾기
+                const serverTreeItem = await findServerTreeItem(bookmark.serverName, bookmark.remotePath);
+                
+                if (DEBUG_MODE) console.log(`[북마크] TreeItem 찾기 결과: ${serverTreeItem ? '성공' : '실패'}`);
+                
+                if (serverTreeItem) {
+                    if (DEBUG_MODE) console.log(`[북마크] reveal() 호출 중...`);
+                    if (DEBUG_MODE) console.log(`[북마크] TreeItem 정보: label=${serverTreeItem.label}, type=${serverTreeItem.itemType}`);
+                    
+                    // TreeView를 명시적으로 보이게 함
+                    await vscode.commands.executeCommand('workbench.view.extension.ctlim-sftp-explorer');
+                    
+                    // TreeView가 완전히 로드될 때까지 대기
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // TreeView 강제 새로고침
+                    treeProvider.refresh();
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    
+                    // 부모 경로들을 순차적으로 펼치기
+                    const pathParts = bookmark.remotePath.replace(connection.config.remotePath, '').split('/').filter(p => p);
+                    let currentPath = connection.config.remotePath;
+                    
+                    if (DEBUG_MODE) console.log(`[북마크] 경로 분해: ${pathParts.length}개 레벨`);
+                    
+                    // 각 레벨별로 TreeItem 찾아서 펼치기
+                    for (let i = 0; i < pathParts.length; i++) {
+                        currentPath = currentPath + '/' + pathParts[i];
+                        const levelItem = await findServerTreeItem(bookmark.serverName, currentPath);
+                        
+                        if (levelItem && sftpTreeView) {
+                            if (DEBUG_MODE) console.log(`[북마크] 레벨 ${i + 1} 펼치기: ${pathParts[i]}`);
+                            try {
+                                await sftpTreeView.reveal(levelItem, {
+                                    select: i === pathParts.length - 1, // 마지막만 선택
+                                    focus: i === pathParts.length - 1,  // 마지막만 포커스
+                                    expand: i === pathParts.length - 1 ? 2 : 1  // 마지막은 2레벨, 나머지는 1레벨
+                                });
+                                // 각 레벨마다 충분한 대기 시간
+                                await new Promise(resolve => setTimeout(resolve, 300));
+                            } catch (revealError: any) {
+                                if (DEBUG_MODE) console.log(`[북마크] 레벨 ${i + 1} 펼치기 실패: ${revealError.message}`);
+                            }
+                        }
+                    }
+                    
+                    if (DEBUG_MODE) console.log(`[북마크] reveal() 완료`);
+                    
+                    vscode.window.showInformationMessage(
+                        `✅ 북마크 폴더로 이동: ${bookmark.name}`
+                    );
+                } else {
+                    if (DEBUG_MODE) console.log(`[북마크] TreeItem을 찾을 수 없음`);
+                    
+                    vscode.window.showWarningMessage(
+                        `⚠️ 북마크 위치를 찾을 수 없습니다.\n\n경로: ${bookmark.remotePath}\n서버: ${bookmark.serverName}\n\n서버가 연결되어 있고 경로가 유효한지 확인하세요.`
+                    );
+                }
+            } catch (revealError) {
+                console.error('TreeView reveal error:', revealError);
+                vscode.window.showErrorMessage(
+                    `❌ 북마크 폴더 이동 실패: ${revealError}\n\n경로: ${bookmark.remotePath}`
+                );
+            }
+        } else {
+            // 파일인 경우 - TreeView 위치 이동 + 파일 열기
+            try {
+                // TreeView 새로고침
+                treeProvider.refresh();
+                
+                // 서버 TreeItem 찾기
+                const serverTreeItem = await findServerTreeItem(bookmark.serverName, bookmark.remotePath);
+                
+                if (serverTreeItem && sftpTreeView) {
+                    // TreeView에서 해당 위치로 이동
+                    await sftpTreeView.reveal(serverTreeItem, {
+                        select: true,
+                        focus: false,  // 파일은 에디터에 포커스
+                        expand: false
+                    });
+                }
+            } catch (revealError) {
+                console.error('TreeView reveal error:', revealError);
+            }
+            
+            // 파일 열기
+            await vscode.commands.executeCommand(
+                'ctlimSftp.openRemoteFile',
+                bookmark.remotePath,
+                connection.config
+            );
+        }
+        
+    } catch (error) {
+        vscode.window.showErrorMessage(`북마크 열기 실패: ${error}`);
+        console.error('openBookmark error:', error);
     }
 }
 

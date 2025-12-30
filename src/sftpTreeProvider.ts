@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { SftpClient } from './sftpClient';
-import { SftpConfig, RemoteFile, ServerListItem } from './types';
+import { SftpConfig, RemoteFile, ServerListItem, Bookmark } from './types';
+import { BookmarkManager } from './bookmarkManager';
 
 // 개발 모드 여부 (릴리스 시 false로 변경)
 const DEBUG_MODE = true;
@@ -34,7 +35,7 @@ export class SftpTreeItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
         public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-        public readonly itemType: 'group' | 'server' | 'remoteFile' | 'remoteDirectory' | 'message',
+        public readonly itemType: 'group' | 'server' | 'remoteFile' | 'remoteDirectory' | 'message' | 'bookmarkGroup' | 'bookmark',
         public readonly remotePath?: string,
         public readonly isDirectory?: boolean,
         public readonly config?: SftpConfig,
@@ -42,7 +43,8 @@ export class SftpTreeItem extends vscode.TreeItem {
         public readonly groupName?: string,
         public readonly fileSize?: number,
         public readonly modifyTime?: Date,
-        public readonly connectionStatus?: 'connected' | 'disconnected' | 'error'
+        public readonly connectionStatus?: 'connected' | 'disconnected' | 'error',
+        public readonly bookmarkData?: Bookmark
     ) {
         super(label, collapsibleState);
         
@@ -62,6 +64,25 @@ export class SftpTreeItem extends vscode.TreeItem {
             this.contextValue = 'server';
             this.tooltip = `${serverItem?.host}:${serverItem?.port}`;
             this.description = `${serverItem?.username}@${serverItem?.host}`;
+        } else if (itemType === 'bookmarkGroup') {
+            this.iconPath = new vscode.ThemeIcon('star-full', new vscode.ThemeColor('charts.yellow'));
+            this.contextValue = 'bookmarkGroup';
+            this.tooltip = '저장된 북마크';
+        } else if (itemType === 'bookmark') {
+            const icon = isDirectory ? 'folder' : 'file';
+            this.iconPath = new vscode.ThemeIcon(icon);
+            this.contextValue = 'bookmark';
+            
+            if (bookmarkData) {
+                const accessInfo = bookmarkData.accessCount > 0 
+                    ? ` | ${bookmarkData.accessCount}회 사용`
+                    : '';
+                this.description = bookmarkData.serverName;
+                this.tooltip = `${bookmarkData.name}\n경로: ${bookmarkData.remotePath}\n서버: ${bookmarkData.serverName}${accessInfo}`;
+                if (bookmarkData.description) {
+                    this.tooltip += `\n설명: ${bookmarkData.description}`;
+                }
+            }
         } else if (isDirectory) {
             this.iconPath = new vscode.ThemeIcon('folder', new vscode.ThemeColor('charts.yellow'));
             this.contextValue = 'remoteDirectory';
@@ -117,9 +138,13 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
 
     private serverList: ServerListItem[] = [];
     private connectedServers: Map<string, { client: SftpClient, config: SftpConfig }> = new Map();
+    private bookmarkManager: BookmarkManager | null = null;
 
-    constructor() {
+    constructor(workspaceRoot?: string) {
         this.loadServerList();
+        if (workspaceRoot) {
+            this.bookmarkManager = new BookmarkManager(workspaceRoot);
+        }
     }
 
     private loadServerList(): void {
@@ -253,11 +278,84 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
 
     refresh(): void {
         this.loadServerList();
+        if (this.bookmarkManager) {
+            this.bookmarkManager.reload();
+        }
         this._onDidChangeTreeData.fire();
     }
 
     getTreeItem(element: SftpTreeItem): vscode.TreeItem {
         return element;
+    }
+
+    getParent(element: SftpTreeItem): SftpTreeItem | undefined {
+        // Bookmark items - parent is bookmarkGroup
+        if (element.itemType === 'bookmark') {
+            // Find bookmark group in root
+            return undefined; // Bookmarks have no parent tracking yet
+        }
+        
+        // Server items
+        if (element.itemType === 'server' && element.groupName) {
+            // Server in a group - find the group item
+            // We need to return the group TreeItem, but we don't have reference
+            // For now, return undefined (will be improved later)
+            return undefined;
+        }
+        
+        // Remote files/directories
+        if ((element.itemType === 'remoteFile' || element.itemType === 'remoteDirectory') && element.remotePath && element.config) {
+            const serverName = element.config.name || `${element.config.username}@${element.config.host}`;
+            const connection = this.connectedServers.get(serverName);
+            
+            if (!connection) {
+                return undefined;
+            }
+            
+            // Get parent directory path
+            const parentPath = element.remotePath === connection.config.remotePath 
+                ? null 
+                : element.remotePath.substring(0, element.remotePath.lastIndexOf('/'));
+            
+            if (!parentPath || parentPath === connection.config.remotePath) {
+                // Parent is the server item
+                const serverItem = this.serverList.find(s => s.name === serverName);
+                if (!serverItem) {
+                    return undefined;
+                }
+                
+                return new SftpTreeItem(
+                    serverItem.name,
+                    vscode.TreeItemCollapsibleState.Collapsed,
+                    'server',
+                    undefined,
+                    undefined,
+                    connection.config,
+                    serverItem,
+                    undefined,
+                    undefined,
+                    undefined,
+                    'connected'
+                );
+            }
+            
+            // Parent is another remote directory
+            const parentName = parentPath.substring(parentPath.lastIndexOf('/') + 1);
+            return new SftpTreeItem(
+                parentName,
+                vscode.TreeItemCollapsibleState.Collapsed,
+                'remoteDirectory',
+                parentPath,
+                true,
+                element.config,
+                undefined,
+                undefined,
+                undefined,
+                undefined
+            );
+        }
+        
+        return undefined;
     }
 
     async getChildren(element?: SftpTreeItem): Promise<SftpTreeItem[]> {
@@ -286,6 +384,18 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
             }
 
             const items: SftpTreeItem[] = [];
+
+            // Add bookmark group at the top
+            if (this.bookmarkManager) {
+                const bookmarks = this.bookmarkManager.getAllBookmarks();
+                if (bookmarks.length > 0) {
+                    items.push(new SftpTreeItem(
+                        `⭐ 북마크 (${bookmarks.length})`,
+                        vscode.TreeItemCollapsibleState.Expanded,
+                        'bookmarkGroup'
+                    ));
+                }
+            }
 
             // Add grouped servers
             for (const [groupName, servers] of groupedServers.entries()) {
@@ -337,6 +447,39 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
             }
 
             return items;
+        } else if (element.itemType === 'bookmarkGroup') {
+            // Show bookmarks
+            if (!this.bookmarkManager) {
+                return [];
+            }
+            
+            const bookmarks = this.bookmarkManager.getAllBookmarks();
+            
+            return bookmarks.map(bookmark => {
+                const item = new SftpTreeItem(
+                    bookmark.name,
+                    vscode.TreeItemCollapsibleState.None,
+                    'bookmark',
+                    bookmark.remotePath,
+                    bookmark.isDirectory,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    bookmark
+                );
+                
+                // Set command to open bookmark
+                item.command = {
+                    command: 'ctlimSftp.openBookmark',
+                    title: 'Open Bookmark',
+                    arguments: [bookmark]
+                };
+                
+                return item;
+            });
         } else if (element.itemType === 'group' && element.groupName) {
             // Show servers in this group
             const serversInGroup = this.serverList.filter(s => s.group === element.groupName);
