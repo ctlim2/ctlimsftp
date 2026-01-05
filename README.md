@@ -2,7 +2,7 @@
 
 > 간편하고 강력한 VS Code SFTP/SSH 파일 동기화 확장 프로그램
 
-[![Version](https://img.shields.io/badge/version-0.4.1-blue.svg)](https://github.com/ctlim2/ctlimsftp)
+[![Version](https://img.shields.io/badge/version-0.4.3-blue.svg)](https://github.com/ctlim2/ctlimsftp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 **저장 시 자동 업로드**와 **지능형 충돌 감지**로 원격 서버와 로컬 파일을 안전하게 동기화하세요.
@@ -45,14 +45,23 @@
 
 ## 📦 설치
 
-### 방법 1: VS Code Marketplace
+### 지원 플랫폼
+- ✅ **VS Code** - Visual Studio Code
+- ✅ **Cursor** - AI 기반 코드 에디터 (VS Code 기반)
+- ✅ **기타 VS Code 호환 에디터**
+
+### 방법 1: VS Code/Cursor Marketplace
 1. `Ctrl+Shift+X` (확장 탭 열기)
 2. **"ctlim SFTP"** 검색
 3. **Install** 클릭
 
 ### 방법 2: 명령 줄
 ```bash
+# VS Code
 code --install-extension ctlim.ctlim-sftp
+
+# Cursor
+cursor --install-extension ctlim.ctlim-sftp
 ```
 
 ---
@@ -87,8 +96,9 @@ code --install-extension ctlim.ctlim-sftp
     "remotePath": "/var/www/html",
     "context": "d:/MyProject/Project/vss1",
     "uploadOnSave": true,
-    "downloadOnOpen": true,
-    "downloadBackup": ".vscode/.sftp-backup"
+    "downloadOnOpen": "confirm",
+    "downloadBackup": ".vscode/.sftp-backup",
+    "webUrl": "http://example.com",
     "ignore": [
       ".vscode",
       ".git",
@@ -114,6 +124,7 @@ code --install-extension ctlim.ctlim-sftp
       "context": "d:/MyProject/Project/dev1",
       "uploadOnSave": true,
       "downloadOnOpen": true,
+      "webUrl": "http://dev1.example.com",
       "ignore": [
         ".vscode",
         ".git",
@@ -195,8 +206,11 @@ code --install-extension ctlim.ctlim-sftp
 | `password` | string | - | ❌ | 비밀번호 (또는 `privateKey` 사용) |
 | `remotePath` | string | `"/"` | ❌ | 원격 서버 기본 경로 |
 | `uploadOnSave` | boolean | `false` | ❌ | 저장 시 자동 업로드 활성화 |
+| `downloadOnOpen` | boolean\|'confirm' | `false` | ❌ | 파일 열기 시 자동 다운로드<br/>- `true`: 자동 다운로드<br/>- `false`: 수동 다운로드<br/>- `'confirm'`: 다운로드 전 확인 대화상자 |
 | `downloadBackup` | string | - | ❌ | 다운로드 시 백업 경로 (상대/절대 경로) |
+| `webUrl` | string | - | ❌ | 웹 서버 기본 URL (브라우저에서 열기 기능 사용 시) |
 | `ignore` | string[] | `[]` | ❌ | 업로드 제외 패턴 (glob 지원) |
+| `watcher` | object | - | ❌ | 파일 감시 설정<br/>- `files`: 감시할 파일 패턴<br/>- `autoUpload`: 자동 업로드 여부<br/>- `autoDelete`: 자동 삭제 여부 |
 | `connectTimeout` | number | `10000` | ❌ | 연결 타임아웃 (밀리초) |
 | `readyTimeout` | number | `20000` | ❌ | 준비 타임아웃 (밀리초) |
 | `keepaliveInterval` | number | `10000` | ❌ | Keep-Alive 간격 (밀리초) |
@@ -589,9 +603,9 @@ $(file) admin.php (1개 일치)
     └── www/
         └── html/
             └── data/
-                ├── test.php.2024-12-24_10-30-45.backup
-                ├── test.php.2024-12-23_15-43-20.backup
-                └── test.php.2024-12-22_09-12-30.backup
+                ├── test.php.2025-12-24_10-30-45.backup
+                ├── test.php.2025-12-23_15-43-20.backup
+                └── test.php.2025-12-22_09-12-30.backup
 ```
 
 #### 사용 시나리오
@@ -613,11 +627,11 @@ $(file) admin.php (1개 일치)
 ```
 ✅ 📤 config.php
    Dev Server | 2.5 KB | 512 KB/s
-   성공 | 2024-12-24 14:30:45
+   성공 | 2025-12-24 14:30:45
 
 ❌ 📥 database.php
    Prod Server | 15 KB | N/A
-   실패 | 2024-12-24 14:28:12 | ❌ Connection timeout
+   실패 | 2025-12-24 14:28:12 | ❌ Connection timeout
 ```
 
 - **성공 기록**: 파일명, 서버, 크기, 전송 속도, 시간
@@ -839,6 +853,91 @@ ssh -i "/path/to/key" -p 22 username@example.com
 
 ---
 
+### 12. 서버 템플릿 시스템
+
+자주 사용하는 서버 설정을 템플릿으로 저장하고 재사용할 수 있습니다.
+
+#### 템플릿으로 저장
+
+현재 연결된 서버 설정을 템플릿으로 저장합니다.
+
+**사용법**:
+1. Activity Bar에서 서버 우클릭
+2. `Save as Template` 선택
+3. 템플릿 이름 및 설명 입력
+
+**저장되는 정보**:
+- ✅ 포트 번호, 원격 경로
+- ✅ 업로드/다운로드 설정
+- ✅ 무시 패턴, 백업 설정
+- ❌ 민감 정보 (비밀번호, SSH 키) - 보안상 제외
+
+#### 템플릿에서 서버 추가
+
+저장된 템플릿을 사용하여 새 서버를 빠르게 추가할 수 있습니다.
+
+**사용법**:
+1. Command Palette: `ctlim SFTP: Add Server from Template`
+2. 템플릿 선택
+3. 서버 정보 입력:
+   - 호스트 주소
+   - 사용자명
+   - 비밀번호 (선택사항)
+   - 서버 이름 (선택사항)
+
+**예시**:
+```
+템플릿 선택: 📋 LAMP Server Config
+
+호스트: new-server.example.com
+사용자명: admin
+비밀번호: ******** (선택사항)
+서버 이름: New Dev Server
+
+→ 설정 파일에 자동 추가됨 ✅
+```
+
+#### 템플릿 관리
+
+**Command Palette**: `ctlim SFTP: Manage Templates`
+
+```
+📋 LAMP Server (사용: 5회)
+   Port: 22 | 생성: 2025-12-15
+   설명: Apache + PHP + MySQL 기본 설정
+
+📋 Node.js Server (사용: 3회)
+   Port: 22 | 생성: 2025-11-20
+   설명: Node.js 프로젝트용 설정
+```
+
+**기능**:
+- 템플릿 삭제
+- 사용 통계 확인
+- 템플릿 상세 정보 보기
+
+#### 활용 시나리오
+
+1. **팀 표준 설정 공유**
+   - 팀 내 표준 서버 설정을 템플릿으로 저장
+   - 새 프로젝트 시작 시 빠른 설정
+
+2. **다중 환경 구축**
+   - 동일한 구성의 개발/테스트/운영 서버 추가
+   - 호스트와 인증 정보만 변경
+
+3. **클라이언트 프로젝트 관리**
+   - 클라이언트별 표준 설정 템플릿 유지
+   - 신규 사이트 작업 시 템플릿 재사용
+
+#### 저장 위치
+
+- **파일**: `.vscode/.sftp-templates.json`
+- **공유 방법**: Git에 커밋하여 팀원과 공유 가능
+- **보안**: 민감 정보(비밀번호, 키)는 저장되지 않음
+
+---
+
 ## ❓ FAQ (자주 묻는 질문)
 
 ### Q1: SSH 연결이 안 돼요
@@ -920,7 +1019,7 @@ rm -rf .vscode/.sftp-metadata/
 
 MIT License - 자세한 내용은 [LICENSE](LICENSE) 파일 참조
 
-Copyright (c) 2025 ctlim2
+Copyright (c) 2026 ctlim2
 
 ---
 
@@ -929,5 +1028,5 @@ Copyright (c) 2025 ctlim2
 이 프로젝트가 유용하다면 ⭐ Star를 눌러주세요!
 
 **개발자**: ctlim  
-**버전**: 0.4.1  
-**마지막 업데이트**: 2024-12-30
+**버전**: 0.4.3  
+**마지막 업데이트**: 2026-01-05

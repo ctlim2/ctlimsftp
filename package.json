@@ -2,7 +2,7 @@
   "name": "ctlim-sftp",
   "displayName": "ctlim-SFTP",
   "description": "Simple SFTP sync extension with upload on save and conflict detection",
-  "version": "0.4.2",
+  "version": "0.4.5",
   "publisher": "ctlim",
   "icon": "resources/icon.png",
   "engines": {

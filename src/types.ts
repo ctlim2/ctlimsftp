@@ -12,6 +12,7 @@ export interface SftpConfig {
     uploadOnSave?: boolean;
     downloadOnOpen?: boolean | 'confirm';
     downloadBackup?: string;
+    webUrl?: string;
     ignore?: string[];
     watcher?: {
         files: string | false;
