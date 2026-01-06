@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { SftpClient } from './sftpClient';
+import { FtpClient } from './ftpClient';
 import { SftpConfig, FileMetadata, RemoteFile, TransferHistory, Bookmark } from './types';
 import { SftpTreeProvider, SftpDragAndDropController, SftpTreeItem } from './sftpTreeProvider';
 import { TransferHistoryManager, createTransferHistory } from './transferHistory';
@@ -11,7 +12,10 @@ import { TemplateManager } from './templateManager';
 // 개발 모드 여부 (릴리스 시 false로 변경)
 const DEBUG_MODE = true;
 
-let sftpClient: SftpClient | null = null;
+// 클라이언트 타입 (SFTP 또는 FTP)
+type ClientType = SftpClient | FtpClient;
+
+let sftpClient: ClientType | null = null;
 let treeProvider: SftpTreeProvider;
 let currentConfig: SftpConfig | null = null;
 let statusBarItem: vscode.StatusBarItem;
@@ -21,10 +25,30 @@ let templateManager: TemplateManager | null = null;
 let sftpTreeView: vscode.TreeView<SftpTreeItem> | null = null;
 
 // Cache document-config and client mapping for performance
-const documentConfigCache = new WeakMap<vscode.TextDocument, { config: SftpConfig; client: SftpClient; remotePath: string }>();
+const documentConfigCache = new WeakMap<vscode.TextDocument, { config: SftpConfig; client: ClientType; remotePath: string }>();
+
+/**
+ * 프로토콜에 따라 적절한 클라이언트 생성
+ */
+function createClient(config: SftpConfig): ClientType {
+    const protocol = config.protocol || 'sftp';
+    
+    if (protocol === 'ftp' || protocol === 'ftps') {
+        if (DEBUG_MODE) console.log(`FTP 클라이언트 생성: ${config.host}`);
+        return new FtpClient();
+    }
+    
+    if (DEBUG_MODE) console.log(`SFTP 클라이언트 생성: ${config.host}`);
+    return new SftpClient();
+}
 
 export function activate(context: vscode.ExtensionContext) {
     if (DEBUG_MODE) console.log('ctlim SFTP extension is now active');
+
+    // Create Output Channel for logging
+    const outputChannel = vscode.window.createOutputChannel('ctlim SFTP');
+    context.subscriptions.push(outputChannel);
+    outputChannel.show(); // F5 디버깅 시 자동으로 Output 창 표시
 
     // Register Tree View Provider (StatusBar보다 먼저 생성)
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -45,7 +69,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(statusBarItem);
     
     // Create Drag and Drop Controller
-    const dragAndDropController = new SftpDragAndDropController(treeProvider);
+    const dragAndDropController = new SftpDragAndDropController(treeProvider, outputChannel);
     
     /**
      * Create Tree View with Drag and Drop support
@@ -290,12 +314,6 @@ export function activate(context: vscode.ExtensionContext) {
                 await backupLocalFile(localPath, config);
             }
 
-            // Download to local path with metadata
-            if (!connection.client.client) {
-                vscode.window.showErrorMessage('SFTP 클라이언트가 초기화되지 않았습니다.');
-                return;
-            }
-
             // Check connection status
             if (!connection.client.isConnected()) {
                 const reconnect = await vscode.window.showWarningMessage(
@@ -317,15 +335,27 @@ export function activate(context: vscode.ExtensionContext) {
             }
 
             try {
-                // 리모트 파일의 정보를 구한다.
-                const remoteStats = await connection.client.client.stat(remotePath);
-                const remoteModifyTime = new Date(remoteStats.modifyTime).getTime();
-                
-                // Download file
-                await connection.client.client.get(remotePath, localPath);
-                
-                // Save metadata after successful download
-                await connection.client.saveRemoteFileMetadata(remotePath, localPath, config, config.workspaceRoot);
+                // Protocol-aware file download
+                if (connection.client instanceof SftpClient) {
+                    // SFTP protocol - use direct access
+                    if (!connection.client.client) {
+                        vscode.window.showErrorMessage('SFTP 클라이언트가 초기화되지 않았습니다.');
+                        return;
+                    }
+                    
+                    // 리모트 파일의 정보를 구한다.
+                    const remoteStats = await connection.client.client.stat(remotePath);
+                    const remoteModifyTime = new Date(remoteStats.modifyTime).getTime();
+                    
+                    // Download file
+                    await connection.client.client.get(remotePath, localPath);
+                    
+                    // Save metadata after successful download
+                    await connection.client.saveRemoteFileMetadata(remotePath, localPath, config, config.workspaceRoot);
+                } else {
+                    // FTP protocol - use abstracted method
+                    await connection.client.downloadFile(remotePath, localPath, config);
+                }
                 
                 const doc = await vscode.workspace.openTextDocument(localPath);
                 documentConfigCache.set(doc, { config, client: connection.client, remotePath });
@@ -433,18 +463,28 @@ export function activate(context: vscode.ExtensionContext) {
                             await connection.client.backupLocalFile(localPath, fileItem.config);
                         }
                         
-                        // Download file
-                        if (connection.client.client) {
-                            await connection.client.client.get(fileItem.remotePath, localPath);
-                            
-                            // Save metadata
-                            await connection.client.saveRemoteFileMetadata(
+                        // Download file - protocol aware
+                        if (connection.client instanceof SftpClient) {
+                            if (connection.client.client) {
+                                await connection.client.client.get(fileItem.remotePath, localPath);
+                                
+                                // Save metadata
+                                await connection.client.saveRemoteFileMetadata(
+                                    fileItem.remotePath,
+                                    localPath,
+                                    fileItem.config,
+                                    fileItem.config.workspaceRoot
+                                );
+                                
+                                succeeded++;
+                            }
+                        } else {
+                            // FTP protocol
+                            await connection.client.downloadFile(
                                 fileItem.remotePath,
                                 localPath,
-                                fileItem.config,
-                                fileItem.config.workspaceRoot
+                                fileItem.config
                             );
-                            
                             succeeded++;
                         }
                     } catch (error) {
@@ -587,7 +627,7 @@ export function activate(context: vscode.ExtensionContext) {
             // Check cache first for opened files
             const cached = documentConfigCache.get(document);
             let config: SftpConfig | null = cached?.config || null;
-            let cachedClient: SftpClient | null = cached?.client || null;
+            let cachedClient: ClientType | null = cached?.client || null;
             
             // Fallback: find config by metadata or file path
             if (!config) {
@@ -610,7 +650,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             // Use cached client if available and connected
             const serverName = config.name || `${config.username}@${config.host}`;
-            let connection: { client: SftpClient; config: SftpConfig } | undefined;
+            let connection: { client: ClientType; config: SftpConfig } | undefined;
             
             if (cachedClient && cachedClient.isConnected()) {
                 connection = { client: cachedClient, config };
@@ -729,17 +769,33 @@ export function activate(context: vscode.ExtensionContext) {
                         return;
                     }
                     
-                    // Download the uploaded file from remote
-                    if (connection!.client.client) {
-                        await connection!.client.client.get(remotePath, newLocalPath);
-                        
-                        // Save metadata
-                        await connection!.client.saveRemoteFileMetadata(
-                            remotePath,
-                            newLocalPath,
-                            config!,
-                            config!.workspaceRoot
-                        );
+                    // Download the uploaded file from remote - protocol aware
+                    if (connection!.client instanceof SftpClient) {
+                        if (connection!.client.client) {
+                            await connection!.client.client.get(remotePath, newLocalPath);
+                            
+                            // Save metadata
+                            await connection!.client.saveRemoteFileMetadata(
+                                remotePath,
+                                newLocalPath,
+                                config!,
+                                config!.workspaceRoot
+                            );
+                            
+                            // Open the downloaded file
+                            const newDoc = await vscode.workspace.openTextDocument(newLocalPath);
+                            await vscode.window.showTextDocument(newDoc);
+                            
+                            // Update cache with new document
+                            documentConfigCache.set(newDoc, {
+                                config: config!,
+                                client: connection!.client,
+                                remotePath: remotePath
+                            });
+                        }
+                    } else {
+                        // FTP protocol
+                        await connection!.client.downloadFile(remotePath, newLocalPath, config!);
                         
                         // Open the downloaded file
                         const newDoc = await vscode.workspace.openTextDocument(newLocalPath);
@@ -1341,9 +1397,24 @@ export function activate(context: vscode.ExtensionContext) {
                 const tempFile = path.join(tempDir, `copy_${Date.now()}_${fileName}`);
                 
                 try {
-                    // 다운로드
-                    if (connection!.client.client) {
-                        await connection!.client.client.get(sourceRemotePath, tempFile);
+                    // 다운로드 - protocol aware
+                    if (connection!.client instanceof SftpClient) {
+                        if (connection!.client.client) {
+                            await connection!.client.client.get(sourceRemotePath, tempFile);
+                            
+                            progress.report({ message: '새 위치에 업로드 중...' });
+                            
+                            // 업로드
+                            await connection!.client.uploadFile(tempFile, targetRemotePath, config);
+                            
+                            vscode.window.showInformationMessage(`✅ 파일 복사 완료: ${path.basename(targetRemotePath)}`);
+                            
+                            // TreeView 새로고침
+                            treeProvider.refresh();
+                        }
+                    } else {
+                        // FTP protocol
+                        await connection!.client.downloadFile(sourceRemotePath, tempFile, config);
                         
                         progress.report({ message: '새 위치에 업로드 중...' });
                         
@@ -1478,9 +1549,29 @@ export function activate(context: vscode.ExtensionContext) {
                 const tempFile = path.join(tempDir, `rename_${Date.now()}_${fileName}`);
                 
                 try {
-                    // 다운로드
-                    if (connection!.client.client) {
-                        await connection!.client.client.get(sourceRemotePath, tempFile);
+                    // 다운로드 - protocol aware
+                    if (connection!.client instanceof SftpClient) {
+                        if (connection!.client.client) {
+                            await connection!.client.client.get(sourceRemotePath, tempFile);
+                            
+                            progress.report({ message: '새 이름으로 업로드 중...' });
+                            
+                            // 새 이름으로 업로드
+                            await connection!.client.uploadFile(tempFile, targetRemotePath, config);
+                            
+                            progress.report({ message: '원본 파일 삭제 중...' });
+                            
+                            // 원본 삭제
+                            await connection!.client.deleteRemoteFile(sourceRemotePath, false);
+                            
+                            vscode.window.showInformationMessage(`✅ 파일 이름 변경 완료: ${newFileName}`);
+                            
+                            // TreeView 새로고침
+                            treeProvider.refresh();
+                        }
+                    } else {
+                        // FTP protocol
+                        await connection!.client.downloadFile(sourceRemotePath, tempFile, config);
                         
                         progress.report({ message: '새 이름으로 업로드 중...' });
                         
@@ -2989,7 +3080,7 @@ export function activate(context: vscode.ExtensionContext) {
         // "ctlimSftp.openRemoteFile" 에서 저장한 document의 config와 client, remotePath를 구한다.
         const cached = documentConfigCache.get(document);
         let config: SftpConfig | null = cached?.config || null;
-        let cachedClient: SftpClient | null = cached?.client || null;
+        let cachedClient: ClientType | null = cached?.client || null;
         let cachedRemotePath: string | null = cached?.remotePath || "";
         
         // 캐시에 없으면 메타데이터로 확인 (원격에서 다운로드한 파일만 메타데이터 존재)
@@ -3345,14 +3436,35 @@ async function retryFailedTransfer(history: TransferHistory): Promise<void> {
                     return;
                 }
                 
-                if (connection.client.client) {
-                    await connection.client.client.get(history.remotePath, history.localPath);
-                    await connection.client.saveRemoteFileMetadata(
-                        history.remotePath,
-                        history.localPath,
-                        config,
-                        config.workspaceRoot
-                    );
+                // 재다운로드 - protocol aware
+                if (connection.client instanceof SftpClient) {
+                    if (connection.client.client) {
+                        await connection.client.client.get(history.remotePath, history.localPath);
+                        await connection.client.saveRemoteFileMetadata(
+                            history.remotePath,
+                            history.localPath,
+                            config,
+                            config.workspaceRoot
+                        );
+                        
+                        const duration = Date.now() - startTime;
+                        const fileSize = fs.existsSync(history.localPath) ? fs.statSync(history.localPath).size : 0;
+                        
+                        const newHistory = createTransferHistory(
+                            'download',
+                            'success',
+                            history.localPath,
+                            history.remotePath,
+                            fileSize,
+                            duration,
+                            history.serverName
+                        );
+                        transferHistoryManager.addHistory(newHistory);
+                        vscode.window.showInformationMessage(`✅ 재다운로드 성공: ${path.basename(history.localPath)}`);
+                    }
+                } else {
+                    // FTP protocol
+                    await connection.client.downloadFile(history.remotePath, history.localPath, config);
                     
                     const duration = Date.now() - startTime;
                     const fileSize = fs.existsSync(history.localPath) ? fs.statSync(history.localPath).size : 0;
@@ -3697,7 +3809,9 @@ async function findConfigForFile(filePath: string): Promise<SftpConfig | null> {
  */
 async function ensureClient(config: SftpConfig): Promise<void> {
     if (!sftpClient) {
-        sftpClient = new SftpClient();
+        sftpClient = createClient(config);
+        const outputChannel = vscode.window.createOutputChannel('ctlim SFTP');
+        sftpClient.setOutputChannel(outputChannel);
     }
     
     if (!sftpClient.isConnected()) {
@@ -3713,7 +3827,7 @@ async function ensureClient(config: SftpConfig): Promise<void> {
  * @param serverName 서버 이름
  * @returns 연결 성공 여부
  */
-async function ensureConnected(client: SftpClient, config: SftpConfig, serverName: string): Promise<boolean> {
+async function ensureConnected(client: ClientType, config: SftpConfig, serverName: string): Promise<boolean> {
     try {
         if (client.isConnected()) {
             return true;
@@ -3756,7 +3870,7 @@ async function downloadAndReloadFile(
     try {
         const connection = treeProvider.getConnectedServer(serverName);
         
-        if (!connection || !connection.client.client) {
+        if (!connection) {
             return false;
         }
 
@@ -3776,14 +3890,20 @@ async function downloadAndReloadFile(
             await backupLocalFile(localPath, config);
         }
 
-        // 파일 다운로드
-        await connection.client.client.get(remotePath, localPath);
-        await connection.client.saveRemoteFileMetadata(
-            remotePath,
-            localPath,
-            config,
-            config.workspaceRoot
-        );
+        // Protocol-aware download and reload
+        if (connection.client instanceof SftpClient) {
+            if (connection.client.client) {
+                await connection.client.client.get(remotePath, localPath);
+                await connection.client.saveRemoteFileMetadata(
+                    remotePath,
+                    localPath,
+                    config,
+                    config.workspaceRoot
+                );
+            }
+        } else {
+            await connection.client.downloadFile(remotePath, localPath, config);
+        }
 
         // 다운로드 성공 - 전송 히스토리 기록
         const duration = Date.now() - startTime;
@@ -3842,7 +3962,7 @@ async function downloadAndReloadFile(
  * @param fileName 저장할 파일 이름
  * @returns 선택한 원격 경로 또는 undefined
  */
-async function selectRemotePathFromTree(client: SftpClient, startPath: string, fileName: string): Promise<string | undefined> {
+async function selectRemotePathFromTree(client: ClientType, startPath: string, fileName: string): Promise<string | undefined> {
     let currentPath = startPath;
     
     while (true) {
@@ -3964,7 +4084,7 @@ async function showDiffWithMergeOptions(
             config.name || `${config.username}@${config.host}`
         );
         
-        if (!connection || !connection.client.client) {
+        if (!connection || !connection.client.isConnected()) {
             vscode.window.showErrorMessage('서버에 연결되어 있지 않습니다.');
             return;
         }
@@ -3979,7 +4099,15 @@ async function showDiffWithMergeOptions(
         const fileName = path.basename(remotePath);
         const tempRemotePath = path.join(tempDir, `${fileName}.remote`);
         
-        await connection.client.client.get(remotePath, tempRemotePath);
+        // Protocol-aware diff file download
+        if (connection.client instanceof SftpClient) {
+            if (connection.client.client) {
+                await connection.client.client.get(remotePath, tempRemotePath);
+            }
+        } else {
+            // FTP protocol
+            await connection.client.downloadFile(remotePath, tempRemotePath, config);
+        }
 
         // Open diff view
         const localUri = vscode.Uri.file(localPath);
@@ -4051,9 +4179,26 @@ async function showDiff(localPath: string, remotePath: string, config: SftpConfi
         const fileName = path.basename(remotePath);
         const tempRemotePath = path.join(tempDir, `${fileName}.remote`);
         
-        if (sftpClient.client) {
-            await sftpClient.client.get(remotePath, tempRemotePath);
+        // Protocol-aware simple diff download
+        if (sftpClient instanceof SftpClient) {
+            if (sftpClient.client) {
+                await sftpClient.client.get(remotePath, tempRemotePath);
 
+                // Open diff view
+                const localUri = vscode.Uri.file(localPath);
+                const remoteUri = vscode.Uri.file(tempRemotePath);
+                
+                await vscode.commands.executeCommand(
+                    'vscode.diff',
+                    remoteUri,
+                    localUri,
+                    `${fileName} (서버) ↔ ${fileName} (로컬)`
+                );
+            }
+        } else {
+            // FTP protocol
+            await sftpClient.downloadFile(remotePath, tempRemotePath, config);
+            
             // Open diff view
             const localUri = vscode.Uri.file(localPath);
             const remoteUri = vscode.Uri.file(tempRemotePath);
@@ -4269,7 +4414,7 @@ if (DEBUG_MODE) console.log('> checkAndReloadRemoteFiles');
             const config = fileInfos[0].config;
             
             // 서버 연결 확인: 캐시 → treeProvider → 새 연결
-            let client: SftpClient | null = null;
+            let client: ClientType | null = null;
             
             // 1. 캐시된 client가 있으면 우선 사용
             for (const fileInfo of fileInfos) {
@@ -4304,7 +4449,7 @@ if (DEBUG_MODE) console.log('> checkAndReloadRemoteFiles');
             
             // 3. 새 연결 생성
             if (!client) {
-                client = new SftpClient();
+                client = createClient(config);
                 try {
                     if (DEBUG_MODE) console.log(`서버 연결 시작: ${serverName}`);
                     await client.connect(config);
@@ -4698,8 +4843,8 @@ async function openBookmark(bookmark: Bookmark): Promise<void> {
                 if (serverTreeItem && sftpTreeView) {
                     try {
                         await sftpTreeView.reveal(serverTreeItem, {
-                            select: false,
-                            focus: false,
+                            select: true,
+                            focus: true,
                             expand: true
                         });
                         await new Promise(resolve => setTimeout(resolve, 500));

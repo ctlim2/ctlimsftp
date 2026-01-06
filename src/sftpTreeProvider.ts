@@ -2,11 +2,15 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { SftpClient } from './sftpClient';
+import { FtpClient } from './ftpClient';
 import { SftpConfig, RemoteFile, ServerListItem, Bookmark } from './types';
 import { BookmarkManager } from './bookmarkManager';
 
 // 개발 모드 여부 (릴리스 시 false로 변경)
 const DEBUG_MODE = true;
+
+// 클라이언트 타입 (SFTP 또는 FTP)
+type ClientType = SftpClient | FtpClient;
 
 /**
  * 파일 크기를 사람이 읽기 쉬운 형식으로 변환
@@ -137,7 +141,7 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
     readonly onDidChangeTreeData: vscode.Event<SftpTreeItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
     private serverList: ServerListItem[] = [];
-    private connectedServers: Map<string, { client: SftpClient, config: SftpConfig }> = new Map();
+    private connectedServers: Map<string, { client: ClientType, config: SftpConfig }> = new Map();
     private bookmarkManager: BookmarkManager | null = null;
 
     constructor(workspaceRoot?: string) {
@@ -231,7 +235,11 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
             config.workspaceRoot = workspaceRoot;
             config.name = serverItem.name;
 
-            const client = new SftpClient();
+            // Create appropriate client based on protocol
+            const protocol = config.protocol || 'sftp';
+            const client = protocol === 'ftp' || protocol === 'ftps' 
+                ? new FtpClient() 
+                : new SftpClient();
             await client.connect(config);
 
             this.connectedServers.set(serverItem.name, { client, config });
@@ -253,7 +261,7 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
         }
     }
 
-    getConnectedServer(serverName: string): { client: SftpClient, config: SftpConfig } | undefined {
+    getConnectedServer(serverName: string): { client: ClientType, config: SftpConfig } | undefined {
         return this.connectedServers.get(serverName);
     }
 
@@ -271,7 +279,7 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
      * @param client SFTP 클라이언트
      * @param config 서버 설정
      */
-    addConnectedServer(serverName: string, client: SftpClient, config: SftpConfig): void {
+    addConnectedServer(serverName: string, client: ClientType, config: SftpConfig): void {
         this.connectedServers.set(serverName, { client, config });
         this._onDidChangeTreeData.fire();
     }
@@ -553,7 +561,7 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
         } else if (element.itemType === 'remoteDirectory' && element.remotePath) {
             // Show subdirectory contents
             // Use element.config if available (most accurate)
-            let connection: { client: SftpClient, config: SftpConfig } | undefined;
+            let connection: { client: ClientType, config: SftpConfig } | undefined;
             
             if (element.config) {
                 // Find connection by config name
@@ -827,23 +835,36 @@ export class SftpDragAndDropController implements vscode.TreeDragAndDropControll
                             fs.mkdirSync(localDir, { recursive: true });
                         }
 
-                        // Download file
-                        if (connection.client.client) {
-                            await connection.client.client.get(item.remotePath!, localPath);
-                            
-                            // Save metadata (same as openRemoteFile)
-                            await connection.client.saveRemoteFileMetadata(
+                        // Download file using abstracted method
+                        if (connection.client instanceof SftpClient) {
+                            // SFTP 프로토콜 사용
+                            if (connection.client.client) {
+                                await connection.client.client.get(item.remotePath!, localPath);
+                                
+                                // Save metadata (same as openRemoteFile)
+                                await connection.client.saveRemoteFileMetadata(
+                                    item.remotePath!,
+                                    localPath,
+                                    item.config!,
+                                    item.config!.workspaceRoot
+                                );
+                                
+                                // Backup existing file if downloadBackup is enabled
+                                if (item.config!.downloadBackup && fs.existsSync(localPath)) {
+                                    await connection.client.backupLocalFile(localPath, item.config!);
+                                }
+
+                                uris.push(vscode.Uri.file(localPath));
+                                this.log(`Downloaded and saved metadata: ${localPath}`);
+                            }
+                        } else {
+                            // FTP 프로토콜 사용 - downloadFile 메서드로 다운로드
+                            await connection.client.downloadFile(
                                 item.remotePath!,
                                 localPath,
-                                item.config!,
-                                item.config!.workspaceRoot
+                                item.config!
                             );
                             
-                            // Backup existing file if downloadBackup is enabled
-                            if (item.config!.downloadBackup && fs.existsSync(localPath)) {
-                                await connection.client.backupLocalFile(localPath, item.config!);
-                            }
-
                             uris.push(vscode.Uri.file(localPath));
                             this.log(`Downloaded and saved metadata: ${localPath}`);
                         }

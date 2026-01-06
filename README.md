@@ -1,61 +1,63 @@
 # ctlim SFTP
 
-> 간편하고 강력한 VS Code SFTP/SSH 파일 동기화 확장 프로그램
+**English** | [한국어](README.ko.md)
 
-[![Version](https://img.shields.io/badge/version-0.4.3-blue.svg)](https://github.com/ctlim2/ctlimsftp)
+> Simple and Powerful VS Code SFTP/SSH File Synchronization Extension
+
+[![Version](https://img.shields.io/badge/version-0.5.1-blue.svg)](https://github.com/ctlim2/ctlimsftp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**저장 시 자동 업로드**와 **지능형 충돌 감지**로 원격 서버와 로컬 파일을 안전하게 동기화하세요.
+Safely synchronize remote servers and local files with **Auto Upload on Save** and **Intelligent Conflict Detection**.
 
 ---
 
-## ✨ 주요 특징
+## ✨ Key Features
 
-### 🚀 핵심 기능
-- **저장 시 자동 업로드** - `Ctrl+S`만 누르면 원격 서버에 즉시 반영
-- **충돌 감지 시스템** - 원격 파일 변경 감지 시 덮어쓰기/비교/취소 선택 가능
-- **다중 서버 관리** - 개발/운영 등 여러 서버를 하나의 설정으로 관리
-- **원격 파일 탐색** - Activity Bar에서 서버 파일 구조 실시간 탐색
+### 🚀 Core Functionality
+- **Auto Upload on Save** - Press `Ctrl+S` to instantly sync to remote server
+- **Conflict Detection System** - Choose to overwrite/compare/cancel when remote file changes detected
+- **Multi-Server Management** - Manage multiple servers (dev/production) in one configuration
+- **Remote File Explorer** - Browse server file structure in real-time from Activity Bar
 
-### 🔐 보안 & 호환성
-- **SSH 키 인증 지원** - Password 또는 Private Key (passphrase 포함)
-- **구형 서버 호환** - Legacy SSH 알고리즘 지원 (DES, SHA1 등)
-- **메타데이터 기반 동기화** - 파일 수정 시간 추적으로 안전한 업로드
+### 🔐 Security & Compatibility
+- **SSH Key Authentication** - Supports Password or Private Key (with passphrase)
+- **Legacy Server Support** - Compatible with legacy SSH algorithms (DES, SHA1, etc.)
+- **Metadata-Based Sync** - Safe uploads with file modification time tracking
 
-### 💡 개발 편의성
-- **스마트 북마크** - 자주 사용하는 파일/폴더 즐겨찾기
-- **다른 이름으로 저장** - 원격 경로를 직접 입력하거나 트리에서 선택
-- **Diff 비교** - 충돌 시 로컬/원격 파일을 시각적으로 비교
-- **선택적 무시** - `.git`, `node_modules` 등 불필요한 파일 제외
-- **재연결 자동화** - 연결 끊김 시 자동 재연결 시도
+### 💡 Developer Convenience
+- **Smart Bookmarks** - Favorite frequently used files/folders
+- **Save As Remote** - Enter remote path directly or select from tree
+- **Diff Comparison** - Visually compare local/remote files on conflict
+- **Selective Ignore** - Exclude unnecessary files like `.git`, `node_modules`
+- **Auto Reconnection** - Automatically retry on connection loss
 
-### 📊 모니터링 & 분석
-- **전송 히스토리** - 업로드/다운로드 기록 자동 저장 (최근 100개)
-- **전송 통계** - 전송량, 속도, 성공률 실시간 분석
-- **실패 재시도** - 실패한 전송을 원클릭으로 재시도
-- **서버별 통계** - 서버별 전송 통계 및 성능 비교
+### 📊 Monitoring & Analysis
+- **Transfer History** - Auto-save upload/download records (last 100)
+- **Transfer Statistics** - Real-time analysis of transfer volume, speed, success rate
+- **Retry Failed Transfers** - One-click retry for failed transfers
+- **Server Statistics** - Transfer stats and performance comparison by server
 
-### 🔍 고급 작업
-- **원격 파일 검색** - 파일명 또는 내용으로 검색 (정규식 지원)
-- **권한 관리** - chmod 원클릭 변경 (755, 644 등)
-- **SSH 터미널** - 원격 서버 SSH 터미널 바로 열기
-- **다중 파일 작업** - 여러 파일 동시 다운로드/삭제
+### 🔍 Advanced Operations
+- **Remote File Search** - Search by filename or content (regex support)
+- **Permission Management** - One-click chmod changes (755, 644, etc.)
+- **SSH Terminal** - Open SSH terminal to remote server directly
+- **Multi-File Operations** - Download/delete multiple files simultaneously
 
 ---
 
-## 📦 설치
+## 📦 Installation
 
-### 지원 플랫폼
+### Supported Platforms
 - ✅ **VS Code** - Visual Studio Code
-- ✅ **Cursor** - AI 기반 코드 에디터 (VS Code 기반)
-- ✅ **기타 VS Code 호환 에디터**
+- ✅ **Cursor** - AI-powered code editor (VS Code-based)
+- ✅ **Other VS Code Compatible Editors**
 
-### 방법 1: VS Code/Cursor Marketplace
-1. `Ctrl+Shift+X` (확장 탭 열기)
-2. **"ctlim SFTP"** 검색
-3. **Install** 클릭
+### Method 1: VS Code/Cursor Marketplace
+1. Press `Ctrl+Shift+X` (Open Extensions Tab)
+2. Search **"ctlim SFTP"**
+3. Click **Install**
 
-### 방법 2: 명령 줄
+### Method 2: Command Line
 ```bash
 # VS Code
 code --install-extension ctlim.ctlim-sftp
@@ -66,25 +68,25 @@ cursor --install-extension ctlim.ctlim-sftp
 
 ---
 
-## 🚀 빠른 시작 (3분 완성)
+## 🚀 Quick Start (3 Minutes)
 
-### 1️⃣ 설정 파일 생성
+### 1️⃣ Create Configuration File
 
-**Command Palette** 열기:
+**Open Command Palette**:
 - Windows/Linux: `Ctrl+Shift+P`
 - macOS: `Cmd+Shift+P`
 
-명령어 입력: **`ctlim SFTP: Config`**
+Enter command: **`ctlim SFTP: Config`**
 
-→ `.vscode/ctlim-sftp.json` 자동 생성 ✅
+→ `.vscode/ctlim-sftp.json` auto-generated ✅
 
 ---
 
-### 2️⃣ 서버 정보 입력
+### 2️⃣ Enter Server Information
 
-생성된 설정 파일에 서버 정보를 입력하세요:
+Enter server information in the generated configuration file:
 
-#### 기본 설정 (Password 인증)
+#### Basic Configuration (Password Authentication)
 ```json
 {
     "name": "My Development Server",
@@ -98,7 +100,7 @@ cursor --install-extension ctlim.ctlim-sftp
     "uploadOnSave": true,
     "downloadOnOpen": "confirm",
     "downloadBackup": ".vscode/.sftp-backup",
-    "webUrl": "http://example.com",
+    "webUrl": "http://dev.example.com",
     "ignore": [
       ".vscode",
       ".git",
@@ -106,15 +108,14 @@ cursor --install-extension ctlim.ctlim-sftp
       "*.log"
     ]
 }
-
 ```
 
-#### 다중 서버 설정 (그룹 기능 포함)
+#### Multi-Server Configuration (with Groups)
 ```json
 [
   {
-      "name": "개발 서버 1",
-      "group": "개발 환경",
+      "name": "Dev Server 1",
+      "group": "Development",
       "host": "dev1.example.com",
       "protocol": "sftp",
       "port": 22,
@@ -133,8 +134,8 @@ cursor --install-extension ctlim.ctlim-sftp
       ]
   },
   {
-      "name": "개발 서버 2",
-      "group": "개발 환경",
+      "name": "Dev Server 2",
+      "group": "Development",
       "host": "dev2.example.com",
       "protocol": "sftp",
       "port": 22,
@@ -152,8 +153,8 @@ cursor --install-extension ctlim.ctlim-sftp
       ]
   },
   {
-      "name": "운영 서버",
-      "group": "운영 환경",
+      "name": "Production Server",
+      "group": "Production",
       "host": "prod.example.com",
       "protocol": "sftp",
       "port": 22,
@@ -175,50 +176,53 @@ cursor --install-extension ctlim.ctlim-sftp
 
 ---
 
-### 3️⃣ 서버 연결 및 사용
+### 3️⃣ Connect to Server and Use
 
-1. **Activity Bar**에서 ctlim SFTP 아이콘 클릭 (왼쪽 사이드바)
-2. 서버 또는 그룹을 펼쳐서 서버 이름 클릭 → 자동 연결
-3. 파일 트리 탐색 및 파일 더블클릭 → 자동 다운로드 & 편집
-4. 파일 저장 (`Ctrl+S`) → 자동 업로드 ✨
+1. Click **ctlim SFTP icon** in Activity Bar (left sidebar)
+2. Expand server or group, click server name → auto-connect
+3. Browse file tree and double-click file → auto-download & edit
+4. Save file (`Ctrl+S`) → auto-upload ✨
 
-**그룹별 서버 표시**:
+**Server Display by Group**:
 ```
-📁 개발 환경
-  ☁ 개발 서버 1
-  ☁ 개발 서버 2
-📁 운영 환경
-  ☁ 운영 서버
+📁 Development
+  ☁ Dev Server 1
+  ☁ Dev Server 2
+📁 Production
+  ☁ Production Server
 ```
 
 ---
 
-## ⚙️ 설정 옵션 상세
+## ⚙️ Configuration Options
 
-| 옵션 | 타입 | 기본값 | 필수 | 설명 |
+| Option | Type | Default | Required | Description |
 |------|------|--------|------|------|
-| `name` | string | - | ❌ | 서버 식별 이름 (트리 뷰에 표시) |
-| `group` | string | - | ❌ | 서버 그룹 이름 (같은 그룹끼리 묶여 표시) |
-| `context` | string | `"./"` | ❌ | 로컬 워크스페이스 루트 (상대/절대 경로) |
-| `host` | string | - | ✅ | SFTP 서버 호스트 주소 |
-| `port` | number | `22` | ❌ | SSH/SFTP 포트 번호 |
-| `username` | string | - | ✅ | 서버 로그인 사용자명 |
-| `password` | string | - | ❌ | 비밀번호 (또는 `privateKey` 사용) |
-| `remotePath` | string | `"/"` | ❌ | 원격 서버 기본 경로 |
-| `uploadOnSave` | boolean | `false` | ❌ | 저장 시 자동 업로드 활성화 |
-| `downloadOnOpen` | boolean\|'confirm' | `false` | ❌ | 파일 열기 시 자동 다운로드<br/>- `true`: 자동 다운로드<br/>- `false`: 수동 다운로드<br/>- `'confirm'`: 다운로드 전 확인 대화상자 |
-| `downloadBackup` | string | - | ❌ | 다운로드 시 백업 경로 (상대/절대 경로) |
-| `webUrl` | string | - | ❌ | 웹 서버 기본 URL (브라우저에서 열기 기능 사용 시) |
-| `ignore` | string[] | `[]` | ❌ | 업로드 제외 패턴 (glob 지원) |
-| `watcher` | object | - | ❌ | 파일 감시 설정<br/>- `files`: 감시할 파일 패턴<br/>- `autoUpload`: 자동 업로드 여부<br/>- `autoDelete`: 자동 삭제 여부 |
-| `connectTimeout` | number | `10000` | ❌ | 연결 타임아웃 (밀리초) |
-| `readyTimeout` | number | `20000` | ❌ | 준비 타임아웃 (밀리초) |
-| `keepaliveInterval` | number | `10000` | ❌ | Keep-Alive 간격 (밀리초) |
-| `keepaliveCountMax` | number | `3` | ❌ | Keep-Alive 최대 재시도 횟수 |
+| `name` | string | - | ❌ | Server identification name (displayed in tree view) |
+| `group` | string | - | ❌ | Server group name (servers with same group displayed together) |
+| `context` | string | `"./"` | ❌ | Local workspace root (relative/absolute path) |
+| `protocol` | string | `"sftp"` | ❌ | Protocol: `'sftp'` (default) |
+| `host` | string | - | ✅ | Server host address |
+| `port` | number | `22` | ❌ | Server port number |
+| `username` | string | - | ✅ | Server login username |
+| `password` | string | - | ❌ | Password (or use `privateKey`) |
+| `privateKey` | string | - | ❌ | Path to private key file |
+| `passphrase` | string | - | ❌ | Private key passphrase |
+| `remotePath` | string | `"/"` | ❌ | Remote server default path |
+| `uploadOnSave` | boolean | `false` | ❌ | Enable auto-upload on save |
+| `downloadOnOpen` | boolean\|'confirm' | `false` | ❌ | Auto-download on file open<br/>- `true`: Auto-download<br/>- `false`: Manual download<br/>- `'confirm'`: Confirmation dialog before download |
+| `downloadBackup` | string | - | ❌ | Download backup path (relative/absolute path) |
+| `webUrl` | string | - | ❌ | Web server base URL (for browser open feature) |
+| `ignore` | string[] | `[]` | ❌ | Upload exclusion patterns (glob support) |
+| `watcher` | object | - | ❌ | File watch settings |
+| `connectTimeout` | number | `10000` | ❌ | Connection timeout (milliseconds) |
+| `readyTimeout` | number | `20000` | ❌ | Ready timeout (milliseconds) |
+| `keepaliveInterval` | number | `10000` | ❌ | Keep-Alive interval (milliseconds) |
+| `keepaliveCountMax` | number | `3` | ❌ | Keep-Alive max retry count |
 
-### 🔒 인증 방법 선택
+### 🔒 Authentication Methods
 
-1. **Password 인증** (간단)
+1. **Password Authentication** (Simple)
    ```json
    {
      "username": "user",
@@ -226,116 +230,125 @@ cursor --install-extension ctlim.ctlim-sftp
    }
    ```
 
-2. **비밀번호 생략** (런타임 입력)
+2. **SSH Key Authentication** (Recommended)
+   ```json
+   {
+     "username": "user",
+     "privateKey": "C:/Users/YourName/.ssh/id_rsa",
+     "passphrase": "your-passphrase"  // Optional
+   }
+   ```
+
+3. **Password Prompt** (Secure)
    ```json
    {
      "username": "user"
-     // password 필드 없음 → 연결 시 입력 창 표시
+     // No password field → prompt shown on connect
    }
    ```
 
 ---
 
-## 🔍 충돌 감지 시스템
+## 🔍 Conflict Detection System
 
-ctlim SFTP는 메타데이터 기반 충돌 감지로 원격 파일의 안전성을 보장합니다.
+ctlim SFTP ensures remote file safety with metadata-based conflict detection.
 
-### 작동 원리
+### How It Works
 
 ```mermaid
 sequenceDiagram
-    participant 사용자
+    participant User
     participant VS Code
     participant ctlim SFTP
-    participant 원격 서버
+    participant Remote Server
     
-    사용자->>VS Code: 원격 파일 열기
+    User->>VS Code: Open Remote File
     VS Code->>ctlim SFTP: openRemoteFile
-    ctlim SFTP->>원격 서버: 파일 다운로드
-    ctlim SFTP->>ctlim SFTP: 메타데이터 저장<br/>(수정시간, 크기)
+    ctlim SFTP->>Remote Server: Download File
+    ctlim SFTP->>ctlim SFTP: Save Metadata<br/>(modification time, size)
     
-    Note over 사용자,원격 서버: 다른 사용자가 서버 파일 수정...
+    Note over User,Remote Server: Another user modifies server file...
     
-    사용자->>VS Code: 파일 저장 (Ctrl+S)
-    ctlim SFTP->>원격 서버: 현재 파일 정보 조회
-    ctlim SFTP->>ctlim SFTP: 메타데이터 비교
+    User->>VS Code: Save File (Ctrl+S)
+    ctlim SFTP->>Remote Server: Query Current File Info
+    ctlim SFTP->>ctlim SFTP: Compare Metadata
     
-    alt 충돌 감지
-        ctlim SFTP->>사용자: ⚠️ 충돌 알림
-        사용자->>ctlim SFTP: 선택 (덮어쓰기/비교)
-    else 충돌 없음
-        ctlim SFTP->>원격 서버: 파일 업로드
-        ctlim SFTP->>ctlim SFTP: 메타데이터 갱신
+    alt Conflict Detected
+        ctlim SFTP->>User: ⚠️ Conflict Alert
+        User->>ctlim SFTP: Choose (Overwrite/Compare)
+    else No Conflict
+        ctlim SFTP->>Remote Server: Upload File
+        ctlim SFTP->>ctlim SFTP: Update Metadata
     end
 ```
 
-### 충돌 감지 플로우
+### Conflict Detection Flow
 
-1. **다운로드 시**: 원격 파일의 **수정 시간**과 **크기**를 로컬에 메타데이터로 저장
-   - 저장 위치: `.vscode/.sftp-metadata/`
+1. **On Download**: Save remote file's **modification time** and **size** as local metadata
+   - Storage location: `.vscode/.sftp-metadata/`
    
-2. **업로드 시**: 원격 서버의 현재 파일 정보와 메타데이터 비교
+2. **On Upload**: Compare remote server's current file info with metadata
    
-3. **충돌 발견 시**: 모달 대화상자 표시
+3. **On Conflict Detection**: Display modal dialog
    ```
-   ⚠️ 충돌 감지!
+   ⚠️ Conflict Detected!
    
-   파일이 서버에서 수정되었습니다: test.php
+   File has been modified on server: test.php
    
-   로컬 변경사항으로 덮어쓰시겠습니까?
+   Do you want to overwrite with local changes?
    
-   [덮어쓰기]  [비교]  [Cancel]
+   [Overwrite]  [Compare]  [Cancel]
    ```
 
-### 사용자 옵션
+### User Options
 
-- **덮어쓰기** 🔄
-  - 로컬 파일로 원격 파일 강제 덮어쓰기
-  - 원격 변경사항은 손실됩니다
+- **Overwrite** 🔄
+  - Force overwrite remote file with local file
+  - Remote changes will be lost
 
-- **비교** 📊
-  - Diff 뷰로 로컬 ↔ 원격 파일 비교
-  - 변경사항 확인 후 수동 병합 가능
+- **Compare** 📊
+  - Compare local ↔ remote files in Diff view
+  - Manual merge possible after reviewing changes
 
 - **Cancel** ❌
-  - 업로드 중단
-  - 로컬 파일은 그대로 유지
+  - Abort upload
+  - Keep local file as-is
 
 ---
 
-## � 자동 재연결 시스템
+## 🔄 Auto-Reconnection System
 
-ctlim SFTP는 안정적인 연결 유지를 위해 자동 재연결 기능을 제공합니다.
+ctlim SFTP provides auto-reconnection for stable connection maintenance.
 
-### Keep-Alive 메커니즘
+### Keep-Alive Mechanism
 
-1. **주기적 연결 확인**: 설정된 간격(기본 10초)마다 서버 연결 상태 체크
-2. **자동 재연결**: 연결 끊김 감지 시 자동으로 재연결 시도
-3. **사용자 알림**: 재연결 성공/실패 시 알림 메시지 표시
+1. **Periodic Connection Check**: Check server connection status at set intervals (default 10 seconds)
+2. **Auto-Reconnect**: Automatically attempt reconnection on connection loss detection
+3. **User Notification**: Show notification message on reconnection success/failure
 
-### 연결 설정 옵션
+### Connection Configuration Options
 
 ```json
 {
-  "connectTimeout": 10000,        // 연결 시도 타임아웃 (10초)
-  "readyTimeout": 20000,          // 연결 준비 타임아웃 (20초)
-  "keepaliveInterval": 10000,     // Keep-Alive 체크 간격 (10초)
-  "keepaliveCountMax": 3          // 최대 재시도 횟수
+  "connectTimeout": 10000,        // Connection attempt timeout (10 seconds)
+  "readyTimeout": 20000,          // Connection ready timeout (20 seconds)
+  "keepaliveInterval": 10000,     // Keep-Alive check interval (10 seconds)
+  "keepaliveCountMax": 3          // Max retry count
 }
 ```
 
-### 재연결 동작
+### Reconnection Behavior
 
-- **연결 끊김 감지**: Keep-Alive 체크 실패 시
-- **자동 재연결 시도**: 백그라운드에서 즉시 시도
-- **성공 시**: "🔄 SFTP 재연결 성공" 알림
-- **실패 시**: "⚠️ SFTP 재연결 실패" 경고 + 수동 재연결 안내
+- **Connection Loss Detection**: When Keep-Alive check fails
+- **Auto-Reconnect Attempt**: Immediate background attempt
+- **On Success**: "🔄 SFTP Reconnection Successful" notification
+- **On Failure**: "⚠️ SFTP Reconnection Failed" warning + manual reconnection guide
 
 ---
 
-## �💡 사용 시나리오
+## 💡 Usage Scenarios
 
-### 시나리오 1: 개발 서버 실시간 테스트
+### Scenario 1: Real-Time Development Server Testing
 
 ```json
 {
@@ -347,32 +360,32 @@ ctlim SFTP는 안정적인 연결 유지를 위해 자동 재연결 기능을 �
 }
 ```
 
-**워크플로우**:
-1. 로컬에서 PHP/HTML 파일 수정
-2. `Ctrl+S` 저장 → 자동 업로드
-3. 브라우저에서 즉시 결과 확인 ✨
+**Workflow**:
+1. Modify PHP/HTML files locally
+2. Save with `Ctrl+S` → auto-upload
+3. Check results immediately in browser ✨
 
 ---
 
-### 시나리오 2: 운영 서버 안전 배포
+### Scenario 2: Safe Production Server Deployment
 
 ```json
 {
   "name": "Production",
   "host": "prod.mysite.com",
   "remotePath": "/var/www/production",
-  "uploadOnSave": false,
+  "uploadOnSave": false
 }
 ```
 
-**워크플로우**:
-1. 로컬 개발 완료 (`uploadOnSave: false`로 자동 업로드 방지)
-2. 파일 우클릭 → `ctlim SFTP: Upload File`로 수동 업로드
-3. 충돌 감지로 안전성 확보 🛡️
+**Workflow**:
+1. Complete local development (`uploadOnSave: false` prevents auto-upload)
+2. Right-click file → `ctlim SFTP: Upload File` for manual upload
+3. Ensure safety with conflict detection 🛡️
 
 ---
 
-### 시나리오 3: 다중 환경 관리
+### Scenario 3: Multi-Environment Management
 
 ```json
 [
@@ -397,131 +410,131 @@ ctlim SFTP는 안정적인 연결 유지를 위해 자동 재연결 기능을 �
 ]
 ```
 
-**워크플로우**:
-- Activity Bar에서 환경 선택 후 개별 연결/배포
-- 각 서버별 독립적인 메타데이터 관리
+**Workflow**:
+- Select environment from Activity Bar, then connect/deploy individually
+- Independent metadata management for each server
 
 ---
 
-## 🛠️ 고급 기능
+## 🛠️ Advanced Features
 
-### 1. 북마크 시스템
+### 1. Bookmark System
 
-자주 사용하는 원격 파일이나 폴더를 북마크로 저장하여 빠르게 접근할 수 있습니다.
+Save frequently used remote files or folders as bookmarks for quick access.
 
-#### 북마크 추가
+#### Add Bookmark
 
-**방법 1: 트리 뷰 우클릭**
-1. Activity Bar에서 원격 파일/폴더 우클릭
-2. `Add Bookmark` 선택
-3. 북마크 이름 및 설명 입력
+**Method 1: Tree View Right-Click**
+1. Right-click remote file/folder in Activity Bar
+2. Select `Add Bookmark`
+3. Enter bookmark name and description
 
-**방법 2: Command Palette**
+**Method 2: Command Palette**
 - `ctlim SFTP: Add Bookmark`
 
-#### 북마크 사용
+#### Use Bookmarks
 
-**북마크 보기**:
+**View Bookmarks**:
 ```
-⭐ 북마크 (5)
-├── 📄 설정 파일
-├── 📁 로그 디렉토리
-├── 📄 데이터베이스 설정
-└── 📁 백업 폴더
+⭐ Bookmarks (5)
+├── 📄 Config File
+├── 📁 Log Directory
+├── 📄 Database Config
+└── 📁 Backup Folder
 ```
 
-**빠른 접근**:
-- Activity Bar에서 북마크 클릭 → 파일 즉시 열기 또는 폴더 이동
-- `ctlim SFTP: View Bookmarks` - 북마크 목록 보기
-- `ctlim SFTP: Frequent Bookmarks` - 자주 사용하는 북마크 (상위 10개)
+**Quick Access**:
+- Click bookmark in Activity Bar → instantly open file or navigate to folder
+- `ctlim SFTP: View Bookmarks` - View bookmark list
+- `ctlim SFTP: Frequent Bookmarks` - Frequently used bookmarks (top 10)
 
-#### 북마크 관리
+#### Bookmark Management
 
-**삭제**: 북마크 우클릭 → `Delete Bookmark`
+**Delete**: Right-click bookmark → `Delete Bookmark`
 
-**통계**:
-- 접근 횟수 자동 추적
-- 마지막 접근 시간 기록
-- 자주 사용하는 순으로 정렬
+**Statistics**:
+- Auto-track access count
+- Record last access time
+- Sort by frequency of use
 
-**활용 시나리오**:
-- 설정 파일 빠른 수정
-- 로그 디렉토리 실시간 모니터링
-- 자주 편집하는 코드 파일 즐겨찾기
+**Usage Scenarios**:
+- Quick config file modification
+- Real-time log directory monitoring
+- Favorite frequently edited code files
 
 ---
 
-### 2. 원격 파일 검색
+### 2. Remote File Search
 
-#### 파일명 검색
+#### Search by Filename
 
 **Command Palette**: `ctlim SFTP: Search Remote Files by Name`
 
 ```
-검색 패턴 입력:
-- 일반 텍스트: config.php
-- 정규식: /\.php$/
+Enter search pattern:
+- Plain text: config.php
+- Regex: /\.php$/
 ```
 
-**검색 결과**:
+**Search Results**:
 ```
 $(file) config.php
   /var/www/html/config.php
-  크기: 2.5 KB | 수정: 2024-12-30 14:30
+  Size: 2.5 KB | Modified: 2024-12-30 14:30
 
 $(file) app-config.php
   /var/www/html/includes/app-config.php
-  크기: 5.1 KB | 수정: 2024-12-29 10:15
+  Size: 5.1 KB | Modified: 2024-12-29 10:15
 ```
 
-#### 파일 내용 검색
+#### Search File Content
 
 **Command Palette**: `ctlim SFTP: Search in Remote Files`
 
 ```
-검색 텍스트: database_connect
-파일 패턴: *.php
+Search text: database_connect
+File pattern: *.php
 ```
 
-**검색 결과 (매칭 줄 표시)**:
+**Search Results (with matching lines)**:
 ```
-$(file) config.php (2개 일치)
+$(file) config.php (2 matches)
   Line 15: function database_connect() {
   Line 45: $conn = database_connect();
 
-$(file) admin.php (1개 일치)
+$(file) admin.php (1 match)
   Line 102: require_once('database_connect.php');
 ```
 
-**고급 옵션**:
-- 정규식 지원: `/function\s+\w+/`
-- 파일 패턴: `*.php`, `config.*`, `**/*.js`
-- 최대 결과 수 제한
+**Advanced Options**:
+- Regex support: `/function\s+\w+/`
+- File patterns: `*.php`, `config.*`, `**/*.js`
+- Max results limit
 
 ---
 
-### 3. 다른 이름으로 저장
+### 3. Save As Remote
 
-에디터에서 우클릭 → `ctlim SFTP: Save As Remote Path`
+Right-click in editor → `ctlim SFTP: Save As Remote Path`
 
-#### 옵션 A: 직접 입력
+#### Option A: Direct Input
 ```
-원격 저장 경로를 입력하세요:
+Enter remote save path:
 /var/www/html/backup/test_v2.php
 ```
 
-#### 옵션 B: 트리 선택
+#### Option B: Tree Selection
 ```
-현재 위치: /var/www/html
+Current location: /var/www/html
 ├── 📁 public/
 ├── 📁 admin/
-└── 📁 backup/   ← 선택
-    └── test_v2.php로 저장
+└── 📁 backup/   ← Select
+    └── Save as test_v2.php
 ```
 
 ---
 
-### 4. 파일 무시 패턴
+### 4. File Ignore Patterns
 
 ```json
 {
@@ -537,16 +550,16 @@ $(file) admin.php (1개 일치)
 }
 ```
 
-**지원 패턴**:
-- `node_modules` - 폴더명 정확히 일치
-- `*.log` - 확장자 매칭
-- `**/.DS_Store` - 모든 하위 디렉토리
+**Supported Patterns**:
+- `node_modules` - Exact folder name match
+- `*.log` - Extension matching
+- `**/.DS_Store` - All subdirectories
 
 ---
 
-### 5. Context 경로 활용
+### 5. Context Path Utilization
 
-서로 다른 로컬 폴더를 각기 다른 원격 경로에 매핑:
+Map different local folders to different remote paths:
 
 ```json
 [
@@ -565,38 +578,38 @@ $(file) admin.php (1개 일치)
 
 ---
 
-### 6. 다운로드 백업 기능
+### 6. Download Backup Feature
 
-원격 파일을 다운로드할 때 기존 로컬 파일을 자동으로 백업합니다.
+Automatically backup existing local files when downloading remote files.
 
-#### 설정
-
-```json
-{
-  "downloadBackup": ".vscode/.sftp-backup"  // 상대 경로
-}
-```
-
-또는 절대 경로 지정:
+#### Configuration
 
 ```json
 {
-  "downloadBackup": "D:/MyBackup/sftp-backup"  // 절대 경로
+  "downloadBackup": ".vscode/.sftp-backup"  // Relative path
 }
 ```
 
-#### 백업 방식
+Or specify absolute path:
 
-- **저장 위치**: 원격 경로 구조를 그대로 재현
-- **폴더 구조**: 원격 서버의 디렉토리 구조가 백업 폴더에 유지됨
-- **파일명 형식**: `파일명.YYYY-MM-DD_HH-mm-ss.backup`
-- **자동 정리**: 파일당 최근 5개 백업만 유지
+```json
+{
+  "downloadBackup": "D:/MyBackup/sftp-backup"  // Absolute path
+}
+```
 
-#### 예시
+#### Backup Method
 
-원격 파일: `/var/www/html/data/test.php`
+- **Storage Location**: Recreate remote path structure as-is
+- **Folder Structure**: Remote server directory structure maintained in backup folder
+- **Filename Format**: `filename.YYYY-MM-DD_HH-mm-ss.backup`
+- **Auto-Cleanup**: Keep only last 5 backups per file
 
-백업 파일:
+#### Example
+
+Remote file: `/var/www/html/data/test.php`
+
+Backup files:
 ```
 .vscode/.sftp-backup/
 └── var/
@@ -608,158 +621,158 @@ $(file) admin.php (1개 일치)
                 └── test.php.2025-12-22_09-12-30.backup
 ```
 
-#### 사용 시나리오
+#### Usage Scenarios
 
-1. **실수 방지**: 다운로드 전 로컬 수정사항 백업
-2. **버전 관리**: 원격 파일의 여러 버전 보존
-3. **충돌 복구**: 다운로드 후 문제 발생 시 이전 버전 복원
+1. **Mistake Prevention**: Backup local modifications before download
+2. **Version Control**: Preserve multiple versions of remote files
+3. **Conflict Recovery**: Restore previous version if problems occur after download
 
 ---
 
-### 7. 전송 히스토리 및 통계
+### 7. Transfer History and Statistics
 
-모든 파일 전송 활동을 자동으로 기록하고 분석합니다.
+Automatically record and analyze all file transfer activities.
 
-#### 전송 히스토리 보기
+#### View Transfer History
 
 **Command Palette**: `ctlim SFTP: View Transfer History`
 
 ```
 ✅ 📤 config.php
    Dev Server | 2.5 KB | 512 KB/s
-   성공 | 2025-12-24 14:30:45
+   Success | 2025-12-24 14:30:45
 
 ❌ 📥 database.php
    Prod Server | 15 KB | N/A
-   실패 | 2025-12-24 14:28:12 | ❌ Connection timeout
+   Failed | 2025-12-24 14:28:12 | ❌ Connection timeout
 ```
 
-- **성공 기록**: 파일명, 서버, 크기, 전송 속도, 시간
-- **실패 기록**: 에러 메시지 포함
-- **재시도**: 실패한 전송 선택 → 원클릭 재시도
+- **Success Records**: Filename, server, size, transfer speed, time
+- **Failure Records**: Includes error message
+- **Retry**: Select failed transfer → one-click retry
 
-#### 전송 통계 보기
+#### View Transfer Statistics
 
 **Command Palette**: `ctlim SFTP: View Transfer Statistics`
 
 ```
-📊 전송 통계 (Dev Server)
+📊 Transfer Statistics (Dev Server)
 
-📤 업로드: 127개
-📥 다운로드: 43개
-✅ 성공: 165개
-❌ 실패: 5개
-📈 성공률: 97.1%
-💾 총 전송량: 2.8 MB
-⚡ 평균 속도: 485 KB/s
+📤 Uploads: 127
+📥 Downloads: 43
+✅ Success: 165
+❌ Failed: 5
+📈 Success Rate: 97.1%
+💾 Total Transfer: 2.8 MB
+⚡ Average Speed: 485 KB/s
 ```
 
-- **서버별 통계**: 각 서버의 전송 성능 비교
-- **전체 통계**: 모든 서버의 종합 통계
-- **성공률 분석**: 전송 신뢰성 확인
+- **Server Statistics**: Compare transfer performance of each server
+- **Overall Statistics**: Comprehensive statistics for all servers
+- **Success Rate Analysis**: Check transfer reliability
 
-#### 히스토리 삭제
+#### Delete History
 
 **Command Palette**: `ctlim SFTP: Clear Transfer History`
 
-- 모든 전송 기록 삭제
-- 통계 데이터 초기화
+- Delete all transfer records
+- Reset statistics data
 
-#### 자동 기록 범위
+#### Auto-Recording Scope
 
-- ✅ 업로드: 저장 시 자동, 수동 업로드, 동기화
-- ✅ 다운로드: 원격 파일 열기, 수동 다운로드, 동기화
-- ✅ 재연결: 연결 끊김 후 재시도 포함
-- ✅ 실패: 에러 메시지 및 타임스탬프 기록
+- ✅ Upload: Auto on save, manual upload, sync
+- ✅ Download: Open remote file, manual download, sync
+- ✅ Reconnection: Includes retry after connection loss
+- ✅ Failures: Record error message and timestamp
 
-#### 저장 위치
+#### Storage Location
 
-- **파일**: `.vscode/.sftp-history.json`
-- **최대 저장**: 최근 100개 기록
-- **자동 정리**: 오래된 기록 자동 삭제
+- **File**: `.vscode/.sftp-history.json`
+- **Max Storage**: Last 100 records
+- **Auto-Cleanup**: Automatically delete old records
 
 ---
 
-### 8. 권한 관리
+### 8. Permission Management
 
-원격 파일의 권한을 쉽게 변경할 수 있습니다.
+Easily change remote file permissions.
 
-**사용법**:
-1. 원격 파일/폴더 우클릭
-2. `Change Permissions` 선택
-3. 권한 모드 선택
+**Usage**:
+1. Right-click remote file/folder
+2. Select `Change Permissions`
+3. Choose permission mode
 
-**권장 권한**:
+**Recommended Permissions**:
 ```
 $(file-code) 755 - rwxr-xr-x
-  실행 파일, 디렉토리
-  소유자: 모든 권한 | 그룹/기타: 읽기+실행
+  Executable files, directories
+  Owner: All permissions | Group/Others: Read+Execute
 
 $(file) 644 - rw-r--r--
-  일반 파일 (HTML, CSS, JS 등)
-  소유자: 읽기+쓰기 | 그룹/기타: 읽기만
+  Regular files (HTML, CSS, JS, etc.)
+  Owner: Read+Write | Group/Others: Read only
 
 $(lock) 600 - rw-------
-  비밀 파일 (SSH key, 설정 파일)
-  소유자만 읽기+쓰기
+  Secret files (SSH key, config files)
+  Owner only: Read+Write
 
 $(warning) 777 - rwxrwxrwx
-  모든 권한 (⚠️ 보안 위험! 권장하지 않음)
+  All permissions (⚠️ Security risk! Not recommended)
 ```
 
-**커스텀 입력**:
-- 직접 권한 코드 입력 (예: 754, 640)
-- 8진수 3자리 형식 (000-777)
+**Custom Input**:
+- Enter permission code directly (e.g., 754, 640)
+- 3-digit octal format (000-777)
 
-**활용 시나리오**:
-- 업로드 후 실행 권한 추가
-- 설정 파일 보안 강화
-- 로그 파일 접근 제한
+**Usage Scenarios**:
+- Add execute permission after upload
+- Strengthen config file security
+- Restrict log file access
 
 ---
 
-### 9. SSH 터미널
+### 9. SSH Terminal
 
-연결된 서버의 SSH 터미널을 VS Code에서 바로 열 수 있습니다.
+Open connected server's SSH terminal directly in VS Code.
 
-**사용법**:
-1. 서버 우클릭 → `Open SSH Terminal`
-2. 또는 Command Palette: `ctlim SFTP: Open SSH Terminal`
+**Usage**:
+1. Right-click server → `Open SSH Terminal`
+2. Or Command Palette: `ctlim SFTP: Open SSH Terminal`
 
-**자동 명령**:
+**Auto-Generated Command**:
 ```bash
 ssh -p 22 username@example.com
-# Private Key 사용 시
+# When using Private Key
 ssh -i "/path/to/key" -p 22 username@example.com
 ```
 
-**활용 시나리오**:
-- 서버 로그 실시간 확인 (`tail -f`)
-- 원격 명령 실행 (재시작, 백업 등)
-- Git 작업 (pull, commit 등)
-- 데이터베이스 직접 접속
+**Usage Scenarios**:
+- Real-time server log checking (`tail -f`)
+- Execute remote commands (restart, backup, etc.)
+- Git operations (pull, commit, etc.)
+- Direct database access
 
 ---
 
-### 10. 다중 파일 작업
+### 10. Multi-File Operations
 
-여러 파일을 동시에 선택하여 일괄 작업할 수 있습니다.
+Select multiple files simultaneously for batch operations.
 
-#### 다중 선택
+#### Multi-Selection
 
-- **Ctrl + 클릭**: 개별 파일 추가 선택
-- **Shift + 클릭**: 범위 선택
+- **Ctrl + Click**: Add individual files to selection
+- **Shift + Click**: Range selection
 
-#### 다중 다운로드
+#### Multi-Download
 
-**사용법**:
-1. 여러 파일 선택 (Ctrl/Shift + 클릭)
-2. 우클릭 → `Download Multiple Files`
-3. 진행 상황 표시
+**Usage**:
+1. Select multiple files (Ctrl/Shift + Click)
+2. Right-click → `Download Multiple Files`
+3. Progress indicator displayed
 
-**결과**:
+**Result**:
 ```
-✅ 5개 파일 다운로드 완료
+✅ 5 files downloaded successfully
 - config.php
 - database.php
 - functions.php
@@ -767,222 +780,237 @@ ssh -i "/path/to/key" -p 22 username@example.com
 - style.css
 ```
 
-#### 다중 삭제
+#### Multi-Delete
 
-**사용법**:
-1. 여러 파일 선택
-2. 우클릭 → `Delete Multiple Files`
-3. 확인 대화상자
+**Usage**:
+1. Select multiple files
+2. Right-click → `Delete Multiple Files`
+3. Confirmation dialog
 
-**주의사항**:
-- 삭제 전 확인 필수
-- 원격 서버에서 영구 삭제
-- 복구 불가능
+**Caution**:
+- Confirmation required before deletion
+- Permanently deleted from remote server
+- Cannot be recovered
 
 ---
 
-### 11. 컨텍스트 메뉴 기능
+### 11. Context Menu Features
 
-원격 파일/폴더를 우클릭하여 다양한 작업을 수행할 수 있습니다.
+Perform various operations by right-clicking remote files/folders.
 
-#### Copy Remote Path (원격 경로 복사)
+#### Copy Remote Path
 
-원격 파일의 전체 경로를 클립보드에 복사합니다.
+Copy full path of remote file to clipboard.
 
-**사용법**:
-1. Activity Bar에서 원격 파일/폴더 우클릭
-2. `Copy Remote Path` 선택
-3. 클립보드에 경로 복사됨
+**Usage**:
+1. Right-click remote file/folder in Activity Bar
+2. Select `Copy Remote Path`
+3. Path copied to clipboard
 
-**예시**:
+**Example**:
 ```
-복사된 경로: /var/www/html/public/index.php
+Copied path: /var/www/html/public/index.php
 ```
 
-**활용 시나리오**:
-- SSH 터미널에서 파일 경로 붙여넣기
-- 다른 도구나 문서에 경로 공유
-- 스크립트 작성 시 경로 참조
+**Usage Scenarios**:
+- Paste file path in SSH terminal
+- Share path with other tools or documents
+- Reference path when writing scripts
 
-#### Open in Browser (브라우저에서 열기)
+#### Open in Browser
 
-웹 서버의 파일을 브라우저에서 바로 열어 확인할 수 있습니다.
+Open web server files directly in browser for verification.
 
-**사용법**:
-1. 원격 파일 우클릭
-2. `Open in Browser` 선택
-3. 웹 URL 입력 (최초 1회) 또는 설정에서 자동 로드
-4. 브라우저에서 파일 열림
+**Usage**:
+1. Right-click remote file
+2. Select `Open in Browser`
+3. Enter web URL (first time only) or auto-load from settings
+4. File opens in browser
 
-**설정에 웹 URL 추가** (선택사항):
+**Add Web URL to Settings** (optional):
 ```json
 {
   "name": "Web Server",
   "host": "example.com",
   "remotePath": "/var/www/html",
-  "webUrl": "http://example.com"  // 추가
+  "webUrl": "http://example.com"  // Add this
 }
 ```
 
-**URL 변환 예시**:
+**URL Conversion Example**:
 ```
-원격 경로: /var/www/html/admin/dashboard.php
-웹 URL: http://example.com
-→ 브라우저: http://example.com/admin/dashboard.php
+Remote path: /var/www/html/admin/dashboard.php
+Web URL: http://example.com
+→ Browser: http://example.com/admin/dashboard.php
 ```
 
-**활용 시나리오**:
-- PHP/HTML 파일 수정 후 즉시 브라우저에서 확인
-- 웹 서버 디버깅 및 테스트
-- 프론트엔드 변경사항 실시간 검증
+**Usage Scenarios**:
+- Verify PHP/HTML files in browser immediately after modification
+- Web server debugging and testing
+- Real-time frontend change validation
 
-#### New File / New Folder (새 파일/폴더 생성)
+#### New File / New Folder
 
-원격 서버에 직접 파일이나 폴더를 생성할 수 있습니다.
+Create files or folders directly on remote server.
 
-**사용법**:
-1. 서버 또는 원격 폴더 우클릭
-2. `New File` 또는 `New Folder` 선택
-3. 파일/폴더 이름 입력
-4. 원격 서버에 즉시 생성됨
+**Usage**:
+1. Right-click server or remote folder
+2. Select `New File` or `New Folder`
+3. Enter file/folder name
+4. Created immediately on remote server
 
-**활용 시나리오**:
-- 빠른 테스트 파일 생성
-- 새 디렉토리 구조 설정
-- 로컬에서 만들지 않고 원격에 직접 생성
+**Usage Scenarios**:
+- Quick test file creation
+- Set up new directory structure
+- Create directly on remote without creating locally
 
 ---
 
-### 12. 서버 템플릿 시스템
+### 12. Server Template System
 
-자주 사용하는 서버 설정을 템플릿으로 저장하고 재사용할 수 있습니다.
+Save and reuse frequently used server configurations as templates.
 
-#### 템플릿으로 저장
+#### Save as Template
 
-현재 연결된 서버 설정을 템플릿으로 저장합니다.
+Save current connected server configuration as template.
 
-**사용법**:
-1. Activity Bar에서 서버 우클릭
-2. `Save as Template` 선택
-3. 템플릿 이름 및 설명 입력
+**Usage**:
+1. Right-click server in Activity Bar
+2. Select `Save as Template`
+3. Enter template name and description
 
-**저장되는 정보**:
-- ✅ 포트 번호, 원격 경로
-- ✅ 업로드/다운로드 설정
-- ✅ 무시 패턴, 백업 설정
-- ❌ 민감 정보 (비밀번호, SSH 키) - 보안상 제외
+**Saved Information**:
+- ✅ Port number, remote path
+- ✅ Upload/download settings
+- ✅ Ignore patterns, backup settings
+- ❌ Sensitive information (password, SSH key) - Excluded for security
 
-#### 템플릿에서 서버 추가
+#### Add Server from Template
 
-저장된 템플릿을 사용하여 새 서버를 빠르게 추가할 수 있습니다.
+Quickly add new server using saved template.
 
-**사용법**:
+**Usage**:
 1. Command Palette: `ctlim SFTP: Add Server from Template`
-2. 템플릿 선택
-3. 서버 정보 입력:
-   - 호스트 주소
-   - 사용자명
-   - 비밀번호 (선택사항)
-   - 서버 이름 (선택사항)
+2. Select template
+3. Enter server information:
+   - Host address
+   - Username
+   - Password (optional)
+   - Server name (optional)
 
-**예시**:
+**Example**:
 ```
-템플릿 선택: 📋 LAMP Server Config
+Select template: 📋 LAMP Server Config
 
-호스트: new-server.example.com
-사용자명: admin
-비밀번호: ******** (선택사항)
-서버 이름: New Dev Server
+Host: new-server.example.com
+Username: admin
+Password: ******** (optional)
+Server name: New Dev Server
 
-→ 설정 파일에 자동 추가됨 ✅
+→ Automatically added to config file ✅
 ```
 
-#### 템플릿 관리
+#### Template Management
 
 **Command Palette**: `ctlim SFTP: Manage Templates`
 
 ```
-📋 LAMP Server (사용: 5회)
-   Port: 22 | 생성: 2025-12-15
-   설명: Apache + PHP + MySQL 기본 설정
+📋 LAMP Server (Usage: 5 times)
+   Port: 22 | Created: 2025-12-15
+   Description: Apache + PHP + MySQL base config
 
-📋 Node.js Server (사용: 3회)
-   Port: 22 | 생성: 2025-11-20
-   설명: Node.js 프로젝트용 설정
+📋 Node.js Server (Usage: 3 times)
+   Port: 22 | Created: 2025-11-20
+   Description: Configuration for Node.js projects
 ```
 
-**기능**:
-- 템플릿 삭제
-- 사용 통계 확인
-- 템플릿 상세 정보 보기
+**Features**:
+- Delete templates
+- Check usage statistics
+- View template details
 
-#### 활용 시나리오
+#### Usage Scenarios
 
-1. **팀 표준 설정 공유**
-   - 팀 내 표준 서버 설정을 템플릿으로 저장
-   - 새 프로젝트 시작 시 빠른 설정
+1. **Share Team Standard Configuration**
+   - Save team standard server configuration as template
+   - Quick setup when starting new project
 
-2. **다중 환경 구축**
-   - 동일한 구성의 개발/테스트/운영 서버 추가
-   - 호스트와 인증 정보만 변경
+2. **Build Multi-Environment**
+   - Add dev/test/production servers with same configuration
+   - Change only host and authentication info
 
-3. **클라이언트 프로젝트 관리**
-   - 클라이언트별 표준 설정 템플릿 유지
-   - 신규 사이트 작업 시 템플릿 재사용
+3. **Client Project Management**
+   - Maintain standard configuration templates for each client
+   - Reuse template when working on new sites
 
-#### 저장 위치
+#### Storage Location
 
-- **파일**: `.vscode/.sftp-templates.json`
-- **공유 방법**: Git에 커밋하여 팀원과 공유 가능
-- **보안**: 민감 정보(비밀번호, 키)는 저장되지 않음
-
----
-
-## ❓ FAQ (자주 묻는 질문)
-
-### Q1: SSH 연결이 안 돼요
-**A**: 
-1. 호스트 주소와 포트 확인 (기본 22)
-2. 방화벽 설정 확인
-3. SSH 키 권한 확인 (Windows: `icacls`, Linux: `chmod 600`)
-4. 구형 서버는 자동으로 호환 알고리즘 적용됨
-
-### Q2: 비밀번호를 매번 입력해야 하나요?
-**A**: 설정 파일의 `password` 필드를 **비워두면** 연결 시 한 번만 입력합니다. 
-
-### Q3: 충돌 감지가 작동하지 않아요
-**A**: 
-1. 파일을 먼저 `ctlim SFTP: Open Remote File`로 다운로드
-2. 메타데이터 파일 확인: `.vscode/.sftp-metadata/`
-3. 원격 파일을 직접 수정한 경우에만 충돌 감지
-
-### Q4: 여러 서버에 동시 연결 가능한가요?
-**A**: **가능합니다!** Activity Bar에서 여러 서버를 각각 클릭하여 연결하세요.
+- **File**: `.vscode/.sftp-templates.json`
+- **Sharing Method**: Commit to Git to share with team
+- **Security**: Sensitive information (password, keys) not saved
 
 ---
 
-## 🐛 문제 해결
+## ❓ FAQ (Frequently Asked Questions)
 
-### 연결 끊김 문제
-증상: "서버 연결이 끊어졌습니다" 메시지
+### Q1: SSH connection not working
+**A**: 
+1. Check host address and port (default 22)
+2. Check firewall settings
+3. Check SSH key permissions (Windows: `icacls`, Linux: `chmod 600`)
+4. Legacy servers automatically use compatible algorithms
 
-**해결책**:
-1. 서버 타임아웃 설정 확인
-2. 네트워크 안정성 확인
-3. **자동 재연결** - 대화상자에서 "연결" 클릭
+### Q2: Do I need to enter password every time?
+**A**: If you **leave the `password` field empty** in config file, you only need to enter it once on connection.
 
-### 업로드 실패
-증상: "❌ 업로드 실패" 메시지
+### Q3: Conflict detection not working
+**A**: 
+1. First download file with `ctlim SFTP: Open Remote File`
+2. Check metadata file: `.vscode/.sftp-metadata/`
+3. Conflict detection only works when remote file was directly modified
 
-**확인 사항**:
-1. 원격 경로 권한 (`chmod`, `chown`)
-2. 디스크 공간 확인
-3. 파일명 특수문자 제거
+### Q4: Can I connect to multiple servers simultaneously?
+**A**: **Yes!** Click each server in Activity Bar to connect to them individually.
 
-### 메타데이터 손상
-증상: 충돌 감지 오작동
+### Q5: How to use SSH Key authentication?
+**A**: Add `privateKey` field to configuration:
+```json
+{
+  "username": "user",
+  "privateKey": "C:/Users/YourName/.ssh/id_rsa",
+  "passphrase": "your-passphrase"  // If key has passphrase
+}
+```
 
-**해결책**:
+### Q6: How to sync entire folder?
+**A**: Use Command Palette:
+- `ctlim SFTP: Sync Local -> Remote` - Upload all local changes
+- `ctlim SFTP: Sync Remote -> Local` - Download all remote changes
+
+---
+
+## 🐛 Troubleshooting
+
+### Connection Loss Issue
+Symptom: "Server connection lost" message
+
+**Solution**:
+1. Check server timeout settings
+2. Check network stability
+3. **Auto-Reconnect** - Click "Connect" in dialog
+
+### Upload Failure
+Symptom: "❌ Upload failed" message
+
+**Check**:
+1. Remote path permissions (`chmod`, `chown`)
+2. Check disk space
+3. Remove special characters from filename
+
+### Metadata Corruption
+Symptom: Conflict detection malfunction
+
+**Solution**:
 ```powershell
 # Windows
 Remove-Item -Recurse .vscode\.sftp-metadata\
@@ -990,11 +1018,23 @@ Remove-Item -Recurse .vscode\.sftp-metadata\
 # Linux/Mac
 rm -rf .vscode/.sftp-metadata/
 ```
-파일을 다시 다운로드하여 메타데이터 재생성
+Re-download files to regenerate metadata
+
+### Private Key Permission Error
+Symptom: "Bad permissions" error with SSH key
+
+**Solution**:
+```powershell
+# Windows
+icacls "C:\Users\YourName\.ssh\id_rsa" /inheritance:r /grant:r "%USERNAME%:R"
+
+# Linux/Mac
+chmod 600 ~/.ssh/id_rsa
+```
 
 ---
 
-## 🔗 링크 및 리소스
+## 🔗 Links and Resources
 
 - 📦 **GitHub Repository**: [github.com/ctlim2/ctlimsftp](https://github.com/ctlim2/ctlimsftp)
 - 🐛 **Issue Tracker**: [github.com/ctlim2/ctlimsftp/issues](https://github.com/ctlim2/ctlimsftp/issues)
@@ -1003,9 +1043,9 @@ rm -rf .vscode/.sftp-metadata/
 
 ---
 
-## 🤝 기여하기
+## 🤝 Contributing
 
-버그 리포트, 기능 제안, Pull Request 환영합니다!
+Bug reports, feature suggestions, and Pull Requests are welcome!
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
@@ -1015,18 +1055,18 @@ rm -rf .vscode/.sftp-metadata/
 
 ---
 
-## 📄 라이선스
+## 📄 License
 
-MIT License - 자세한 내용은 [LICENSE](LICENSE) 파일 참조
+MIT License - See [LICENSE](LICENSE) file for details
 
 Copyright (c) 2026 ctlim2
 
 ---
 
-## 🌟 지원
+## 🌟 Support
 
-이 프로젝트가 유용하다면 ⭐ Star를 눌러주세요!
+If you find this project useful, please give it a ⭐ Star!
 
-**개발자**: ctlim  
-**버전**: 0.4.3  
-**마지막 업데이트**: 2026-01-05
+**Developer**: ctlim  
+**Version**: 0.5.1  
+**Last Updated**: 2026-01-06

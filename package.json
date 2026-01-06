@@ -2,7 +2,7 @@
   "name": "ctlim-sftp",
   "displayName": "ctlim-SFTP",
   "description": "Simple SFTP sync extension with upload on save and conflict detection",
-  "version": "0.4.5",
+  "version": "0.5.1",
   "publisher": "ctlim",
   "icon": "resources/icon.png",
   "engines": {
@@ -479,14 +479,15 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "@types/vscode": "^1.85.0",
     "@types/ssh2-sftp-client": "^9.0.0",
+    "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "eslint": "^8.0.0",
     "typescript": "^5.3.0"
   },
   "dependencies": {
+    "basic-ftp": "^5.1.0",
     "ssh2-sftp-client": "^10.0.3"
   }
 }

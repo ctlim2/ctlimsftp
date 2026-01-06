@@ -35,6 +35,9 @@ export class SftpClient {
             host: config.host,
             port: config.port,
             username: config.username,
+            readyTimeout: 20000,  // 연결 준비 타임아웃 (20초)
+            strictVendor: false,  // 엄격한 벤더 체크 비활성화
+            debug: DEBUG_MODE ? (info: string) => this.log(`[SSH2] ${info}`) : undefined,
             // Add algorithms for compatibility with older SSH servers
             algorithms: {
                 kex: [

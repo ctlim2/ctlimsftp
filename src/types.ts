@@ -2,6 +2,7 @@ export interface SftpConfig {
     name?: string;
     group?: string;
     context?: string;
+    protocol?: 'sftp' | 'ftp' | 'ftps';
     host: string;
     port: number;
     username: string;
