@@ -6,7 +6,7 @@ import { SftpConfig, RemoteFile, FileMetadata } from './types';
 import { config } from 'process';
 
 // 개발 모드 여부 (릴리스 시 false로 변경)
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 
 export class SftpClient {
     public client: SftpClient2 | null = null;

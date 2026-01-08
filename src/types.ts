@@ -85,6 +85,7 @@ export interface Bookmark {
     name: string;
     serverName: string;
     groupName?: string;
+    protocol?: 'sftp' | 'ftp' | 'ftps';
     remotePath: string;
     isDirectory: boolean;
     description?: string;

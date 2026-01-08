@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 import { SftpConfig, RemoteFile, FileMetadata } from './types';
 
 // 개발 모드 여부 (릴리스 시 false로 변경)
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 
 export class FtpClient {
     private client: ftp.Client | null = null;

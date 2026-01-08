@@ -24,6 +24,9 @@ let bookmarkManager: BookmarkManager | null = null;
 let templateManager: TemplateManager | null = null;
 let sftpTreeView: vscode.TreeView<SftpTreeItem> | null = null;
 
+// 북마크 네비게이션 중 onDidChangeSelection 자동 실행 방지
+let isNavigatingBookmark: boolean = false;
+
 // Cache document-config and client mapping for performance
 const documentConfigCache = new WeakMap<vscode.TextDocument, { config: SftpConfig; client: ClientType; remotePath: string }>();
 
@@ -85,6 +88,12 @@ export function activate(context: vscode.ExtensionContext) {
      * Handle selection on tree items (servers only, files use double-click)
      */
     sftpTreeView.onDidChangeSelection(async (e) => {
+        // 북마크 네비게이션 중에는 자동 실행 건너뛰기
+        if (isNavigatingBookmark) {
+            if (DEBUG_MODE) console.log('북마크 네비게이션 중: onDidChangeSelection 무시됨');
+            return;
+        }
+
         if (e.selection.length > 0) {
             const item = e.selection[0];
             
@@ -669,7 +678,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 
                 try {
-                    const client = new SftpClient();
+                    const client = createClient(config);
                     await client.connect(config);
                     treeProvider.addConnectedServer(serverName, client, config);
                     connection = treeProvider.getConnectedServer(serverName);
@@ -911,7 +920,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 
                 try {
-                    const client = new SftpClient();
+                    const client = createClient(config);
                     await client.connect(config);
                     treeProvider.addConnectedServer(serverName, client, config);
                     connection = treeProvider.getConnectedServer(serverName);
@@ -1098,7 +1107,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 
                 try {
-                    const client = new SftpClient();
+                    const client = createClient(config);
                     await client.connect(config);
                     treeProvider.addConnectedServer(serverName, client, config);
                     connection = treeProvider.getConnectedServer(serverName);
@@ -1181,7 +1190,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 
                 try {
-                    const client = new SftpClient();
+                    const client = createClient(config);
                     await client.connect(config);
                     treeProvider.addConnectedServer(serverName, client, config);
                     connection = treeProvider.getConnectedServer(serverName);
@@ -1264,7 +1273,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 
                 try {
-                    const client = new SftpClient();
+                    const client = createClient(config);
                     await client.connect(config);
                     treeProvider.addConnectedServer(serverName, client, config);
                     connection = treeProvider.getConnectedServer(serverName);
@@ -1327,7 +1336,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 
                 try {
-                    const client = new SftpClient();
+                    const client = createClient(config);
                     await client.connect(config);
                     treeProvider.addConnectedServer(serverName, client, config);
                     connection = treeProvider.getConnectedServer(serverName);
@@ -1471,7 +1480,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 
                 try {
-                    const client = new SftpClient();
+                    const client = createClient(config);
                     await client.connect(config);
                     treeProvider.addConnectedServer(serverName, client, config);
                     connection = treeProvider.getConnectedServer(serverName);
@@ -1941,7 +1950,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 
                 try {
-                    const client = new SftpClient();
+                    const client = createClient(config);
                     await client.connect(config);
                     treeProvider.addConnectedServer(serverName, client, config);
                     connection = treeProvider.getConnectedServer(serverName);
@@ -2485,7 +2494,8 @@ export function activate(context: vscode.ExtensionContext) {
                 remotePath,
                 isDirectory,
                 description,
-                config.group  // 그룹 정보 추가
+                config.group,  // 그룹 정보 추가
+                config.protocol || 'sftp'  // 프로토콜 정보 추가
             );
             
             vscode.window.showInformationMessage(`⭐ 북마크 추가: ${bookmarkName}`);
@@ -3386,7 +3396,7 @@ async function retryFailedTransfer(history: TransferHistory): Promise<void> {
             }
             
             try {
-                const client = new SftpClient();
+                const client = createClient(config);
                 await client.connect(config);
                 treeProvider.addConnectedServer(history.serverName, client, config);
                 connection = treeProvider.getConnectedServer(history.serverName);
@@ -4624,70 +4634,175 @@ if (DEBUG_MODE) console.log('> checkAndReloadRemoteFiles');
     }
 }
 
+
 /**
- * 서버 이름과 원격 경로로 TreeItem 찾기
- * @param serverName 서버 이름
- * @param remotePath 원격 경로
- * @returns SftpTreeItem 또는 undefined
+ * TreeView에서 북마크 위치로 네비게이션
+ * @param bookmark 열 북마크
  */
-async function findServerTreeItem(serverName: string, remotePath: string): Promise<SftpTreeItem | undefined> {
+async function findServerTreeItem(bookmark: Bookmark): Promise<void> {
+    isNavigatingBookmark = true;
+    let serverItem: SftpTreeItem | undefined;
+    
     try {
-        // Get all root items (servers and groups)
+        if (!sftpTreeView) {
+            vscode.window.showWarningMessage('TreeView를 초기화할 수 없습니다.');
+            return;
+        }
+
+        try {
+            await vscode.commands.executeCommand('ctlimSftpView.focus');
+        } 
+        catch (e) {
+            // focus 명령어 실패해도 계속 진행
+        }
+        
+        // 1단계: 루트 아이템 가져오기
         const rootItems = await treeProvider.getChildren();
+
+        // 2단계: 그룹 처리
+        let groupItem: SftpTreeItem | undefined;
         
-        // Find the server item
-        let serverItem: SftpTreeItem | undefined;
-        
+        if (bookmark.groupName) {
+            groupItem = rootItems.find((item: SftpTreeItem) => item.label === bookmark.groupName);
+            
+            if (groupItem) {
+                try {
+                    await sftpTreeView.reveal(groupItem, { expand: true });
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                } catch (e) {
+                    if (DEBUG_MODE) console.log(`그룹 reveal 실패: ${e}`);
+                }
+            }
+            else {
+                if (DEBUG_MODE) console.log(`그룹을 찾을 수 없음: ${bookmark.groupName}`);
+                return;
+            }
+        }
+
+        // 3단계: 서버 아이템 찾기
+        // A. 루트 레벨에서 검색
         for (const item of rootItems) {
-            if (item.itemType === 'server' && item.serverItem?.name === serverName) {
+            if (item.itemType === 'server' && item.label === bookmark.serverName) {
                 serverItem = item;
                 break;
-            } else if (item.itemType === 'group') {
-                // Check servers in group
-                const groupChildren = await treeProvider.getChildren(item);
-                for (const child of groupChildren) {
-                    if (child.itemType === 'server' && child.serverItem?.name === serverName) {
-                        serverItem = child;
-                        break;
-                    }
-                }
-                if (serverItem) break;
             }
+        }
+        
+        // B. 그룹 내에서 검색
+        if (!serverItem && bookmark.groupName && groupItem) {
+            // 그룹이 이미 펼쳐졌으므로 API를 통해 자식을 다시 가져옴
+            const groupChildren = await treeProvider.getChildren(groupItem);
+            serverItem = groupChildren.find((child: SftpTreeItem) => 
+                child.itemType === 'server' && child.label === bookmark.serverName
+            );
         }
         
         if (!serverItem) {
-            return undefined;
+            if (DEBUG_MODE) console.log(`서버를 찾을 수 없음: ${bookmark.serverName}`);
+            return;
         }
-        
-        // If remotePath matches server's remotePath, return server item
-        const connection = treeProvider.getConnectedServer(serverName);
+
+        // 4단계: 서버 아이템 Reveal (ID 기반)
+        try {
+             await sftpTreeView.reveal(serverItem, { 
+                 expand: true,
+                 select: false, // 파일/폴더를 찾아갈 것이므로 서버 선택은 비활성화
+                 focus: false 
+             });
+             await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (revealError) {
+             if (DEBUG_MODE) console.log(`서버 reveal 실패: ${revealError}`);
+        }
+
+        // 5단계: 원격 경로를 따라가며 폴더 열기 (Deep Navigation)
+        const connection = treeProvider.getConnectedServer(bookmark.serverName);
         if (!connection) {
-            return serverItem;
+            return;
         }
+
+        const serverRemotePath = connection.config.remotePath;
+        let relativePath = '';
         
-        if (remotePath === connection.config.remotePath) {
-            return serverItem;
+        // bookmark.remotePath가 server remotePath로 시작하는지 확인
+        if (bookmark.remotePath.startsWith(serverRemotePath)) {
+            relativePath = bookmark.remotePath.substring(serverRemotePath.length);
+            if (relativePath.startsWith('/')) {
+                relativePath = relativePath.substring(1);
+            }
+        } else {
+            // 다른 경로면 전체 경로 사용? 보통은 server root 아래에 있음.
+            relativePath = bookmark.remotePath; 
         }
-        
-        // Navigate to the remote path
-        const pathParts = remotePath.replace(connection.config.remotePath, '').split('/').filter(p => p);
-        let currentItem = serverItem;
-        
-        for (const part of pathParts) {
-            const children = await treeProvider.getChildren(currentItem);
-            const nextItem = children.find(child => child.label === part);
+
+        // 경로가 없으면(루트) 서버만 선택하고 종료
+        if (!relativePath) {
+            await sftpTreeView.reveal(serverItem, { select: true, focus: true });
+            return;
+        }
+
+        const pathParts = relativePath.split('/').filter(p => p.length > 0);
+        let currentPath = serverRemotePath; // 시작 경로
+
+        // 경로를 순차적으로 따라감
+        for (let i = 0; i < pathParts.length; i++) {
+            currentPath = path.posix.join(currentPath, pathParts[i]);
             
-            if (!nextItem) {
-                return currentItem; // Return closest match
+            // 마지막 아이템(파일 또는 최종 폴더)인지 확인
+            const isLast = i === pathParts.length - 1;
+            
+            // ID 생성 규칙 재사용 (SftpTreeProvider와 일치)
+            const serverId = connection.config.name || `${connection.config.username}@${connection.config.host}`;
+            
+            // 중간 경로는 무조건 디렉토리임. 마지막 경로는 bookmark.isDirectory 값으로 판단.
+            let isDir = true;
+            if (isLast) {
+                isDir = bookmark.isDirectory;
             }
             
-            currentItem = nextItem;
+            // 가상의 TreeItem 생성 (ID는 생성자에서 자동 설정됨)
+            const tempItem = new SftpTreeItem(
+                pathParts[i],
+                isDir ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
+                isDir ? 'remoteDirectory' : 'remoteFile',
+                currentPath,
+                isDir,
+                connection.config,
+                undefined,
+                undefined,
+                undefined,
+                undefined
+            );
+            
+            try {
+                // select: 마지막 아이템인 경우만 true
+                // expand: 디렉토리인 경우 true 
+                const shouldExpand = isDir && (isLast ? true : true); 
+                const shouldSelect = isLast;
+                const shouldFocus = isLast;
+
+                await sftpTreeView.reveal(tempItem, { 
+                    select: shouldSelect,
+                    focus: shouldFocus,
+                    expand: shouldExpand
+                });
+                
+                // 로딩 대기
+                if (shouldExpand) {
+                    await new Promise(resolve => setTimeout(resolve, 400));
+                }
+            } catch (e) {
+                if (DEBUG_MODE) console.log(`경로 reveal 실패 (${currentPath}): ${e}`);
+                // 실패하면 멈춤
+                break;
+            }
         }
-        
-        return currentItem;
-    } catch (error) {
+
+    } 
+    catch (error) {
         if (DEBUG_MODE) console.error('findServerTreeItem error:', error);
-        return undefined;
+        vscode.window.showWarningMessage(`북마크 네비게이션 실패: ${error}`);
+    } finally {
+        isNavigatingBookmark = false;
     }
 }
 
@@ -4708,246 +4823,43 @@ async function openBookmark(bookmark: Bookmark): Promise<void> {
         if (!connection || !connection.client.isConnected()) {
             const reconnect = await vscode.window.showWarningMessage(
                 `서버에 연결되어 있지 않습니다: ${bookmark.serverName}\n연결하시겠습니까?`,
-                '연결',
+                '연결'
             );
             if (reconnect !== '연결') {
                 return;
             }
             
             try {
-                // 설정 파일에서 config 찾기
-                const config = await findConfigByName(bookmark.serverName);
-                if (!config) {
+                const serverItem = await treeProvider.getServerItem(bookmark.serverName);
+                if (!serverItem) {
                     vscode.window.showErrorMessage(`서버 설정을 찾을 수 없습니다: ${bookmark.serverName}`);
                     return;
                 }
-                
-                const client = new SftpClient();
-                await client.connect(config);
-                treeProvider.addConnectedServer(bookmark.serverName, client, config);
+                await treeProvider.connectToServer(serverItem);
                 connection = treeProvider.getConnectedServer(bookmark.serverName);
-                
-                if (!connection) {
-                    vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
-                    return;
-                }
             } catch (connectError) {
                 vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
                 return;
             }
         }
         
+        if (!connection) {
+            vscode.window.showErrorMessage('서버 연결을 가져올 수 없습니다.');
+            return;
+        }
+        
         // 접근 통계 업데이트
         bookmarkManager.recordAccess(bookmark.id);
         
-        // 파일/폴더 열기
-        if (bookmark.isDirectory) {
-            // 폴더인 경우 - TreeView에서 해당 경로로 이동
-            try {
-                if (DEBUG_MODE) console.log(`[북마크] 폴더 열기 시작: ${bookmark.remotePath}`);
-                
-                // TreeView 새로고침
-                treeProvider.refresh();
-                
-                if (!sftpTreeView) {
-                    vscode.window.showErrorMessage('SFTP TreeView가 초기화되지 않았습니다.');
-                    return;
-                }
-                
-                if (DEBUG_MODE) console.log(`[북마크] TreeItem 검색 중: ${bookmark.serverName} / ${bookmark.remotePath}`);
-                
-                // TreeView를 명시적으로 보이게 함
-                await vscode.commands.executeCommand('workbench.view.extension.ctlim-sftp-explorer');
-                
-                // TreeView가 완전히 로드될 때까지 대기
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                // TreeView 강제 새로고침
-                treeProvider.refresh();
-                await new Promise(resolve => setTimeout(resolve, 200));
-                
-                // 1단계: 그룹 찾기 및 펼치기 (서버가 그룹에 속해 있는 경우)
-                const rootItems = await treeProvider.getChildren();
-                let groupItem: SftpTreeItem | undefined;
-                let serverItem: SftpTreeItem | undefined;
-                
-                // 루트에서 서버 찾기 또는 그룹 찾기
-                for (const item of rootItems) {
-                    if (item.itemType === 'server' && item.serverItem?.name === bookmark.serverName) {
-                        serverItem = item;
-                        if (DEBUG_MODE) console.log(`[북마크] 서버 발견 (그룹 없음): ${bookmark.serverName}`);
-                        break;
-                    } else if (item.itemType === 'group') {
-                        // 저장된 그룹명이 있으면 해당 그룹만 확인, 없으면 모든 그룹 확인
-                        if (bookmark.groupName && item.label !== bookmark.groupName) {
-                            continue;
-                        }
-                        
-                        // 그룹 안에 서버가 있는지 확인
-                        const groupChildren = await treeProvider.getChildren(item);
-                        for (const child of groupChildren) {
-                            if (child.itemType === 'server' && child.serverItem?.name === bookmark.serverName) {
-                                groupItem = item;
-                                serverItem = child;
-                                if (DEBUG_MODE) console.log(`[북마크] 서버 발견 (그룹 내): ${bookmark.serverName} in ${item.label}`);
-                                break;
-                            }
-                        }
-                        if (serverItem) break;
-                    }
-                }
-                
-                if (!serverItem) {
-                    vscode.window.showErrorMessage(`서버를 찾을 수 없습니다: ${bookmark.serverName}`);
-                    return;
-                }
-                
-                // 2단계: 그룹이 있으면 먼저 펼치기
-                if (groupItem && sftpTreeView) {
-                    if (DEBUG_MODE) console.log(`[북마크] 그룹 펼치기: ${groupItem.label}`);
-                    
-                    // TreeView 강제 새로고침 및 대기
-                    treeProvider.refresh();
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    
-                    try {
-                        await sftpTreeView.reveal(groupItem, {
-                            select: false,
-                            focus: false,
-                            expand: true
-                        });
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        if (DEBUG_MODE) console.log(`[북마크] 그룹 펼침 완료`);
-                    } catch (err) {
-                        if (DEBUG_MODE) console.log(`[북마크] 그룹 펼치기 실패 (무시): ${err}`);
-                        // 그룹 펼치기 실패해도 계속 진행
-                    }
-                }
-                
-                // 3단계: 서버 펼치기 (findServerTreeItem으로 안전하게)
-                if (DEBUG_MODE) console.log(`[북마크] 서버 펼치기 시작: ${bookmark.serverName}`);
-                let serverTreeItem: SftpTreeItem | undefined;
-                
-                // 서버 TreeItem 찾기 재시도 (최대 3번)
-                for (let retry = 0; retry < 3; retry++) {
-                    serverTreeItem = await findServerTreeItem(bookmark.serverName, connection.config.remotePath);
-                    if (serverTreeItem) {
-                        if (DEBUG_MODE) console.log(`[북마크] 서버 TreeItem 발견`);
-                        break;
-                    }
-                    if (DEBUG_MODE) console.log(`[북마크] 서버 TreeItem 찾기 재시도 ${retry + 1}/3`);
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                }
-                
-                // 서버 펼치기
-                if (serverTreeItem && sftpTreeView) {
-                    try {
-                        await sftpTreeView.reveal(serverTreeItem, {
-                            select: true,
-                            focus: true,
-                            expand: true
-                        });
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        if (DEBUG_MODE) console.log(`[북마크] 서버 펼침 완료`);
-                    } catch (err) {
-                        if (DEBUG_MODE) console.log(`[북마크] 서버 펼치기 실패 (무시): ${err}`);
-                    }
-                }
-                
-                // 4단계: 원격 경로 따라가기
-                const pathParts = bookmark.remotePath.replace(connection.config.remotePath, '').split('/').filter(p => p);
-                let currentPath = connection.config.remotePath;
-                
-                if (DEBUG_MODE) console.log(`[북마크] 경로 분해: ${pathParts.length}개 레벨`);
-                
-                // 각 레벨별로 TreeItem 찾아서 펼치기 (재시도 로직 포함)
-                for (let i = 0; i < pathParts.length; i++) {
-                        currentPath = path.posix.join(currentPath, pathParts[i]);
-                        
-                        if (DEBUG_MODE) console.log(`[북마크] 레벨 ${i + 1} 처리 중: ${currentPath}`);
-                        
-                        // TreeItem 찾기 재시도 (최대 3번)
-                        let levelItem: SftpTreeItem | undefined;
-                        for (let retry = 0; retry < 3; retry++) {
-                            levelItem = await findServerTreeItem(bookmark.serverName, currentPath);
-                            if (levelItem) break;
-                            if (DEBUG_MODE) console.log(`[북마크] TreeItem 찾기 재시도 ${retry + 1}/3`);
-                            await new Promise(resolve => setTimeout(resolve, 200));
-                        }
-                        
-                        if (levelItem && sftpTreeView) {
-                            if (DEBUG_MODE) console.log(`[북마크] 레벨 ${i + 1} 펼치기: ${pathParts[i]}`);
-                            
-                            const isLast = i === pathParts.length - 1;
-                            
-                            try {
-                                // reveal 재시도 (최대 2번)
-                                let revealSuccess = false;
-                                for (let retry = 0; retry < 2; retry++) {
-                                    try {
-                                        await sftpTreeView.reveal(levelItem, {
-                                            select: isLast,
-                                            focus: isLast,
-                                            expand: true
-                                        });
-                                        revealSuccess = true;
-                                        if (DEBUG_MODE) console.log(`[북마크] reveal 성공: ${pathParts[i]}`);
-                                        break;
-                                    } catch (err) {
-                                        if (retry === 0) {
-                                            if (DEBUG_MODE) console.log(`[북마크] reveal 재시도 중...`);
-                                            await new Promise(resolve => setTimeout(resolve, 300));
-                                        }
-                                    }
-                                }
-                                
-                                if (!revealSuccess) {
-                                    if (DEBUG_MODE) console.log(`[북마크] reveal 실패: ${pathParts[i]}`);
-                                }
-                                
-                                // 마지막 레벨이면 한 번 더 reveal (스크롤 고정)
-                                if (isLast && revealSuccess) {
-                                    await new Promise(resolve => setTimeout(resolve, 200));
-                                    try {
-                                        await sftpTreeView.reveal(levelItem, {
-                                            select: true,
-                                            focus: true,
-                                            expand: true
-                                        });
-                                        if (DEBUG_MODE) console.log(`[북마크] 최종 위치 고정 완료`);
-                                    } catch (err) {
-                                        // 무시
-                                    }
-                                }
-                                
-                                // 다음 레벨 로드 대기
-                                await new Promise(resolve => setTimeout(resolve, 400));
-                            } catch (revealError: any) {
-                                if (DEBUG_MODE) console.log(`[북마크] 레벨 ${i + 1} 펼치기 실패: ${revealError.message}`);
-                            }
-                        } else {
-                            if (DEBUG_MODE) console.log(`[북마크] TreeItem을 찾을 수 없음: ${pathParts[i]}`);
-                        }
-                    }
-                    
-                    if (DEBUG_MODE) console.log(`[북마크] reveal() 완료`);
-                    
-                    vscode.window.showInformationMessage(
-                        `✅ 북마크로 이동: ${bookmark.name}`
-                    );
-            } catch (revealError) {
-                if (DEBUG_MODE) console.error('TreeView reveal error:', revealError);
-                vscode.window.showErrorMessage(
-                    `❌ 북마크 이동 실패: ${revealError}\n\n경로: ${bookmark.remotePath}`
-                );
-            }
-        }
+        // TreeView에서 북마크 위치로 이동
+        await findServerTreeItem(bookmark);
         
     } catch (error) {
         vscode.window.showErrorMessage(`북마크 열기 실패: ${error}`);
         if (DEBUG_MODE) console.error('openBookmark error:', error);
     }
 }
+
 
 /**
  * 로컬 파일 백업

@@ -52,11 +52,14 @@ export class SftpTreeItem extends vscode.TreeItem {
     ) {
         super(label, collapsibleState);
         
+        // 고유 ID 생성 (reveal 메서드의 안정성을 위함)
         if (itemType === 'group') {
+            this.id = `group_${groupName || label}`;
             this.iconPath = new vscode.ThemeIcon('folder');
             this.contextValue = 'group';
             this.tooltip = `그룹: ${label}`;
         } else if (itemType === 'server') {
+            this.id = `server_${serverItem ? serverItem.name : label}`;
             // 연결 상태별 아이콘 색상
             if (connectionStatus === 'connected') {
                 this.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('testing.iconPassed'));
@@ -69,10 +72,12 @@ export class SftpTreeItem extends vscode.TreeItem {
             this.tooltip = `${serverItem?.host}:${serverItem?.port}`;
             this.description = `${serverItem?.username}@${serverItem?.host}`;
         } else if (itemType === 'bookmarkGroup') {
+            this.id = 'bookmark_group_root';
             this.iconPath = new vscode.ThemeIcon('star-full', new vscode.ThemeColor('charts.yellow'));
             this.contextValue = 'bookmarkGroup';
             this.tooltip = '저장된 북마크';
         } else if (itemType === 'bookmark') {
+            this.id = `bookmark_${bookmarkData?.id || label}`;
             const icon = isDirectory ? 'folder' : 'file';
             this.iconPath = new vscode.ThemeIcon(icon);
             this.contextValue = 'bookmark';
@@ -88,6 +93,12 @@ export class SftpTreeItem extends vscode.TreeItem {
                 }
             }
         } else if (isDirectory) {
+            // Set ID for directory for reveal API
+            if (config && remotePath) {
+                const serverId = config.name || `${config.username}@${config.host}`;
+                this.id = `dir_${serverId}_${remotePath}`;
+            }
+            
             this.iconPath = new vscode.ThemeIcon('folder', new vscode.ThemeColor('charts.yellow'));
             this.contextValue = 'remoteDirectory';
             // 디렉토리는 크기 정보 없음
@@ -95,6 +106,12 @@ export class SftpTreeItem extends vscode.TreeItem {
                 this.tooltip = `${label}\n수정: ${formatDateTime(modifyTime)}`;
             }
         } else if (itemType === 'remoteFile') {
+            // Set ID for file for reveal API
+            if (config && remotePath) {
+                const serverId = config.name || `${config.username}@${config.host}`;
+                this.id = `file_${serverId}_${remotePath}`;
+            }
+
             // Use resourceUri for Material Icon Theme support
             this.resourceUri = vscode.Uri.file(label);
             this.contextValue = 'remoteFile';
@@ -204,6 +221,19 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
         
         // Sort server list by name
         this.serverList.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    async getServerList(): Promise<ServerListItem[]> {
+        return this.serverList;
+    }
+
+    async getServerItem(in_name: string): Promise<ServerListItem | undefined> {
+
+        for(const server of this.serverList) {
+            if(server.name === in_name) {
+                return server;
+            }
+        }
     }
 
     async connectToServer(serverItem: ServerListItem): Promise<void> {
@@ -366,6 +396,11 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
         return undefined;
     }
 
+    /**
+     * 
+     * @param element 
+     * @returns 
+     */
     async getChildren(element?: SftpTreeItem): Promise<SftpTreeItem[]> {
         if (!element) {
             // Root level - show groups or servers

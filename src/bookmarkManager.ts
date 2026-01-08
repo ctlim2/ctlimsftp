@@ -66,13 +66,15 @@ export class BookmarkManager {
         remotePath: string,
         isDirectory: boolean,
         description?: string,
-        groupName?: string
+        groupName?: string,
+        protocol?: 'sftp' | 'ftp' | 'ftps'
     ): Bookmark {
         const bookmark: Bookmark = {
             id: Date.now().toString(),
             name,
             serverName,
             groupName,
+            protocol,
             remotePath,
             isDirectory,
             description,
