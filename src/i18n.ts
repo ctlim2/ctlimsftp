@@ -299,7 +299,43 @@ export class I18n {
         'progress.uploading': '업로드 중: {fileName}',
         'success.uploadComplete': '✅ 업로드 완료: {remotePath}',
         'error.uploadFailed': '❌ 업로드 실패: {remotePath}',
-        'error.uploadFailedGeneral': '업로드 실패: {error}'
+        'error.uploadFailedGeneral': '업로드 실패: {error}',
+        
+        // BATCH 5: Sync and File Management Commands
+        'sync.dontDelete': '삭제하지 않음',
+        'sync.deleteDeletedFiles': '⚠️ 삭제된 파일도 동기화',
+        'sync.selectDeleteHandling': '삭제된 파일 처리 방법을 선택하세요',
+        'sync.bidirectional': '양방향 동기화',
+        'sync.settings': '동기화 설정:\n\n',
+        'sync.deleteChoice': '삭제: {value}',
+        'sync.startButton': '동기화 시작',
+        'sync.confirmStart': '계속하시겠습니까?',
+        'progress.syncingFolder': '폴더 동기화 중...',
+        'progress.syncPreparing': '동기화 준비 중...',
+        'progress.processingFile': '{fileName} 처리 중...',
+        'success.syncComplete': '✅ 동기화 완료!',
+        'success.syncStats': '업로드: {uploaded}개 | 다운로드: {downloaded}개 | 삭제: {deleted}개',
+        'success.syncDeleteCount': '🗑️ 삭제: {count}개',
+        'error.syncFailed': '동기화 실패: {error}',
+        
+        'prompt.fileNameInput': '생성할 파일 이름을 입력하세요',
+        'placeholder.exampleFileName': 'example.txt',
+        'error.fileNameRequired': '파일 이름을 입력해주세요',
+        'error.fileNameInvalidChars': '파일 이름에 경로 구분자를 포함할 수 없습니다',
+        'success.fileCreated': '✅ 파일 생성 완료: {fileName}',
+        'error.fileCreateFailed': '파일 생성 실패: {error}',
+        
+        'prompt.folderNameInput': '생성할 폴더 이름을 입력하세요',
+        'placeholder.exampleFolderName': 'newfolder',
+        'error.folderNameRequired': '폴더 이름을 입력해주세요',
+        'error.folderNameInvalidChars': '폴더 이름에 경로 구분자를 포함할 수 없습니다',
+        'success.folderCreated': '✅ 폴더 생성 완료: {folderName}',
+        'error.folderCreateFailed': '폴더 생성 실패: {error}',
+        
+        'confirm.deleteFolderMessage': '폴더 "{fileName}"와 모든 하위 항목을 삭제하시겠습니까?',
+        'confirm.deleteFileMessage': '파일 "{fileName}"을 삭제하시겠습니까?',
+        'success.fileDeleted': '✅ 파일 삭제 완료: {fileName}',
+        'success.folderDeleted': '✅ 폴더 삭제 완료: {fileName}',
       }
     };
     

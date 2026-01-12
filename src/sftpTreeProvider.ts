@@ -433,7 +433,7 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
                 const bookmarks = this.bookmarkManager.getAllBookmarks();
                 if (bookmarks.length > 0) {
                     items.push(new SftpTreeItem(
-                        `⭐ 북마크 (${bookmarks.length})`,
+                        `북마크 (${bookmarks.length})`,
                         vscode.TreeItemCollapsibleState.Expanded,
                         'bookmarkGroup'
                     ));

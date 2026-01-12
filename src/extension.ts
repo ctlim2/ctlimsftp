@@ -952,10 +952,10 @@ export function activate(context: vscode.ExtensionContext) {
 
             // 삭제 옵션
             const deleteChoice = await vscode.window.showQuickPick([
-                { label: '삭제하지 않음', value: false },
-                { label: '⚠️ 삭제된 파일도 동기화', value: true }
+                { label: i18n.t('sync.dontDelete'), value: false },
+                { label: i18n.t('sync.deleteDeletedFiles'), value: true }
             ], {
-                placeHolder: '삭제된 파일 처리 방법을 선택하세요'
+                placeHolder: i18n.t('sync.selectDeleteHandling')
             });
 
             if (!deleteChoice) {
@@ -965,34 +965,33 @@ export function activate(context: vscode.ExtensionContext) {
             // 방향에 따른 라벨
             const directionLabel = direction === 'local-to-remote' ? '로컬 → 원격' :
                                    direction === 'remote-to-local' ? '원격 → 로컬' :
-                                   '양방향 동기화';
+                                   i18n.t('sync.bidirectional');
 
             // 확인 대화상자
-            const confirmMessage = `동기화 설정:\n\n` +
+            const confirmMessage = `${i18n.t('sync.settings')}` +
                 `로컬: ${syncFolder}\n` +
                 `원격: ${remotePath}\n` +
                 `방향: ${directionLabel}\n` +
-                `삭제: ${deleteChoice.value ? '예' : '아니오'}\n\n` +
-                `계속하시겠습니까?`;
+                `${i18n.t('sync.deleteChoice', { value: deleteChoice.value ? '예' : '아니오' })}\n\n` +
+                `${i18n.t('sync.confirmStart')}`;
 
             const confirm = await vscode.window.showWarningMessage(
                 confirmMessage,
                 { modal: true },
-                '동기화 시작',
-//                '취소'
+                i18n.t('sync.startButton')
             );
 
-            if (confirm !== '동기화 시작') {
+            if (confirm !== i18n.t('sync.startButton')) {
                 return;
             }
 
             // 동기화 실행
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: '폴더 동기화 중...',
+                title: i18n.t('progress.syncingFolder'),
                 cancellable: false
             }, async (progress) => {
-                progress.report({ message: '동기화 준비 중...' });
+                progress.report({ message: i18n.t('progress.syncPreparing') });
 
                 const result = await connection!.client.syncFolder(
                     syncFolder,
@@ -1013,11 +1012,9 @@ export function activate(context: vscode.ExtensionContext) {
                 );
 
                 const summary = [
-                    `✅ 동기화 완료!`,
+                    i18n.t('success.syncComplete'),
                     ``,
-                    `📤 업로드: ${result.uploaded}개`,
-                    `📥 다운로드: ${result.downloaded}개`,
-                    `🗑️ 삭제: ${result.deleted}개`,
+                    i18n.t('success.syncStats', { uploaded: result.uploaded.toString(), downloaded: result.downloaded.toString(), deleted: result.deleted.toString() }),
                     result.failed.length > 0 ? `❌ 실패: ${result.failed.length}개` : ''
                 ].filter(line => line).join('\n');
 
@@ -1043,7 +1040,7 @@ export function activate(context: vscode.ExtensionContext) {
             });
 
         } catch (error) {
-            vscode.window.showErrorMessage(`동기화 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.syncFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('sync error:', error);
         }
     }
@@ -1090,14 +1087,14 @@ export function activate(context: vscode.ExtensionContext) {
             
             // 파일명 입력 받기
             const fileName = await vscode.window.showInputBox({
-                prompt: '생성할 파일 이름을 입력하세요',
-                placeHolder: 'example.txt',
+                prompt: i18n.t('prompt.fileNameInput'),
+                placeHolder: i18n.t('placeholder.exampleFileName'),
                 validateInput: (value) => {
                     if (!value || value.trim() === '') {
-                        return '파일 이름을 입력해주세요';
+                        return i18n.t('error.fileNameRequired');
                     }
                     if (value.includes('/') || value.includes('\\')) {
-                        return '파일 이름에 경로 구분자를 포함할 수 없습니다';
+                        return i18n.t('error.fileNameInvalidChars');
                     }
                     return null;
                 }
@@ -1141,13 +1138,13 @@ export function activate(context: vscode.ExtensionContext) {
             const newFilePath = path.posix.join(remotePath, fileName);
             await connection.client.createRemoteFile(newFilePath);
             
-            vscode.window.showInformationMessage(`✅ 파일 생성 완료: ${fileName}`);
+            vscode.window.showInformationMessage(i18n.t('success.fileCreated', { fileName }));
             
             // TreeView 새로고침
             treeProvider.refresh();
             
         } catch (error) {
-            vscode.window.showErrorMessage(`파일 생성 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.fileCreateFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('newFile error:', error);
         }
     });
@@ -1173,14 +1170,14 @@ export function activate(context: vscode.ExtensionContext) {
             
             // 폴더명 입력 받기
             const folderName = await vscode.window.showInputBox({
-                prompt: '생성할 폴더 이름을 입력하세요',
-                placeHolder: 'newfolder',
+                prompt: i18n.t('prompt.folderNameInput'),
+                placeHolder: i18n.t('placeholder.exampleFolderName'),
                 validateInput: (value) => {
                     if (!value || value.trim() === '') {
-                        return '폴더 이름을 입력해주세요';
+                        return i18n.t('error.folderNameRequired');
                     }
                     if (value.includes('/') || value.includes('\\')) {
-                        return '폴더 이름에 경로 구분자를 포함할 수 없습니다';
+                        return i18n.t('error.folderNameInvalidChars');
                     }
                     return null;
                 }
@@ -1224,13 +1221,13 @@ export function activate(context: vscode.ExtensionContext) {
             const newFolderPath = path.posix.join(remotePath, folderName);
             await connection.client.createRemoteFolder(newFolderPath);
             
-            vscode.window.showInformationMessage(`✅ 폴더 생성 완료: ${folderName}`);
+            vscode.window.showInformationMessage(i18n.t('success.folderCreated', { folderName }));
             
             // TreeView 새로고침
             treeProvider.refresh();
             
         } catch (error) {
-            vscode.window.showErrorMessage(`폴더 생성 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.folderCreateFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('newFolder error:', error);
         }
     });
@@ -1259,13 +1256,13 @@ export function activate(context: vscode.ExtensionContext) {
             // 삭제 확인
             const fileName = path.basename(remotePath);
             const confirmMessage = isDirectory 
-                ? `폴더 "${fileName}"와 모든 하위 항목을 삭제하시겠습니까?`
-                : `파일 "${fileName}"을 삭제하시겠습니까?`;
+                ? i18n.t('confirm.deleteFolderMessage', { fileName })
+                : i18n.t('confirm.deleteFileMessage', { fileName });
             
             const confirm = await vscode.window.showWarningMessage(
                 confirmMessage,
                 { modal: true },
-                '삭제',
+                i18n.t('action.delete'),
 //                '취소'
             );
             
@@ -1307,15 +1304,15 @@ export function activate(context: vscode.ExtensionContext) {
             await connection.client.deleteRemoteFile(remotePath, isDirectory);
             
             const successMessage = isDirectory 
-                ? `✅ 폴더 삭제 완료: ${fileName}`
-                : `✅ 파일 삭제 완료: ${fileName}`;
+                ? i18n.t('success.folderDeleted', { fileName })
+                : i18n.t('success.fileDeleted', { fileName });
             vscode.window.showInformationMessage(successMessage);
             
             // TreeView 새로고침
             treeProvider.refresh();
             
         } catch (error) {
-            vscode.window.showErrorMessage(`삭제 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.deleteFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('deleteRemoteFile error:', error);
         }
     });
