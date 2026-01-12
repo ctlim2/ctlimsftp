@@ -4668,7 +4668,7 @@ async function findServerTreeItem(bookmark: Bookmark): Promise<void> {
             if (groupItem) {
                 try {
                     await sftpTreeView.reveal(groupItem, { expand: true });
-                    await new Promise(resolve => setTimeout(resolve, 200));
+//                    await new Promise(resolve => setTimeout(resolve, 200));
                 } catch (e) {
                     if (DEBUG_MODE) console.log(`그룹 reveal 실패: ${e}`);
                 }
@@ -4709,7 +4709,7 @@ async function findServerTreeItem(bookmark: Bookmark): Promise<void> {
                  select: false, // 파일/폴더를 찾아갈 것이므로 서버 선택은 비활성화
                  focus: false 
              });
-             await new Promise(resolve => setTimeout(resolve, 500));
+//             await new Promise(resolve => setTimeout(resolve, 500));
         } catch (revealError) {
              if (DEBUG_MODE) console.log(`서버 reveal 실패: ${revealError}`);
         }
@@ -4788,7 +4788,7 @@ async function findServerTreeItem(bookmark: Bookmark): Promise<void> {
                 
                 // 로딩 대기
                 if (shouldExpand) {
-                    await new Promise(resolve => setTimeout(resolve, 400));
+//                    await new Promise(resolve => setTimeout(resolve, 400));
                 }
             } catch (e) {
                 if (DEBUG_MODE) console.log(`경로 reveal 실패 (${currentPath}): ${e}`);

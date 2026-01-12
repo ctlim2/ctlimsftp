@@ -4,7 +4,7 @@
 
 > 간편하고 강력한 VS Code FTP/SFTP/SSH 파일 동기화 확장 프로그램
 
-[![Version](https://img.shields.io/badge/version-0.5.1-blue.svg)](https://github.com/ctlim2/ctlimsftp)
+[![Version](https://img.shields.io/badge/version-0.5.3-blue.svg)](https://github.com/ctlim2/ctlimsftp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 **저장 시 자동 업로드**와 **지능형 충돌 감지**로 원격 서버와 로컬 파일을 안전하게 동기화하세요.
@@ -1030,5 +1030,5 @@ Copyright (c) 2026 ctlim2
 이 프로젝트가 유용하다면 ⭐ Star를 눌러주세요!
 
 **개발자**: ctlim  
-**버전**: 0.5.1  
+**버전**: 0.5.3  
 **마지막 업데이트**: 2026-01-06
