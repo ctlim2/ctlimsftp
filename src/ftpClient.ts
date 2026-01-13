@@ -3,8 +3,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { SftpConfig, RemoteFile, FileMetadata } from './types';
+import { i18n } from './i18n';
 
-// 개발 모드 여부 (릴리스 시 false로 변경)
+// Development mode (set to false for release)
 const DEBUG_MODE = false;
 
 export class FtpClient {
@@ -29,7 +30,7 @@ export class FtpClient {
         this.client = new ftp.Client();
         this.lastConfig = config;
         
-        // FTP 디버그 로깅
+        // FTP debug logging
         if (DEBUG_MODE) {
             this.client.ftp.verbose = true;
         }
@@ -42,15 +43,15 @@ export class FtpClient {
                 password: config.password,
                 secure: config.protocol === 'ftps',
                 secureOptions: config.protocol === 'ftps' ? {
-                    rejectUnauthorized: false  // 자체 서명 인증서 허용
+                    rejectUnauthorized: false  // Allow self-signed certificates
                 } : undefined
             });
             
             this.connected = true;
-            this.log(`FTP 서버 연결 성공: ${config.host}:${config.port || 21}`);
+            this.log(i18n.t('server.connectedDetailed', { host: config.host, port: config.port || 21 }));
         } catch (error) {
             this.connected = false;
-            this.log(`FTP 연결 실패: ${error}`);
+            this.log(i18n.t('server.connectionFailed', { error: String(error) }));
             throw error;
         }
     }
@@ -69,7 +70,7 @@ export class FtpClient {
     }
 
     /**
-     * 수동 재연결 시도
+     * Attempt manual reconnection
      */
     async attemptReconnect(): Promise<void> {
         if (this.reconnecting || !this.lastConfig) {
@@ -78,35 +79,35 @@ export class FtpClient {
         
         this.reconnecting = true;
         this.connected = false;
-        this.log(`FTP 재연결 시도 중: ${this.lastConfig.host}...`);
+        this.log(i18n.t('server.ftpReconnecting', { host: this.lastConfig.host }));
         
         try {
-            // 기존 연결 정리
+            // Cleanup existing connection
             if (this.client) {
                 try {
                     this.client.close();
                 } catch (error) {
-                    // 이미 끊어진 연결이면 무시
+                    // Ignore if already disconnected
                 }
                 this.client = null;
             }
             
-            // 새 클라이언트 생성 및 재연결
+            // Create new client and reconnect
             await this.connect(this.lastConfig);
             
-            this.log(`✅ FTP 재연결 성공: ${this.lastConfig.host}`);
+            this.log(i18n.t('server.ftpReconnected', { host: this.lastConfig.host }));
             
-            // 사용자에게 알림
+            // Notify user
             vscode.window.showInformationMessage(
-                `🔄 FTP 재연결 성공: ${this.lastConfig.name || this.lastConfig.host}`
+                i18n.t('server.ftpReconnectedInfo', { serverName: this.lastConfig.name || this.lastConfig.host })
             );
         } catch (error) {
-            this.log(`❌ FTP 재연결 실패: ${error}`);
+            this.log(i18n.t('server.ftpReconnectFailed', { error: String(error) }));
             this.connected = false;
             this.client = null;
             
             vscode.window.showWarningMessage(
-                `⚠️ FTP 재연결 실패: ${this.lastConfig.name || this.lastConfig.host}\n다시 연결해주세요.`
+                i18n.t('server.ftpReconnectFailedWarning', { serverName: this.lastConfig.name || this.lastConfig.host })
             );
         } finally {
             this.reconnecting = false;
@@ -114,70 +115,70 @@ export class FtpClient {
     }
 
     /**
-     * 파일 업로드
+     * Upload file
      */
     async uploadFile(localPath: string, remotePath: string, config: SftpConfig): Promise<boolean> {
         if (!this.client || !this.isConnected()) {
-            throw new Error('FTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.ftpClientNotConnected'));
         }
 
         try {
-            // 원격 디렉토리 생성
+            // Create remote directory
             const remoteDir = path.posix.dirname(remotePath);
             await this.ensureRemoteDir(remoteDir);
             
-            this.log(`FTP 업로드 중: ${localPath} -> ${remotePath}`);
+            this.log(i18n.t('file.ftpUploading', { local: localPath, remote: remotePath }));
             await this.client.uploadFrom(localPath, remotePath);
-            this.log(`FTP 업로드 완료: ${remotePath}`);
+            this.log(i18n.t('file.ftpUploadComplete', { remote: remotePath }));
             
-            // 메타데이터 저장
+            // Save metadata
             const remoteMetadata = await this.getRemoteFileInfo(remotePath);
             this.saveFileMetadata(localPath, remotePath, remoteMetadata.remoteModifyTime, remoteMetadata.remoteFileSize, config);
             
             return true;
         } catch (error) {
-            this.log(`FTP 업로드 실패: ${error}`);
+            this.log(i18n.t('file.ftpUploadFailed', { error: String(error) }));
             throw error;
         }
     }
 
     /**
-     * 파일 다운로드
+     * Download file
      */
     async downloadFile(remotePath: string, localPath: string, config: SftpConfig): Promise<void> {
         if (!this.client || !this.isConnected()) {
-            throw new Error('FTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.ftpClientNotConnected'));
         }
 
         try {
-            // 로컬 디렉토리 생성
+            // Create local directory
             const localDir = path.dirname(localPath);
             if (!fs.existsSync(localDir)) {
                 fs.mkdirSync(localDir, { recursive: true });
             }
 
-            this.log(`FTP 다운로드 중: ${remotePath} -> ${localPath}`);
+            this.log(i18n.t('file.ftpDownloading', { remote: remotePath, local: localPath }));
             
-            // 파일 다운로드
+            // Download file
             const writable = fs.createWriteStream(localPath);
             await this.client.downloadTo(writable, remotePath);
             
-            this.log(`FTP 다운로드 완료: ${localPath}`);
+            this.log(i18n.t('file.ftpDownloadComplete', { local: localPath }));
             
-            // 메타데이터 저장
+            // Save metadata
             await this.saveRemoteFileMetadata(remotePath, localPath, config);
         } catch (error) {
-            this.log(`FTP 다운로드 실패: ${error}`);
+            this.log(i18n.t('file.ftpDownloadFailed', { error: String(error) }));
             throw error;
         }
     }
 
     /**
-     * 원격 파일 목록 조회
+     * List remote files
      */
     async listRemoteFiles(remotePath: string): Promise<RemoteFile[]> {
         if (!this.client || !this.isConnected()) {
-            throw new Error('FTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.ftpClientNotConnected'));
         }
 
         try {
@@ -190,17 +191,17 @@ export class FtpClient {
                 modifyTime: item.modifiedAt ? new Date(item.modifiedAt) : new Date()
             }));
         } catch (error) {
-            this.log(`FTP 파일 목록 조회 실패: ${remotePath} - ${error}`);
+            this.log(i18n.t('error.listRemoteFilesFailed', { path: remotePath, error: String(error) }));
             return [];
         }
     }
 
     /**
-     * 원격 파일 삭제
+     * Delete remote file
      */
     async deleteRemoteFile(remotePath: string, isDirectory: boolean = false): Promise<void> {
         if (!this.client || !this.isConnected()) {
-            throw new Error('FTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.ftpClientNotConnected'));
         }
 
         try {
@@ -209,9 +210,9 @@ export class FtpClient {
             } else {
                 await this.client.remove(remotePath);
             }
-            this.log(`FTP 파일 삭제 완료: ${remotePath}`);
+            this.log(i18n.t('file.ftpDeleteComplete', { path: remotePath }));
         } catch (error) {
-            this.log(`FTP 파일 삭제 실패: ${error}`);
+            this.log(i18n.t('file.ftpDeleteFailed', { error: String(error) }));
             throw error;
         }
     }
@@ -219,16 +220,16 @@ export class FtpClient {
     /**
      * 원격 디렉토리 생성 (재귀적)
      */
-    private async ensureRemoteDir(remotePath: string): Promise<void> {
+    async ensureRemoteDir(remotePath: string): Promise<void> {
         if (!this.client) {
             return;
         }
 
         try {
             await this.client.ensureDir(remotePath);
-            if (DEBUG_MODE) console.log(`FTP 디렉토리 생성/확인: ${remotePath}`);
+            if (DEBUG_MODE) console.log(i18n.t('folder.ftpMkdir', { path: remotePath }));
         } catch (error) {
-            this.log(`FTP 디렉토리 생성 실패: ${remotePath} - ${error}`);
+            this.log(i18n.t('error.ftpMkdirFailed', { path: remotePath, error: String(error) }));
             throw error;
         }
     }
@@ -238,7 +239,7 @@ export class FtpClient {
      */
     async getRemoteFileInfo(remotePath: string): Promise<{ remoteModifyTime: number; remoteFileSize: number }> {
         if (!this.client || !this.isConnected()) {
-            throw new Error('FTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.ftpClientNotConnected'));
         }
 
         try {
@@ -249,17 +250,17 @@ export class FtpClient {
             const fileInfo = list.find(item => item.name === fileName);
             
             if (!fileInfo) {
-                throw new Error(`파일을 찾을 수 없습니다: ${remotePath}`);
+                throw new Error(i18n.t('error.fileNotFound', { path: remotePath }));
             }
 
             const remoteModifyTime = fileInfo.modifiedAt ? new Date(fileInfo.modifiedAt).getTime() : Date.now();
             const remoteFileSize = fileInfo.size;
 
-            this.log(`FTP 파일 정보: ${remotePath} - mtime=${remoteModifyTime}, size=${remoteFileSize}`);
+            this.log(i18n.t('file.ftpInfo', { path: remotePath, mtime: remoteModifyTime.toString(), size: remoteFileSize.toString() }));
             
             return { remoteModifyTime, remoteFileSize };
         } catch (error) {
-            this.log(`FTP 파일 정보 조회 실패: ${error}`);
+            this.log(i18n.t('error.ftpInfoFailed', { error: String(error) }));
             throw error;
         }
     }
@@ -294,9 +295,9 @@ export class FtpClient {
             }
             
             fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
-            this.log(`메타데이터 저장: ${metadataPath}`);
+            this.log(i18n.t('file.uploaded', { path: metadataPath }));
         } catch (error) {
-            console.error('메타데이터 저장 실패:', error);
+            console.error(i18n.t('error.metadataSaveFailed'), error);
         }
     }
 
@@ -334,7 +335,12 @@ export class FtpClient {
             
             const remoteMetadata = await this.getRemoteFileInfo(remotePath);
             
-            this.log(`메타데이터 비교:\n로컬 mtime=${localMetadata.remoteModifyTime}, size=${localMetadata.remoteFileSize}\n원격 mtime=${remoteMetadata.remoteModifyTime}, size=${remoteMetadata.remoteFileSize}`);
+            this.log(i18n.t('metadata.comparing', {
+                lTime: localMetadata.remoteModifyTime.toString(),
+                lSize: localMetadata.remoteFileSize.toString(),
+                rTime: remoteMetadata.remoteModifyTime.toString(),
+                rSize: remoteMetadata.remoteFileSize.toString()
+            }));
             
             return localMetadata.remoteModifyTime === remoteMetadata.remoteModifyTime &&
                    localMetadata.remoteFileSize === remoteMetadata.remoteFileSize;
@@ -355,7 +361,7 @@ export class FtpClient {
         progressCallback?: (current: number, total: number, fileName: string) => void
     ): Promise<{ uploaded: number; downloaded: number; deleted: number; failed: string[] }> {
         if (!this.client || !this.isConnected()) {
-            throw new Error('FTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.ftpClientNotConnected'));
         }
 
         const result = {
@@ -371,7 +377,7 @@ export class FtpClient {
                 const localFiles = this.getAllFiles(localFolder, config.ignore || []);
                 const total = localFiles.length;
                 
-                this.log(`FTP 로컬 → 원격 동기화 시작: ${total}개 파일`);
+                this.log(i18n.t('sync.ftpLocalToRemoteStarted', { count: total.toString() }));
                 
                 for (let i = 0; i < localFiles.length; i++) {
                     const localFile = localFiles[i];
@@ -386,19 +392,22 @@ export class FtpClient {
                         const success = await this.uploadFile(localFile, remoteFilePath, config);
                         if (success) {
                             result.uploaded++;
-                            this.log(`업로드 성공: ${relativePath}`);
+                            this.log(i18n.t('file.uploadSuccessSimple', { path: relativePath }));
                         }
                     } catch (error) {
                         result.failed.push(localFile);
-                        this.log(`업로드 실패: ${localFile} - ${error}`);
+                        this.log(i18n.t('file.uploadFailSimple', { path: localFile, error: String(error) }));
                     }
                 }
             }
 
-            this.log(`FTP 동기화 완료: 업로드=${result.uploaded}, 실패=${result.failed.length}`);
+            this.log(i18n.t('sync.ftpCompletedDetailed', { 
+                uploaded: result.uploaded.toString(), 
+                failed: result.failed.length.toString() 
+            }));
             
         } catch (error) {
-            this.log(`FTP 동기화 오류: ${error}`);
+            this.log(i18n.t('sync.ftpError', { error: String(error) }));
             throw error;
         }
 
@@ -444,7 +453,7 @@ export class FtpClient {
      * 로컬 파일 백업
      */
     async backupLocalFile(localPath: string, config: SftpConfig): Promise<void> {
-        if (DEBUG_MODE) console.log(`백업: ${localPath}`);
+        if (DEBUG_MODE) console.log(`Backup: ${localPath}`);
 
         try {
             const workspaceRoot = config.workspaceRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -487,7 +496,7 @@ export class FtpClient {
 
             fs.copyFileSync(localPath, backupFilePath);
             
-            if (DEBUG_MODE) console.log(`백업 완료: ${backupFilePath}`);
+            if (DEBUG_MODE) console.log(i18n.t('backup.complete', { path: backupFilePath }));
             
             // 오래된 백업 정리 (최근 5개만 유지)
             const backupPattern = new RegExp(`^${fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\..*\\.backup$`);
@@ -503,11 +512,11 @@ export class FtpClient {
             if (backupFiles.length > 5) {
                 for (let i = 5; i < backupFiles.length; i++) {
                     fs.unlinkSync(backupFiles[i].path);
-                    if (DEBUG_MODE) console.log(`오래된 백업 삭제: ${backupFiles[i].name}`);
+                    if (DEBUG_MODE) console.log(i18n.t('backup.deletedOld', { name: backupFiles[i].name }));
                 }
             }
         } catch (error) {
-            console.error('백업 실패:', error);
+            console.error(i18n.t('error.backupFailed'), error);
         }
     }
 
@@ -542,16 +551,16 @@ export class FtpClient {
      */
     async createRemoteFile(remotePath: string, content: string = ''): Promise<void> {
         if (!this.client) {
-            throw new Error('FTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.ftpClientNotConnected'));
         }
 
         try {
             // FTP에서는 빈 파일을 직접 업로드
             const tempBuffer = Buffer.from(content, 'utf-8');
             await this.client.uploadFrom(require('stream').Readable.from([tempBuffer]), remotePath);
-            this.log(`파일 생성 완료: ${remotePath}`);
+            this.log(i18n.t('file.createComplete', { path: remotePath }));
         } catch (error) {
-            this.log(`파일 생성 실패: ${remotePath} - ${error}`);
+            this.log(i18n.t('file.createFail', { path: remotePath, error: String(error) }));
             throw error;
         }
     }
@@ -561,14 +570,14 @@ export class FtpClient {
      */
     async createRemoteFolder(remotePath: string): Promise<void> {
         if (!this.client) {
-            throw new Error('FTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.ftpClientNotConnected'));
         }
 
         try {
             await this.client.ensureDir(remotePath);
-            this.log(`폴더 생성 완료: ${remotePath}`);
+            this.log(i18n.t('folder.createComplete', { path: remotePath }));
         } catch (error) {
-            this.log(`폴더 생성 실패: ${remotePath} - ${error}`);
+            this.log(i18n.t('folder.createFail', { path: remotePath, error: String(error) }));
             throw error;
         }
     }
@@ -582,8 +591,8 @@ export class FtpClient {
         isRegex: boolean = false,
         maxResults: number = 100
     ): Promise<RemoteFile[]> {
-        // FTP는 서버 측 검색을 지원하지 않으므로, 재귀적으로 목록을 가져와서 클라이언트에서 필터링
-        throw new Error('FTP 프로토콜에서는 파일 검색이 제한적으로 지원됩니다. 대신 수동으로 폴더를 탐색하세요.');
+        // FTP does not support server-side search, filtering requires recursive listing on client
+        throw new Error(i18n.t('error.ftpSearchLimited'));
     }
 
     /**
@@ -596,7 +605,7 @@ export class FtpClient {
         filePattern: string = '*',
         maxResults: number = 50
     ): Promise<Array<{ file: RemoteFile; matches: Array<{ line: number; text: string }> }>> {
-        throw new Error('FTP 프로토콜에서는 파일 내용 검색이 지원되지 않습니다.');
+        throw new Error(i18n.t('error.ftpContentSearchNotSupported'));
     }
 
     /**
@@ -604,7 +613,7 @@ export class FtpClient {
      */
     async getFilePermissions(remotePath: string): Promise<string> {
         if (!this.client) {
-            throw new Error('FTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.ftpClientNotConnected'));
         }
 
         try {
@@ -615,14 +624,14 @@ export class FtpClient {
             const file = files.find(f => f.name === fileName);
             
             if (!file) {
-                throw new Error(`파일을 찾을 수 없습니다: ${remotePath}`);
+                throw new Error(i18n.t('error.fileNotFound', { path: remotePath }));
             }
 
             // FTP LIST 응답에서 권한 정보 추출 (예: drwxr-xr-x)
             // basic-ftp는 rawModifiedAt 속성을 통해 원시 LIST 출력을 제공할 수 있음
             return '755'; // 기본값 (실제로는 LIST 파싱 필요)
         } catch (error) {
-            this.log(`권한 조회 실패: ${remotePath} - ${error}`);
+            this.log(i18n.t('permission.ftpReadFailed', { path: remotePath, error: String(error) }));
             return '----------';
         }
     }
@@ -632,16 +641,16 @@ export class FtpClient {
      */
     async changeFilePermissions(remotePath: string, mode: string): Promise<void> {
         if (!this.client) {
-            throw new Error('FTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.ftpClientNotConnected'));
         }
 
         try {
             // FTP SITE CHMOD 명령 사용
             await this.client.send(`SITE CHMOD ${mode} ${remotePath}`);
-            this.log(`권한 변경 완료: ${remotePath} -> ${mode}`);
+            this.log(i18n.t('permission.ftpChanged', { path: remotePath, mode }));
         } catch (error) {
-            this.log(`권한 변경 실패: ${remotePath} - ${error}`);
-            throw new Error('FTP 서버가 CHMOD를 지원하지 않거나 권한이 없습니다.');
+            this.log(i18n.t('permission.ftpChangeFailed', { path: remotePath, error: String(error) }));
+            throw new Error(i18n.t('error.ftpChmodNotSupported'));
         }
     }
 
@@ -663,7 +672,7 @@ export class FtpClient {
                 }
             }
         } catch (error) {
-            this.log(`재귀적 목록 조회 실패: ${remotePath} - ${error}`);
+            this.log(i18n.t('error.recursiveListFailed', { path: remotePath, error: String(error) }));
         }
         
         return result;
@@ -722,16 +731,16 @@ export class FtpClient {
                             await this.client.downloadTo(localFilePath, remoteFilePath);
                             await this.saveRemoteFileMetadata(remoteFilePath, localFilePath, config);
                             result.downloaded++;
-                            this.log(`다운로드 성공: ${fileInfo.name}`);
+                            this.log(i18n.t('file.downloadSuccessSimple', { name: fileInfo.name }));
                         }
                     } catch (error) {
                         result.failed.push(remoteFilePath);
-                        this.log(`다운로드 실패: ${remoteFilePath} - ${error}`);
+                        this.log(i18n.t('file.downloadFailSimple', { path: remoteFilePath, error: String(error) }));
                     }
                 }
             }
         } catch (error) {
-            this.log(`폴더 목록 조회 실패: ${remotePath} - ${error}`);
+            this.log(i18n.t('error.listFolderFailed', { path: remotePath, error: String(error) }));
         }
     }
 
@@ -761,14 +770,14 @@ export class FtpClient {
                     try {
                         await this.deleteRemoteFile(remoteFile.path, remoteFile.isDirectory);
                         result.deleted++;
-                        this.log(`원격 파일 삭제: ${remoteFile.path}`);
+                        this.log(i18n.t('file.remoteDeleteSimple', { path: remoteFile.path }));
                     } catch (error) {
-                        this.log(`원격 파일 삭제 실패: ${remoteFile.path} - ${error}`);
+                        this.log(i18n.t('file.remoteDeleteFailSimple', { path: remoteFile.path, error: String(error) }));
                     }
                 }
             }
         } catch (error) {
-            this.log(`원격 삭제 파일 처리 실패: ${error}`);
+            this.log(i18n.t('error.remoteProcessFail', { error: String(error) }));
         }
     }
 
@@ -800,13 +809,13 @@ export class FtpClient {
                     try {
                         fs.unlinkSync(localFile);
                         result.deleted++;
-                        this.log(`로컬 파일 삭제: ${localFile}`);
+                        this.log(i18n.t('file.localDeleteSimple', { path: localFile }));
                     } catch (error) {
-                        this.log(`로컬 파일 삭제 실패: ${localFile} - ${error}`);
+                        this.log(i18n.t('file.localDeleteFailSimple', { path: localFile, error: String(error) }));
                     }
                 }
             }
         } catch (error) {
-            this.log(`로컬 삭제 파일 처리 실패: ${error}`);
+            this.log(i18n.t('error.localProcessFail', { error: String(error) }));
         }
     }}

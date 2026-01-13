@@ -18,14 +18,14 @@ export class TransferHistoryManager {
     }
     
     /**
-     * 전송 기록 추가
+     * Add transfer history
      */
     addHistory(history: TransferHistory): void {
         try {
             const histories = this.loadHistories();
-            histories.unshift(history);  // 최신 항목을 앞에 추가
+            histories.unshift(history);  // Add newest item to the front
             
-            // 최대 개수 제한
+            // Limit max size
             if (histories.length > this.maxHistorySize) {
                 histories.splice(this.maxHistorySize);
             }
@@ -41,7 +41,7 @@ export class TransferHistoryManager {
     }
     
     /**
-     * 모든 전송 기록 로드
+     * Load all transfer histories
      */
     loadHistories(): TransferHistory[] {
         try {
@@ -58,7 +58,7 @@ export class TransferHistoryManager {
     }
     
     /**
-     * 전송 기록 저장
+     * Save transfer histories
      */
     private saveHistories(histories: TransferHistory[]): void {
         try {
@@ -69,7 +69,7 @@ export class TransferHistoryManager {
     }
     
     /**
-     * 실패한 전송만 조회
+     * Get failed transfers only
      */
     getFailedTransfers(): TransferHistory[] {
         const histories = this.loadHistories();
@@ -77,7 +77,7 @@ export class TransferHistoryManager {
     }
     
     /**
-     * 특정 서버의 전송 기록 조회
+     * Get transfer histories by server
      */
     getHistoriesByServer(serverName: string): TransferHistory[] {
         const histories = this.loadHistories();
@@ -85,7 +85,7 @@ export class TransferHistoryManager {
     }
     
     /**
-     * 전송 통계 계산
+     * Calculate transfer statistics
      */
     getStatistics(serverName?: string): TransferStatistics {
         let histories = this.loadHistories();
@@ -103,7 +103,7 @@ export class TransferHistoryManager {
             averageSpeed: 0
         };
         
-        // 평균 전송 속도 계산
+        // Calculate average transfer speed
         const speedHistories = histories.filter(h => h.transferSpeed && h.transferSpeed > 0);
         if (speedHistories.length > 0) {
             const totalSpeed = speedHistories.reduce((sum, h) => sum + (h.transferSpeed || 0), 0);
@@ -114,7 +114,7 @@ export class TransferHistoryManager {
     }
     
     /**
-     * 전송 기록 삭제
+     * Clear transfer history
      */
     clearHistory(): void {
         try {
@@ -127,7 +127,7 @@ export class TransferHistoryManager {
     }
     
     /**
-     * 특정 전송 기록 제거
+     * Remove specific transfer history
      */
     removeHistory(id: string): void {
         try {
@@ -141,7 +141,7 @@ export class TransferHistoryManager {
 }
 
 /**
- * 전송 기록 생성 헬퍼
+ * Transfer history creation helper
  */
 export function createTransferHistory(
     type: 'upload' | 'download' | 'sync',

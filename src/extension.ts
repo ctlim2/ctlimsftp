@@ -91,7 +91,7 @@ export function activate(context: vscode.ExtensionContext) {
     sftpTreeView.onDidChangeSelection(async (e) => {
         // 북마크 네비게이션 중에는 자동 실행 건너뛰기
         if (isNavigatingBookmark) {
-            if (DEBUG_MODE) console.log('북마크 네비게이션 중: onDidChangeSelection 무시됨');
+            if (DEBUG_MODE) console.log('Bookmark navigation in progress: onDidChangeSelection ignored');
             return;
         }
 
@@ -159,7 +159,7 @@ export function activate(context: vscode.ExtensionContext) {
                     i18n.t('error.configFileNotFound'),
                     i18n.t('input.config')
                 );
-                if (result === '설정') {
+                if (result === i18n.t('input.config')) {
                     await vscode.commands.executeCommand('ctlimSftp.config');
                 }
                 return;
@@ -263,8 +263,7 @@ export function activate(context: vscode.ExtensionContext) {
             if (!connection) {
                 const reconnect = await vscode.window.showWarningMessage(
                     i18n.t('error.serverReconnectionAttempt'),
-                    i18n.t('action.connect'),
-//                    '취소'
+                    i18n.t('action.connect')
                 );
                 if (reconnect === i18n.t('action.connect')) {
                     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -293,8 +292,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
 
 
-            // 워크스페이스 폴더 가져오기 (workspaceRoot 아님)
-            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            // Get workspace folderpace.workspaceFolders?.[0];
             if (!workspaceFolder) {
                 vscode.window.showErrorMessage(i18n.t('error.workspaceNotFound'));
                 return;
@@ -328,8 +326,7 @@ export function activate(context: vscode.ExtensionContext) {
             if (!connection.client.isConnected()) {
                 const reconnect = await vscode.window.showWarningMessage(
                     i18n.t('error.serverConnectionLostAttempt'),
-                    i18n.t('action.reconnect'),
-//                    '취소'
+                    i18n.t('action.reconnect')
                 );
                 if (reconnect === i18n.t('action.reconnect')) {
                     try {
@@ -352,16 +349,6 @@ export function activate(context: vscode.ExtensionContext) {
                         vscode.window.showErrorMessage(i18n.t('error.notImplemented'));
                         return;
                     }
-                    
-                    // 리모트 파일의 정보를 구한다.
-                    const remoteStats = await connection.client.client.stat(remotePath);
-                    const remoteModifyTime = new Date(remoteStats.modifyTime).getTime();
-                    
-                    // Download file
-                    await connection.client.client.get(remotePath, localPath);
-                    
-                    // Save metadata after successful download
-                    await connection.client.saveRemoteFileMetadata(remotePath, localPath, config, config.workspaceRoot);
                 } else {
                     // FTP protocol - use abstracted method
                     await connection.client.downloadFile(remotePath, localPath, config);
@@ -446,7 +433,7 @@ export function activate(context: vscode.ExtensionContext) {
                         let connection = treeProvider.getConnectedServer(serverName);
                         
                         if (!connection || !connection.client.isConnected()) {
-                            if (DEBUG_MODE) console.log(`서버 연결 안 됨: ${serverName}`);
+                            if (DEBUG_MODE) console.log(`연결된 서버 없음: ${serverName}`);
                             failed++;
                             completed++;
                             continue;
@@ -555,10 +542,10 @@ export function activate(context: vscode.ExtensionContext) {
             const confirm = await vscode.window.showWarningMessage(
                 i18n.t('confirm.deleteItems', { count: validItems.length.toString() }),
                 { modal: true },
-                '삭제'
+                i18n.t('action.delete')
             );
             
-            if (confirm !== '삭제') {
+            if (confirm !== i18n.t('action.delete')) {
                 return;
             }
             
@@ -636,13 +623,13 @@ export function activate(context: vscode.ExtensionContext) {
         try {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
-                vscode.window.showErrorMessage('활성 편집기가 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.noActiveEditor'));
                 return;
             }
 
             const document = editor.document;
             if (document.uri.scheme !== 'file') {
-                vscode.window.showErrorMessage('파일 시스템의 파일만 업로드할 수 있습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.notFileScheme'));
                 return;
             }
 
@@ -662,11 +649,11 @@ export function activate(context: vscode.ExtensionContext) {
             }
             if (!config) {
                 const result = await vscode.window.showErrorMessage(
-                    'SFTP 설정을 찾을 수 없습니다. 설정 파일을 생성하시겠습니까?',
-                    '설정',
+                    i18n.t('error.configNotFoundSimple'),
+                    i18n.t('config.createOption'),
 //                    '취소'
                 );
-                if (result === '설정') {
+                if (result === i18n.t('config.createOption')) {
                     await vscode.commands.executeCommand('ctlimSftp.config');
                 }
                 return;
@@ -684,11 +671,11 @@ export function activate(context: vscode.ExtensionContext) {
             
             if (!connection || !connection.client.isConnected()) {
                 const reconnect = await vscode.window.showWarningMessage(
-                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
-                    '연결',
+                    i18n.t('error.serverConnectionAttempt'),
+                    i18n.t('action.connect'),
 //                    '취소'
                 );
-                if (reconnect !== '연결') {
+                if (reconnect !== i18n.t('action.connect')) {
                     return;
                 }
                 
@@ -699,13 +686,13 @@ export function activate(context: vscode.ExtensionContext) {
                     connection = treeProvider.getConnectedServer(serverName);
                     
                     if (!connection) {
-                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        vscode.window.showErrorMessage(i18n.t('error.serverConnectionInfoNotFound'));
                         return;
                     }
                     
-                    vscode.window.showInformationMessage(`서버에 연결되었습니다: ${serverName}`);
+                    vscode.window.showInformationMessage(i18n.t('server.connected', { serverName }));
                 } catch (connectError) {
-                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    vscode.window.showErrorMessage(i18n.t('server.connectionFailed', { error: String(connectError) }));
                     return;
                 }
             }
@@ -713,7 +700,7 @@ export function activate(context: vscode.ExtensionContext) {
             // Calculate default remote path
             const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
             if (!workspaceFolder) {
-                vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.workspaceNotFound'));
                 return;
             }
 
@@ -862,7 +849,7 @@ export function activate(context: vscode.ExtensionContext) {
                 // 로컬 경로는 config의 context 사용
                 const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
                 if (!workspaceFolder) {
-                    vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.workspaceNotFound'));
                     return;
                 }
                 
@@ -882,14 +869,14 @@ export function activate(context: vscode.ExtensionContext) {
                     config = await loadConfigWithSelection();
                 }
                 if (!config) {
-                    vscode.window.showErrorMessage('SFTP 설정을 찾을 수 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.configNotFoundSimple'));
                     return;
                 }
                 
                 // 원격 경로 계산
                 const workspaceRoot = config.workspaceRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
                 if (!workspaceRoot) {
-                    vscode.window.showErrorMessage('워크스페이스 루트를 찾을 수 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.workspaceRootNotFound'));
                     return;
                 }
                 
@@ -900,14 +887,14 @@ export function activate(context: vscode.ExtensionContext) {
             else {
                 const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
                 if (!workspaceFolder) {
-                    vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.workspaceNotFound'));
                     return;
                 }
                 syncFolder = workspaceFolder.uri.fsPath;
                 
                 config = await loadConfigWithSelection();
                 if (!config) {
-                    vscode.window.showErrorMessage('SFTP 설정을 찾을 수 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.configNotFoundSimple'));
                     return;
                 }
                 
@@ -916,7 +903,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             // config가 null이 아닌지 최종 확인
             if (!config) {
-                vscode.window.showErrorMessage('SFTP 설정을 찾을 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.sftpConfigNotFound'));
                 return;
             }
 
@@ -926,11 +913,11 @@ export function activate(context: vscode.ExtensionContext) {
             
             if (!connection || !connection.client.isConnected()) {
                 const reconnect = await vscode.window.showWarningMessage(
-                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
-                    '연결',
+                    i18n.t('error.serverConnectionAttempt'),
+                    i18n.t('action.connect'),
 //                    '취소'
                 );
-                if (reconnect !== '연결') {
+                if (reconnect !== i18n.t('action.connect')) {
                     return;
                 }
                 
@@ -941,11 +928,11 @@ export function activate(context: vscode.ExtensionContext) {
                     connection = treeProvider.getConnectedServer(serverName);
                     
                     if (!connection) {
-                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        vscode.window.showErrorMessage(i18n.t('error.serverConnectionInfoNotFound'));
                         return;
                     }
                 } catch (connectError) {
-                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    vscode.window.showErrorMessage(i18n.t('server.connectionFailed', { error: String(connectError) }));
                     return;
                 }
             }
@@ -963,16 +950,16 @@ export function activate(context: vscode.ExtensionContext) {
             }
 
             // 방향에 따른 라벨
-            const directionLabel = direction === 'local-to-remote' ? '로컬 → 원격' :
-                                   direction === 'remote-to-local' ? '원격 → 로컬' :
+            const directionLabel = direction === 'local-to-remote' ? i18n.t('sync.directionLocalToRemote') :
+                                   direction === 'remote-to-local' ? i18n.t('sync.directionRemoteToLocal') :
                                    i18n.t('sync.bidirectional');
 
             // 확인 대화상자
             const confirmMessage = `${i18n.t('sync.settings')}` +
-                `로컬: ${syncFolder}\n` +
-                `원격: ${remotePath}\n` +
-                `방향: ${directionLabel}\n` +
-                `${i18n.t('sync.deleteChoice', { value: deleteChoice.value ? '예' : '아니오' })}\n\n` +
+                `${i18n.t('sync.label.local')} ${syncFolder}\n` +
+                `${i18n.t('sync.label.remote')} ${remotePath}\n` +
+                `${i18n.t('sync.label.direction')} ${directionLabel}\n` +
+                `${i18n.t('sync.deleteChoice', { value: deleteChoice.value ? i18n.t('action.yes') : i18n.t('action.no') })}\n\n` +
                 `${i18n.t('sync.confirmStart')}`;
 
             const confirm = await vscode.window.showWarningMessage(
@@ -1006,7 +993,7 @@ export function activate(context: vscode.ExtensionContext) {
                                 increment: (1 / total) * 100
                             });
                         } else {
-                            progress.report({ message: `${fileName} 처리 중...` });
+                            progress.report({ message: i18n.t('progress.processingFile', { fileName }) });
                         }
                     }
                 );
@@ -1015,19 +1002,19 @@ export function activate(context: vscode.ExtensionContext) {
                     i18n.t('success.syncComplete'),
                     ``,
                     i18n.t('success.syncStats', { uploaded: result.uploaded.toString(), downloaded: result.downloaded.toString(), deleted: result.deleted.toString() }),
-                    result.failed.length > 0 ? `❌ 실패: ${result.failed.length}개` : ''
+                    result.failed.length > 0 ? i18n.t('sync.failedCount', { count: result.failed.length }) : ''
                 ].filter(line => line).join('\n');
 
                 if (result.failed.length > 0) {
                     const viewDetails = await vscode.window.showWarningMessage(
                         summary,
-                        '실패 목록 보기'
+                        i18n.t('action.viewFailedList')
                     );
                     
                     if (viewDetails) {
                         const failedList = result.failed.join('\n');
                         vscode.window.showInformationMessage(
-                            `실패한 파일:\n\n${failedList}`,
+                            i18n.t('sync.failedFileList', { list: failedList }),
                             { modal: true }
                         );
                     }
@@ -1081,7 +1068,7 @@ export function activate(context: vscode.ExtensionContext) {
                 config = item.config;
                 remotePath = item.remotePath || config.remotePath;
             } else {
-                vscode.window.showErrorMessage('서버 정보를 찾을 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.serverInfoNotFound'));
                 return;
             }
             
@@ -1110,11 +1097,11 @@ export function activate(context: vscode.ExtensionContext) {
             
             if (!connection || !connection.client.isConnected()) {
                 const reconnect = await vscode.window.showWarningMessage(
-                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
-                    '연결',
-//                    '취소'
+                    i18n.t('error.serverConnectionAttempt'),
+                    i18n.t('action.connect'),
+//                    i18n.t('action.cancel')
                 );
-                if (reconnect !== '연결') {
+                if (reconnect !== i18n.t('action.connect')) {
                     return;
                 }
                 
@@ -1125,11 +1112,11 @@ export function activate(context: vscode.ExtensionContext) {
                     connection = treeProvider.getConnectedServer(serverName);
                     
                     if (!connection) {
-                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        vscode.window.showErrorMessage(i18n.t('error.serverConnectionInfoNotFound'));
                         return;
                     }
                 } catch (connectError) {
-                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    vscode.window.showErrorMessage(i18n.t('server.connectionFailed', { error: String(connectError) }));
                     return;
                 }
             }
@@ -1164,7 +1151,7 @@ export function activate(context: vscode.ExtensionContext) {
                 config = item.config;
                 remotePath = item.remotePath || config.remotePath;
             } else {
-                vscode.window.showErrorMessage('서버 정보를 찾을 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.serverInfoNotFound'));
                 return;
             }
             
@@ -1193,11 +1180,11 @@ export function activate(context: vscode.ExtensionContext) {
             
             if (!connection || !connection.client.isConnected()) {
                 const reconnect = await vscode.window.showWarningMessage(
-                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
-                    '연결',
-//                    '취소'
+                    i18n.t('error.serverConnectionAttempt'),
+                    i18n.t('action.connect'),
+//                    i18n.t('action.cancel')
                 );
-                if (reconnect !== '연결') {
+                if (reconnect !== i18n.t('action.connect')) {
                     return;
                 }
                 
@@ -1208,11 +1195,11 @@ export function activate(context: vscode.ExtensionContext) {
                     connection = treeProvider.getConnectedServer(serverName);
                     
                     if (!connection) {
-                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        vscode.window.showErrorMessage(i18n.t('error.serverConnectionInfoNotFound'));
                         return;
                     }
                 } catch (connectError) {
-                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    vscode.window.showErrorMessage(i18n.t('server.connectionFailed', { error: String(connectError) }));
                     return;
                 }
             }
@@ -1249,7 +1236,7 @@ export function activate(context: vscode.ExtensionContext) {
                 remotePath = item.remotePath;
                 isDirectory = item.isDirectory || false;
             } else {
-                vscode.window.showErrorMessage('파일 정보를 찾을 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.fileInfoNotFound'));
                 return;
             }
             
@@ -1263,10 +1250,9 @@ export function activate(context: vscode.ExtensionContext) {
                 confirmMessage,
                 { modal: true },
                 i18n.t('action.delete'),
-//                '취소'
             );
             
-            if (confirm !== '삭제') {
+            if (confirm !== i18n.t('action.delete')) {
                 return;
             }
             
@@ -1276,11 +1262,11 @@ export function activate(context: vscode.ExtensionContext) {
             
             if (!connection || !connection.client.isConnected()) {
                 const reconnect = await vscode.window.showWarningMessage(
-                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
-                    '연결',
-                    '취소'
+                    i18n.t('error.serverConnectionAttempt'),
+                    i18n.t('action.connect'),
+                    i18n.t('action.cancel')
                 );
-                if (reconnect !== '연결') {
+                if (reconnect !== i18n.t('action.connect')) {
                     return;
                 }
                 
@@ -1291,11 +1277,11 @@ export function activate(context: vscode.ExtensionContext) {
                     connection = treeProvider.getConnectedServer(serverName);
                     
                     if (!connection) {
-                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        vscode.window.showErrorMessage(i18n.t('error.serverConnectionInfoNotFound'));
                         return;
                     }
                 } catch (connectError) {
-                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    vscode.window.showErrorMessage(i18n.t('server.connectionFailed', { error: String(connectError) }));
                     return;
                 }
             }
@@ -1326,7 +1312,7 @@ export function activate(context: vscode.ExtensionContext) {
         try {
             // TreeView item에서 정보 가져오기
             if (!item || !item.config || !item.remotePath || item.isDirectory) {
-                vscode.window.showErrorMessage('파일만 복사할 수 있습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.onlyFilesAllowed'));
                 return;
             }
             
@@ -1340,10 +1326,10 @@ export function activate(context: vscode.ExtensionContext) {
             
             if (!connection || !connection.client.isConnected()) {
                 const reconnect = await vscode.window.showWarningMessage(
-                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
-                    '연결'
+                    i18n.t('error.serverConnectionAttempt'),
+                    i18n.t('action.connect')
                 );
-                if (reconnect !== '연결') {
+                if (reconnect !== i18n.t('action.connect')) {
                     return;
                 }
                 
@@ -1354,13 +1340,13 @@ export function activate(context: vscode.ExtensionContext) {
                     connection = treeProvider.getConnectedServer(serverName);
                     
                     if (!connection) {
-                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        vscode.window.showErrorMessage(i18n.t('error.serverConnectionInfoNotFound'));
                         return;
                     }
                     
-                    vscode.window.showInformationMessage(`서버에 연결되었습니다: ${serverName}`);
+                    vscode.window.showInformationMessage(i18n.t('info.serverConnected', { serverName }));
                 } catch (connectError) {
-                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    vscode.window.showErrorMessage(i18n.t('server.connectionFailed', { error: String(connectError) }));
                     return;
                 }
             }
@@ -1372,18 +1358,18 @@ export function activate(context: vscode.ExtensionContext) {
             const defaultFileName = `${baseName}.copy${fileExt}`;
             
             const newFileName = await vscode.window.showInputBox({
-                prompt: '복사할 파일 이름을 입력하세요',
+                prompt: i18n.t('prompt.copyFileName'),
                 value: defaultFileName,
                 placeHolder: 'file.copy.php',
                 validateInput: (value) => {
                     if (!value || value.trim() === '') {
-                        return '파일 이름을 입력해주세요';
+                        return i18n.t('error.fileNameRequired');
                     }
                     if (value === fileName) {
-                        return '원본과 다른 이름을 입력해주세요';
+                        return i18n.t('error.diffFileNameRequired');
                     }
                     if (value.includes('/') || value.includes('\\')) {
-                        return '파일 이름에 경로 구분자를 포함할 수 없습니다';
+                        return i18n.t('error.fileNameInvalidChars');
                     }
                     return null;
                 }
@@ -1398,15 +1384,15 @@ export function activate(context: vscode.ExtensionContext) {
             // 임시 파일로 다운로드 후 새 경로로 업로드
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: `파일 복사 중: ${path.basename(targetRemotePath)}`,
+                title: i18n.t('progress.copyingFile', { fileName: path.basename(targetRemotePath) }),
                 cancellable: false
             }, async (progress) => {
-                progress.report({ message: '원본 다운로드 중...' });
+                progress.report({ message: i18n.t('progress.downloadingOriginal') });
                 
                 // 임시 파일 경로
                 const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
                 if (!workspaceFolder) {
-                    vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.workspaceNotFound'));
                     return;
                 }
                 
@@ -1423,12 +1409,12 @@ export function activate(context: vscode.ExtensionContext) {
                         if (connection!.client.client) {
                             await connection!.client.client.get(sourceRemotePath, tempFile);
                             
-                            progress.report({ message: '새 위치에 업로드 중...' });
+                            progress.report({ message: i18n.t('progress.uploadingToNewLocation') });
                             
                             // 업로드
                             await connection!.client.uploadFile(tempFile, targetRemotePath, config);
                             
-                            vscode.window.showInformationMessage(`✅ 파일 복사 완료: ${path.basename(targetRemotePath)}`);
+                            vscode.window.showInformationMessage(i18n.t('success.copyComplete', { fileName: path.basename(targetRemotePath) }));
                             
                             // TreeView 새로고침
                             treeProvider.refresh();
@@ -1437,12 +1423,12 @@ export function activate(context: vscode.ExtensionContext) {
                         // FTP protocol
                         await connection!.client.downloadFile(sourceRemotePath, tempFile, config);
                         
-                        progress.report({ message: '새 위치에 업로드 중...' });
+                        progress.report({ message: i18n.t('progress.uploadingToNewLocation') });
                         
                         // 업로드
                         await connection!.client.uploadFile(tempFile, targetRemotePath, config);
                         
-                        vscode.window.showInformationMessage(`✅ 파일 복사 완료: ${path.basename(targetRemotePath)}`);
+                        vscode.window.showInformationMessage(i18n.t('success.copyComplete', { fileName: path.basename(targetRemotePath) }));
                         
                         // TreeView 새로고침
                         treeProvider.refresh();
@@ -1456,7 +1442,7 @@ export function activate(context: vscode.ExtensionContext) {
             });
             
         } catch (error) {
-            vscode.window.showErrorMessage(`파일 복사 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.copyFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('copyRemoteFile error:', error);
         }
     });
@@ -1470,7 +1456,7 @@ export function activate(context: vscode.ExtensionContext) {
         try {
             // TreeView item에서 정보 가져오기
             if (!item || !item.config || !item.remotePath || item.isDirectory) {
-                vscode.window.showErrorMessage('파일만 이름 변경할 수 있습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.onlyFilesForRename'));
                 return;
             }
             
@@ -1484,10 +1470,10 @@ export function activate(context: vscode.ExtensionContext) {
             
             if (!connection || !connection.client.isConnected()) {
                 const reconnect = await vscode.window.showWarningMessage(
-                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
-                    '연결'
+                    i18n.t('error.serverConnectionAttempt'),
+                    i18n.t('action.connect')
                 );
-                if (reconnect !== '연결') {
+                if (reconnect !== i18n.t('action.connect')) {
                     return;
                 }
                 
@@ -1498,13 +1484,13 @@ export function activate(context: vscode.ExtensionContext) {
                     connection = treeProvider.getConnectedServer(serverName);
                     
                     if (!connection) {
-                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        vscode.window.showErrorMessage(i18n.t('error.serverConnectionInfoNotFound'));
                         return;
                     }
                     
-                    vscode.window.showInformationMessage(`서버에 연결되었습니다: ${serverName}`);
+                    vscode.window.showInformationMessage(i18n.t('info.serverConnected', { serverName }));
                 } catch (connectError) {
-                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    vscode.window.showErrorMessage(i18n.t('server.connectionFailed', { error: String(connectError) }));
                     return;
                 }
             }
@@ -1513,18 +1499,18 @@ export function activate(context: vscode.ExtensionContext) {
             const remoteDir = path.posix.dirname(sourceRemotePath);
             
             const newFileName = await vscode.window.showInputBox({
-                prompt: '새 파일 이름을 입력하세요',
+                prompt: i18n.t('prompt.renameFileName'),
                 value: fileName,
                 placeHolder: 'newfile.php',
                 validateInput: (value) => {
                     if (!value || value.trim() === '') {
-                        return '파일 이름을 입력해주세요';
+                        return i18n.t('error.fileNameRequired');
                     }
                     if (value === fileName) {
-                        return '원본과 다른 이름을 입력해주세요';
+                        return i18n.t('error.diffFileNameRequired');
                     }
                     if (value.includes('/') || value.includes('\\')) {
-                        return '파일 이름에 경로 구분자를 포함할 수 없습니다';
+                        return i18n.t('error.fileNameInvalidChars');
                     }
                     return null;
                 }
@@ -1538,27 +1524,27 @@ export function activate(context: vscode.ExtensionContext) {
 
             // 확인 대화상자
             const confirm = await vscode.window.showWarningMessage(
-                `파일 이름을 변경하시겠습니까?\n\n${fileName} → ${newFileName}`,
+                i18n.t('confirm.renameFile', { oldName: fileName, newName: newFileName }),
                 { modal: true },
-                '변경'
+                i18n.t('action.rename')
             );
             
-            if (confirm !== '변경') {
+            if (confirm !== i18n.t('action.rename')) {
                 return;
             }
 
             // 임시 파일로 다운로드 후 새 이름으로 업로드, 원본 삭제
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: `파일 이름 변경 중: ${newFileName}`,
+                title: i18n.t('progress.renamingFile', { fileName: newFileName }),
                 cancellable: false
             }, async (progress) => {
-                progress.report({ message: '원본 다운로드 중...' });
+                progress.report({ message: i18n.t('progress.downloadingOriginal') });
                 
                 // 임시 파일 경로
                 const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
                 if (!workspaceFolder) {
-                    vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.workspaceNotFound'));
                     return;
                 }
                 
@@ -1575,17 +1561,17 @@ export function activate(context: vscode.ExtensionContext) {
                         if (connection!.client.client) {
                             await connection!.client.client.get(sourceRemotePath, tempFile);
                             
-                            progress.report({ message: '새 이름으로 업로드 중...' });
+                            progress.report({ message: i18n.t('progress.uploadingToNewName') });
                             
                             // 새 이름으로 업로드
                             await connection!.client.uploadFile(tempFile, targetRemotePath, config);
                             
-                            progress.report({ message: '원본 파일 삭제 중...' });
+                            progress.report({ message: i18n.t('progress.deletingOriginal') });
                             
                             // 원본 삭제
                             await connection!.client.deleteRemoteFile(sourceRemotePath, false);
                             
-                            vscode.window.showInformationMessage(`✅ 파일 이름 변경 완료: ${newFileName}`);
+                            vscode.window.showInformationMessage(i18n.t('success.renameComplete', { fileName: newFileName }));
                             
                             // TreeView 새로고침
                             treeProvider.refresh();
@@ -1594,17 +1580,17 @@ export function activate(context: vscode.ExtensionContext) {
                         // FTP protocol
                         await connection!.client.downloadFile(sourceRemotePath, tempFile, config);
                         
-                        progress.report({ message: '새 이름으로 업로드 중...' });
+                        progress.report({ message: i18n.t('progress.uploadingToNewName') });
                         
                         // 새 이름으로 업로드
                         await connection!.client.uploadFile(tempFile, targetRemotePath, config);
                         
-                        progress.report({ message: '원본 파일 삭제 중...' });
+                        progress.report({ message: i18n.t('progress.deletingOriginal') });
                         
                         // 원본 삭제
                         await connection!.client.deleteRemoteFile(sourceRemotePath, false);
                         
-                        vscode.window.showInformationMessage(`✅ 파일 이름 변경 완료: ${newFileName}`);
+                        vscode.window.showInformationMessage(i18n.t('success.renameComplete', { fileName: newFileName }));
                         
                         // TreeView 새로고침
                         treeProvider.refresh();
@@ -1618,7 +1604,7 @@ export function activate(context: vscode.ExtensionContext) {
             });
             
         } catch (error) {
-            vscode.window.showErrorMessage(`파일 이름 변경 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.renameFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('renameRemoteFile error:', error);
         }
     });
@@ -1642,7 +1628,7 @@ export function activate(context: vscode.ExtensionContext) {
                 const connectedServers = treeProvider.getConnectedServerNames();
                 
                 if (connectedServers.length === 0) {
-                    vscode.window.showErrorMessage('연결된 서버가 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.connectedServersNotFound'));
                     return;
                 }
                 
@@ -1651,7 +1637,7 @@ export function activate(context: vscode.ExtensionContext) {
                     serverName = connectedServers[0];
                 } else {
                     const selected = await vscode.window.showQuickPick(connectedServers, {
-                        placeHolder: '검색할 서버를 선택하세요'
+                        placeHolder: i18n.t('prompt.selectServerToSearch')
                     });
                     
                     if (!selected) {
@@ -1662,7 +1648,7 @@ export function activate(context: vscode.ExtensionContext) {
                 
                 const connection = treeProvider.getConnectedServer(serverName);
                 if (!connection) {
-                    vscode.window.showErrorMessage('서버 연결 정보를 찾을 수 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.serverConnectionInfoNotFound'));
                     return;
                 }
                 
@@ -1672,11 +1658,11 @@ export function activate(context: vscode.ExtensionContext) {
             
             // 검색 패턴 입력
             const searchPattern = await vscode.window.showInputBox({
-                prompt: '검색할 파일명을 입력하세요 (정규식 지원: /pattern/)',
-                placeHolder: '예: test.php 또는 /\\.php$/',
+                prompt: i18n.t('prompt.enterSearchPattern'),
+                placeHolder: i18n.t('placeholder.searchPattern'),
                 validateInput: (value) => {
                     if (!value || value.trim() === '') {
-                        return '검색 패턴을 입력해주세요';
+                        return i18n.t('validation.searchPatternRequired');
                     }
                     return null;
                 }
@@ -1701,17 +1687,17 @@ export function activate(context: vscode.ExtensionContext) {
             let connection = treeProvider.getConnectedServer(serverName);
             
             if (!connection || !connection.client.isConnected()) {
-                vscode.window.showErrorMessage('서버에 연결되어 있지 않습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.serverNotConnected'));
                 return;
             }
             
             // 검색 실행
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: '원격 파일 검색 중...',
+                title: i18n.t('progress.searchingRemoteFiles'),
                 cancellable: false
             }, async (progress) => {
-                progress.report({ message: `"${pattern}" 검색 중...` });
+                progress.report({ message: i18n.t('progress.searching', { pattern }) });
                 
                 const results = await connection!.client.searchRemoteFilesByName(
                     remotePath,
@@ -1721,7 +1707,7 @@ export function activate(context: vscode.ExtensionContext) {
                 );
                 
                 if (results.length === 0) {
-                    vscode.window.showInformationMessage(`검색 결과 없음: "${searchPattern}"`);
+                    vscode.window.showInformationMessage(i18n.t('info.noSearchResults', { pattern: searchPattern }));
                     return;
                 }
                 
@@ -1733,12 +1719,12 @@ export function activate(context: vscode.ExtensionContext) {
                 const items: FileQuickPickItem[] = results.map(file => ({
                     label: `$(file) ${file.name}`,
                     description: file.path,
-                    detail: `크기: ${formatFileSize(file.size || 0)} | 수정: ${file.modifyTime ? formatDateTime(file.modifyTime) : 'N/A'}`,
+                    detail: i18n.t('detail.fileInfo', { size: formatFileSize(file.size || 0), time: file.modifyTime ? formatDateTime(file.modifyTime) : 'N/A' }),
                     file: file
                 }));
                 
                 const selected = await vscode.window.showQuickPick(items, {
-                    placeHolder: `${results.length}개 파일 발견 - 열 파일을 선택하세요`,
+                    placeHolder: i18n.t('prompt.selectFileToOpen', { count: results.length }),
                     matchOnDescription: true,
                     matchOnDetail: true
                 });
@@ -1750,7 +1736,7 @@ export function activate(context: vscode.ExtensionContext) {
             });
             
         } catch (error) {
-            vscode.window.showErrorMessage(`파일 검색 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.searchFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('searchRemoteFiles error:', error);
         }
     });
@@ -1774,7 +1760,7 @@ export function activate(context: vscode.ExtensionContext) {
                 const connectedServers = treeProvider.getConnectedServerNames();
                 
                 if (connectedServers.length === 0) {
-                    vscode.window.showErrorMessage('연결된 서버가 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.connectedServersNotFound'));
                     return;
                 }
                 
@@ -1783,7 +1769,7 @@ export function activate(context: vscode.ExtensionContext) {
                     serverName = connectedServers[0];
                 } else {
                     const selected = await vscode.window.showQuickPick(connectedServers, {
-                        placeHolder: '검색할 서버를 선택하세요'
+                        placeHolder: i18n.t('prompt.selectServerToSearch')
                     });
                     
                     if (!selected) {
@@ -1794,7 +1780,7 @@ export function activate(context: vscode.ExtensionContext) {
                 
                 const connection = treeProvider.getConnectedServer(serverName);
                 if (!connection) {
-                    vscode.window.showErrorMessage('서버 연결 정보를 찾을 수 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.serverConnectionInfoNotFound'));
                     return;
                 }
                 
@@ -1804,11 +1790,11 @@ export function activate(context: vscode.ExtensionContext) {
             
             // 검색 텍스트 입력
             const searchText = await vscode.window.showInputBox({
-                prompt: '검색할 텍스트를 입력하세요 (정규식 지원: /pattern/)',
-                placeHolder: '예: function test 또는 /function\\s+\\w+/',
+                prompt: i18n.t('prompt.enterSearchText'),
+                placeHolder: i18n.t('placeholder.searchText'),
                 validateInput: (value) => {
                     if (!value || value.trim() === '') {
-                        return '검색 텍스트를 입력해주세요';
+                        return i18n.t('validation.searchTextRequired');
                     }
                     return null;
                 }
@@ -1820,9 +1806,9 @@ export function activate(context: vscode.ExtensionContext) {
             
             // 파일 패턴 입력
             const filePattern = await vscode.window.showInputBox({
-                prompt: '검색할 파일 패턴을 입력하세요 (* = 모든 파일)',
+                prompt: i18n.t('prompt.enterFilePattern'),
                 value: '*',
-                placeHolder: '예: *.php, *.js, config.*'
+                placeHolder: i18n.t('placeholder.filePattern')
             });
             
             if (!filePattern) {
@@ -1844,17 +1830,17 @@ export function activate(context: vscode.ExtensionContext) {
             let connection = treeProvider.getConnectedServer(serverName);
             
             if (!connection || !connection.client.isConnected()) {
-                vscode.window.showErrorMessage('서버에 연결되어 있지 않습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.serverNotConnected'));
                 return;
             }
             
             // 검색 실행
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: '파일 내용 검색 중...',
+                title: i18n.t('progress.searchingFileContent'),
                 cancellable: false
             }, async (progress) => {
-                progress.report({ message: `"${pattern}" 검색 중 (${filePattern})...` });
+                progress.report({ message: i18n.t('progress.searchingInFile', { pattern, filePattern }) });
                 
                 const results = await connection!.client.searchInRemoteFiles(
                     remotePath,
@@ -1865,7 +1851,7 @@ export function activate(context: vscode.ExtensionContext) {
                 );
                 
                 if (results.length === 0) {
-                    vscode.window.showInformationMessage(`검색 결과 없음: "${searchText}"`);
+                    vscode.window.showInformationMessage(i18n.t('info.noSearchResults', { pattern: searchText }));
                     return;
                 }
                 
@@ -1882,7 +1868,7 @@ export function activate(context: vscode.ExtensionContext) {
                     items.push({
                         label: `$(file) ${result.file.name}`,
                         description: result.file.path,
-                        detail: `${result.matches.length}개 일치`,
+                        detail: i18n.t('detail.matchCount', { count: result.matches.length }),
                         file: result.file,
                         kind: vscode.QuickPickItemKind.Separator
                     } as any);
@@ -1899,7 +1885,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 
                 const selected = await vscode.window.showQuickPick(items, {
-                    placeHolder: `${results.length}개 파일에서 발견 - 열 파일을 선택하세요`,
+                    placeHolder: i18n.t('prompt.selectFileToOpenFromResults', { count: results.length }),
                     matchOnDescription: true
                 });
                 
@@ -1922,7 +1908,7 @@ export function activate(context: vscode.ExtensionContext) {
             });
             
         } catch (error) {
-            vscode.window.showErrorMessage(`내용 검색 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.contentSearchFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('searchInRemoteFiles error:', error);
         }
     });
@@ -1944,7 +1930,7 @@ export function activate(context: vscode.ExtensionContext) {
                 remotePath = item.remotePath;
                 isDirectory = item.isDirectory || false;
             } else {
-                vscode.window.showErrorMessage('파일 정보를 찾을 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.fileInfoNotFound'));
                 return;
             }
             
@@ -1954,10 +1940,10 @@ export function activate(context: vscode.ExtensionContext) {
             
             if (!connection || !connection.client.isConnected()) {
                 const reconnect = await vscode.window.showWarningMessage(
-                    '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
-                    '연결'
+                    i18n.t('warning.serverNotConnected'),
+                    i18n.t('action.connect')
                 );
-                if (reconnect !== '연결') {
+                if (reconnect !== i18n.t('action.connect')) {
                     return;
                 }
                 
@@ -1968,11 +1954,11 @@ export function activate(context: vscode.ExtensionContext) {
                     connection = treeProvider.getConnectedServer(serverName);
                     
                     if (!connection) {
-                        vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                        vscode.window.showErrorMessage(i18n.t('error.serverConnectionInfoNotFound'));
                         return;
                     }
                 } catch (connectError) {
-                    vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                    vscode.window.showErrorMessage(i18n.t('error.serverConnectionFailed', { error: String(connectError) }));
                     return;
                 }
             }
@@ -1995,44 +1981,44 @@ export function activate(context: vscode.ExtensionContext) {
             const items: PermissionQuickPickItem[] = [
                 {
                     label: '$(file-code) 755',
-                    description: 'rwxr-xr-x - 실행 파일, 디렉토리 (소유자:모든권한, 그룹/기타:읽기+실행)',
-                    detail: isDirectory ? '디렉토리 권장 권한' : '실행 파일 권장 권한',
+                    description: i18n.t('permission.755.description'),
+                    detail: isDirectory ? i18n.t('permission.directory.recommended') : i18n.t('permission.executable.recommended'),
                     mode: '755'
                 },
                 {
                     label: '$(file) 644',
-                    description: 'rw-r--r-- - 일반 파일 (소유자:읽기+쓰기, 그룹/기타:읽기만)',
-                    detail: isDirectory ? '' : '일반 파일 권장 권한',
+                    description: i18n.t('permission.644.description'),
+                    detail: isDirectory ? '' : i18n.t('permission.file.recommended'),
                     mode: '644'
                 },
                 {
                     label: '$(lock) 600',
-                    description: 'rw------- - 개인 파일 (소유자만 읽기+쓰기)',
-                    detail: '비밀 파일 권장 권한 (SSH key 등)',
+                    description: i18n.t('permission.600.description'),
+                    detail: i18n.t('permission.secret.recommended'),
                     mode: '600'
                 },
                 {
                     label: '$(warning) 777',
-                    description: 'rwxrwxrwx - 모든 권한 (보안 위험!)',
-                    detail: '⚠️ 보안상 권장하지 않음',
+                    description: i18n.t('permission.777.description'),
+                    detail: i18n.t('permission.777.detail'),
                     mode: '777'
                 },
                 {
                     label: '$(file-directory) 700',
-                    description: 'rwx------ - 개인 디렉토리 (소유자만 모든 권한)',
-                    detail: isDirectory ? '개인 디렉토리 권장 권한' : '',
+                    description: i18n.t('permission.700.description'),
+                    detail: isDirectory ? i18n.t('permission.privateDirectory.recommended') : '',
                     mode: '700'
                 },
                 {
-                    label: '$(edit) 커스텀 입력',
-                    description: '직접 권한 코드 입력 (예: 754)',
+                    label: i18n.t('permission.custom.label'),
+                    description: i18n.t('permission.custom.description'),
                     mode: 'custom'
                 }
             ];
             
             const placeHolder = currentMode 
-                ? `${fileName}의 권한 변경 (현재: ${currentMode})`
-                : `${fileName}의 권한 설정`;
+                ? i18n.t('prompt.changePermissionCurrent', { fileName, currentMode })
+                : i18n.t('prompt.setPermission', { fileName });
             
             const selected = await vscode.window.showQuickPick(items, {
                 placeHolder: placeHolder,
@@ -2049,12 +2035,12 @@ export function activate(context: vscode.ExtensionContext) {
             // 커스텀 입력
             if (mode === 'custom') {
                 const customMode = await vscode.window.showInputBox({
-                    prompt: '권한 모드를 입력하세요 (8진수 3자리)',
+                    prompt: i18n.t('prompt.enterPermissionMode'),
                     value: currentMode || '644',
-                    placeHolder: '예: 755, 644, 600',
+                    placeHolder: i18n.t('placeholder.permissionMode'),
                     validateInput: (value) => {
                         if (!/^[0-7]{3}$/.test(value)) {
-                            return '올바른 권한 모드를 입력하세요 (000-777)';
+                            return i18n.t('validation.invalidPermissionMode');
                         }
                         return null;
                     }
@@ -2070,13 +2056,13 @@ export function activate(context: vscode.ExtensionContext) {
             // 777 경고
             if (mode === '777') {
                 const confirm = await vscode.window.showWarningMessage(
-                    `⚠️ 보안 경고\n\n777 권한은 모든 사용자에게 모든 권한을 부여합니다.\n파일: ${fileName}\n\n정말 변경하시겠습니까?`,
+                    i18n.t('warning.permission777', { fileName }),
                     { modal: true },
-                    '변경',
-                    '취소'
+                    i18n.t('action.change'),
+                    i18n.t('action.cancel')
                 );
                 
-                if (confirm !== '변경') {
+                if (confirm !== i18n.t('action.change')) {
                     return;
                 }
             }
@@ -2084,13 +2070,13 @@ export function activate(context: vscode.ExtensionContext) {
             // 권한 변경 실행
             await connection.client.changeFilePermissions(remotePath, mode);
             
-            vscode.window.showInformationMessage(`✅ 권한 변경 완료: ${fileName} -> ${mode}`);
+            vscode.window.showInformationMessage(i18n.t('info.permissionChanged', { fileName, mode }));
             
             // TreeView 새로고침
             treeProvider.refresh();
             
         } catch (error) {
-            vscode.window.showErrorMessage(`권한 변경 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.changePermissionFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('changePermissions error:', error);
         }
     });
@@ -2122,7 +2108,7 @@ export function activate(context: vscode.ExtensionContext) {
                 });
                 
                 if (!foundConfig) {
-                    vscode.window.showErrorMessage(`서버 설정을 찾을 수 없습니다: ${serverName}`);
+                    vscode.window.showErrorMessage(i18n.t('error.serverConfigNotFound', { serverName }));
                     return;
                 }
                 
@@ -2132,7 +2118,7 @@ export function activate(context: vscode.ExtensionContext) {
                 const connectedServers = treeProvider.getConnectedServerNames();
                 
                 if (connectedServers.length === 0) {
-                    vscode.window.showErrorMessage('연결된 서버가 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.connectedServersNotFound'));
                     return;
                 }
                 
@@ -2140,7 +2126,7 @@ export function activate(context: vscode.ExtensionContext) {
                     serverName = connectedServers[0];
                 } else {
                     const selected = await vscode.window.showQuickPick(connectedServers, {
-                        placeHolder: 'SSH 터미널을 열 서버를 선택하세요'
+                        placeHolder: i18n.t('prompt.selectServerForTerminal')
                     });
                     
                     if (!selected) {
@@ -2151,7 +2137,7 @@ export function activate(context: vscode.ExtensionContext) {
                 
                 const connection = treeProvider.getConnectedServer(serverName);
                 if (!connection) {
-                    vscode.window.showErrorMessage('서버 연결 정보를 찾을 수 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.serverConnectionInfoNotFound'));
                     return;
                 }
                 
@@ -2178,10 +2164,10 @@ export function activate(context: vscode.ExtensionContext) {
             terminal.show();
             terminal.sendText(sshCommand);
             
-            vscode.window.showInformationMessage(`🔌 SSH 터미널 시작: ${serverName}`);
+            vscode.window.showInformationMessage(i18n.t('info.sshTerminalStarted', { serverName }));
             
         } catch (error) {
-            vscode.window.showErrorMessage(`SSH 터미널 열기 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.openTerminalFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('openSSHTerminal error:', error);
         }
     });
@@ -2193,7 +2179,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (DEBUG_MODE) console.log('> ctlimSftp.viewTransferHistory');
         
         if (!transferHistoryManager) {
-            vscode.window.showErrorMessage('전송 히스토리를 사용할 수 없습니다.');
+            vscode.window.showErrorMessage(i18n.t('error.transferHistoryNotAvailable'));
             return;
         }
         
@@ -2201,7 +2187,7 @@ export function activate(context: vscode.ExtensionContext) {
             const histories = transferHistoryManager.loadHistories();
             
             if (histories.length === 0) {
-                vscode.window.showInformationMessage('📋 전송 기록이 없습니다.');
+                vscode.window.showInformationMessage(i18n.t('info.noTransferHistory'));
                 return;
             }
             
@@ -2218,13 +2204,13 @@ export function activate(context: vscode.ExtensionContext) {
                 const speedStr = h.transferSpeed ? `${formatFileSize(h.transferSpeed)}/s` : 'N/A';
                 
                 let icon = '$(check)';
-                let statusText = '성공';
+                let statusText = i18n.t('status.success');
                 if (h.status === 'failed') {
                     icon = '$(error)';
-                    statusText = '실패';
+                    statusText = i18n.t('status.failed');
                 } else if (h.status === 'cancelled') {
                     icon = '$(circle-slash)';
-                    statusText = '취소';
+                    statusText = i18n.t('status.cancelled');
                 }
                 
                 const typeIcon = h.type === 'upload' ? '$(cloud-upload)' : '$(cloud-download)';
@@ -2238,7 +2224,7 @@ export function activate(context: vscode.ExtensionContext) {
             });
             
             const selected = await vscode.window.showQuickPick(items, {
-                placeHolder: `전송 기록 (${histories.length}개) - 선택하여 재시도하거나 통계 확인`,
+                placeHolder: i18n.t('prompt.selectHistoryToRetry', { count: histories.length }),
                 matchOnDescription: true,
                 matchOnDetail: true
             });
@@ -2246,19 +2232,19 @@ export function activate(context: vscode.ExtensionContext) {
             if (selected && selected.history.status === 'failed') {
                 // 실패한 전송 재시도 옵션
                 const action = await vscode.window.showWarningMessage(
-                    `실패한 전송을 재시도하시겠습니까?\n\n파일: ${path.basename(selected.history.localPath)}\n에러: ${selected.history.errorMessage || '알 수 없음'}`,
+                    i18n.t('warning.retryFailedTransfer', { fileName: path.basename(selected.history.localPath), error: selected.history.errorMessage || i18n.t('error.unknown') }),
                     { modal: true },
-                    '재시도',
-                    '취소'
+                    i18n.t('action.retry'),
+                    i18n.t('action.cancel')
                 );
                 
-                if (action === '재시도') {
+                if (action === i18n.t('action.retry')) {
                     await retryFailedTransfer(selected.history);
                 }
             }
             
         } catch (error) {
-            vscode.window.showErrorMessage(`히스토리 조회 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.historyLoadFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('viewTransferHistory error:', error);
         }
     });
@@ -2270,18 +2256,18 @@ export function activate(context: vscode.ExtensionContext) {
         if (DEBUG_MODE) console.log('> ctlimSftp.viewTransferStatistics');
         
         if (!transferHistoryManager) {
-            vscode.window.showErrorMessage('전송 통계를 사용할 수 없습니다.');
+            vscode.window.showErrorMessage(i18n.t('error.transferStatisticsNotAvailable'));
             return;
         }
         
         try {
             // 서버 선택
             const connectedServers = treeProvider.getConnectedServerNames();
-            const allOption = '전체 서버';
+            const allOption = i18n.t('option.allServers');
             const serverOptions = [allOption, ...connectedServers];
             
             const selectedServer = await vscode.window.showQuickPick(serverOptions, {
-                placeHolder: '통계를 볼 서버를 선택하세요'
+                placeHolder: i18n.t('prompt.selectServerForStats')
             });
             
             if (!selectedServer) {
@@ -2298,21 +2284,21 @@ export function activate(context: vscode.ExtensionContext) {
                 : '0';
             
             const message = [
-                `📊 전송 통계 ${selectedServer !== allOption ? `(${selectedServer})` : ''}`,
+                `📊 ${i18n.t('title.transferStatistics')} ${selectedServer !== allOption ? `(${selectedServer})` : ''}`,
                 ``,
-                `📤 업로드: ${stats.totalUploads}개`,
-                `📥 다운로드: ${stats.totalDownloads}개`,
-                `✅ 성공: ${stats.successCount}개`,
-                `❌ 실패: ${stats.failedCount}개`,
-                `📈 성공률: ${successRate}%`,
-                `💾 총 전송량: ${formatFileSize(stats.totalBytes)}`,
-                `⚡ 평균 속도: ${stats.averageSpeed > 0 ? formatFileSize(stats.averageSpeed) + '/s' : 'N/A'}`
+                `📤 ${i18n.t('stats.uploads')}: ${stats.totalUploads}`,
+                `📥 ${i18n.t('stats.downloads')}: ${stats.totalDownloads}`,
+                `✅ ${i18n.t('stats.success')}: ${stats.successCount}`,
+                `❌ ${i18n.t('stats.failed')}: ${stats.failedCount}`,
+                `📈 ${i18n.t('stats.successRate')}: ${successRate}%`,
+                `💾 ${i18n.t('stats.totalTransfer')}: ${formatFileSize(stats.totalBytes)}`,
+                `⚡ ${i18n.t('stats.averageSpeed')}: ${stats.averageSpeed > 0 ? formatFileSize(stats.averageSpeed) + '/s' : 'N/A'}`
             ].join('\n');
             
             vscode.window.showInformationMessage(message, { modal: true });
             
         } catch (error) {
-            vscode.window.showErrorMessage(`통계 조회 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.statsLoadFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('viewTransferStatistics error:', error);
         }
     });
@@ -2324,25 +2310,25 @@ export function activate(context: vscode.ExtensionContext) {
         if (DEBUG_MODE) console.log('> ctlimSftp.clearTransferHistory');
         
         if (!transferHistoryManager) {
-            vscode.window.showErrorMessage('전송 히스토리를 사용할 수 없습니다.');
+            vscode.window.showErrorMessage(i18n.t('error.transferHistoryNotAvailable'));
             return;
         }
         
         try {
             const confirm = await vscode.window.showWarningMessage(
-                '모든 전송 히스토리를 삭제하시겠습니까?',
+                i18n.t('warning.clearTransferHistory'),
                 { modal: true },
-                '삭제',
-                '취소'
+                i18n.t('action.delete'),
+                i18n.t('action.cancel')
             );
             
-            if (confirm === '삭제') {
+            if (confirm === i18n.t('action.delete')) {
                 transferHistoryManager.clearHistory();
-                vscode.window.showInformationMessage('✅ 전송 히스토리가 삭제되었습니다.');
+                vscode.window.showInformationMessage(i18n.t('info.transferHistoryCleared'));
             }
             
         } catch (error) {
-            vscode.window.showErrorMessage(`히스토리 삭제 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.historyClearFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('clearTransferHistory error:', error);
         }
     });
@@ -2355,16 +2341,16 @@ export function activate(context: vscode.ExtensionContext) {
         
         try {
             if (!item || !item.remotePath) {
-                vscode.window.showErrorMessage('원격 경로를 찾을 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.remotePathNotFound'));
                 return;
             }
             
             // 클립보드에 복사
             await vscode.env.clipboard.writeText(item.remotePath);
-            vscode.window.showInformationMessage(`📋 경로 복사됨: ${item.remotePath}`);
+            vscode.window.showInformationMessage(i18n.t('info.pathCopied', { path: item.remotePath }));
             
         } catch (error) {
-            vscode.window.showErrorMessage(`경로 복사 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.pathCopyFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('copyRemotePath error:', error);
         }
     });
@@ -2377,7 +2363,7 @@ export function activate(context: vscode.ExtensionContext) {
         
         try {
             if (!item || !item.remotePath || !item.config) {
-                vscode.window.showErrorMessage('파일 정보를 찾을 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.fileInfoNotFound'));
                 return;
             }
             
@@ -2387,14 +2373,14 @@ export function activate(context: vscode.ExtensionContext) {
             if (!webUrl) {
                 // 웹 URL이 없으면 입력 요청
                 webUrl = await vscode.window.showInputBox({
-                    prompt: '웹 서버 기본 URL을 입력하세요 (예: http://example.com)',
+                    prompt: i18n.t('prompt.enterWebUrl'),
                     placeHolder: 'http://example.com',
                     validateInput: (value) => {
                         if (!value || value.trim() === '') {
-                            return 'URL을 입력해주세요';
+                            return i18n.t('validation.urlRequired');
                         }
                         if (!value.startsWith('http://') && !value.startsWith('https://')) {
-                            return 'http:// 또는 https://로 시작해야 합니다';
+                            return i18n.t('validation.urlProtocol');
                         }
                         return null;
                     }
@@ -2406,14 +2392,14 @@ export function activate(context: vscode.ExtensionContext) {
                 
                 // 설정에 저장할지 물어보기
                 const save = await vscode.window.showInformationMessage(
-                    `이 URL을 서버 설정에 저장하시겠습니까?\n${webUrl}`,
-                    '저장',
-                    '이번만 사용'
+                    i18n.t('prompt.saveWebUrl', webUrl),
+                    i18n.t('action.save'),
+                    i18n.t('action.useOnce')
                 );
                 
-                if (save === '저장') {
+                if (save === i18n.t('action.save')) {
                     // TODO: 설정 파일 업데이트
-                    vscode.window.showInformationMessage('💡 다음 버전에서 자동 저장 기능이 추가됩니다.');
+                    vscode.window.showInformationMessage(i18n.t('info.autoSaveFeatureComingSoon'));
                 }
             }
             
@@ -2426,10 +2412,10 @@ export function activate(context: vscode.ExtensionContext) {
             
             // 브라우저에서 열기
             await vscode.env.openExternal(vscode.Uri.parse(fullUrl));
-            vscode.window.showInformationMessage(`🌐 브라우저 열기: ${fullUrl}`);
+            vscode.window.showInformationMessage(i18n.t('info.openingInBrowser', { url: fullUrl }));
             
         } catch (error) {
-            vscode.window.showErrorMessage(`브라우저 열기 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.browserOpenFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('openInBrowser error:', error);
         }
     });
@@ -2449,7 +2435,7 @@ export function activate(context: vscode.ExtensionContext) {
         
         try {
             if (!bookmarkManager) {
-                vscode.window.showErrorMessage('북마크 관리자를 초기화할 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.bookmarkManagerInitFailed'));
                 return;
             }
             
@@ -2465,13 +2451,13 @@ export function activate(context: vscode.ExtensionContext) {
                 isDirectory = item.isDirectory || false;
                 serverName = config.name || `${config.username}@${config.host}`;
             } else {
-                vscode.window.showErrorMessage('북마크 정보를 찾을 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.bookmarkInfoNotFound'));
                 return;
             }
             
             // 이미 북마크에 있는지 확인
             if (bookmarkManager.hasBookmark(serverName, remotePath)) {
-                vscode.window.showWarningMessage('이미 북마크에 추가된 경로입니다.');
+                vscode.window.showWarningMessage(i18n.t('warning.bookmarkExists'));
                 return;
             }
             
@@ -2479,12 +2465,12 @@ export function activate(context: vscode.ExtensionContext) {
             const fileName = path.basename(remotePath);
             const defaultName = `${serverName}-${fileName}`;
             const bookmarkName = await vscode.window.showInputBox({
-                prompt: '북마크 이름을 입력하세요',
+                prompt: i18n.t('prompt.enterBookmarkName'),
                 value: defaultName,
-                placeHolder: '예: 설정 파일, 로그 디렉토리',
+                placeHolder: i18n.t('placeholder.bookmarkName'),
                 validateInput: (value) => {
                     if (!value || value.trim() === '') {
-                        return '이름을 입력해주세요';
+                        return i18n.t('validation.nameRequired');
                     }
                     return null;
                 }
@@ -2496,8 +2482,8 @@ export function activate(context: vscode.ExtensionContext) {
             
             // 설명 입력 (선택사항)
             const description = await vscode.window.showInputBox({
-                prompt: '북마크 설명 (선택사항)',
-                placeHolder: '예: 개발 서버 설정 파일',
+                prompt: i18n.t('prompt.bookmarkDescription'),
+                placeHolder: i18n.t('placeholder.bookmarkDescription'),
             });
             
             // 북마크 추가
@@ -2511,13 +2497,13 @@ export function activate(context: vscode.ExtensionContext) {
                 config.protocol || 'sftp'  // 프로토콜 정보 추가
             );
             
-            vscode.window.showInformationMessage(`⭐ 북마크 추가: ${bookmarkName}`);
+            vscode.window.showInformationMessage(i18n.t('info.bookmarkAdded', { name: bookmarkName }));
             
             // TreeView 새로고침
             treeProvider.refresh();
             
         } catch (error) {
-            vscode.window.showErrorMessage(`북마크 추가 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.bookmarkAddFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('addBookmark error:', error);
         }
     });
@@ -2530,14 +2516,14 @@ export function activate(context: vscode.ExtensionContext) {
         
         try {
             if (!bookmarkManager) {
-                vscode.window.showErrorMessage('북마크 관리자를 초기화할 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.bookmarkManagerInitFailed'));
                 return;
             }
             
             const bookmarks = bookmarkManager.getAllBookmarks();
             
             if (bookmarks.length === 0) {
-                vscode.window.showInformationMessage('⭐ 저장된 북마크가 없습니다.');
+                vscode.window.showInformationMessage(i18n.t('info.noBookmarks'));
                 return;
             }
             
@@ -2550,19 +2536,19 @@ export function activate(context: vscode.ExtensionContext) {
             const items: BookmarkQuickPickItem[] = bookmarks.map(b => {
                 const typeIcon = b.isDirectory ? '📁' : '📄';
                 const accessInfo = b.accessCount > 0 
-                    ? ` | 사용횟수: ${b.accessCount}회`
+                    ? ` | ${i18n.t('detail.usageCount', { count: b.accessCount })}`
                     : '';
                 
                 return {
                     label: `⭐ ${b.name}`,
                     description: `${b.serverName} | ${b.remotePath}`,
-                    detail: `${typeIcon} ${b.description || '설명 없음'}${accessInfo}`,
+                    detail: `${typeIcon} ${b.description || i18n.t('detail.noDescription')}${accessInfo}`,
                     bookmark: b
                 };
             });
             
             const selected = await vscode.window.showQuickPick(items, {
-                placeHolder: `${bookmarks.length}개의 북마크 - 선택하여 열기`,
+                placeHolder: i18n.t('prompt.selectBookmarkToOpen', { count: bookmarks.length }),
                 matchOnDescription: true,
                 matchOnDetail: true
             });
@@ -2573,7 +2559,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
             
         } catch (error) {
-            vscode.window.showErrorMessage(`북마크 조회 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.bookmarkLoadFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('viewBookmarks error:', error);
         }
     });
@@ -2586,14 +2572,14 @@ export function activate(context: vscode.ExtensionContext) {
         
         try {
             if (!bookmarkManager) {
-                vscode.window.showErrorMessage('북마크 관리자를 초기화할 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.bookmarkManagerInitFailed'));
                 return;
             }
             
             const bookmarks = bookmarkManager.getAllBookmarks();
             
             if (bookmarks.length === 0) {
-                vscode.window.showInformationMessage('삭제할 북마크가 없습니다.');
+                vscode.window.showInformationMessage(i18n.t('info.noBookmarksToDelete'));
                 return;
             }
             
@@ -2604,12 +2590,12 @@ export function activate(context: vscode.ExtensionContext) {
             const items: BookmarkQuickPickItem[] = bookmarks.map(b => ({
                 label: `⭐ ${b.name}`,
                 description: `${b.serverName} | ${b.remotePath}`,
-                detail: b.description || '설명 없음',
+                detail: b.description || i18n.t('detail.noDescription'),
                 bookmark: b
             }));
             
             const selected = await vscode.window.showQuickPick(items, {
-                placeHolder: '삭제할 북마크 선택',
+                placeHolder: i18n.t('prompt.selectBookmarkToDelete'),
                 matchOnDescription: true
             });
             
@@ -2619,20 +2605,20 @@ export function activate(context: vscode.ExtensionContext) {
             
             // 확인 대화상자
             const confirm = await vscode.window.showWarningMessage(
-                `북마크를 삭제하시겠습니까?\n\n${selected.bookmark.name}`,
+                i18n.t('warning.deleteBookmark', { name: selected.bookmark.name }),
                 { modal: true },
-                '삭제'
+                i18n.t('action.delete')
             );
             
-            if (confirm === '삭제') {
+            if (confirm === i18n.t('action.delete')) {
                 const success = bookmarkManager.removeBookmark(selected.bookmark.id);
                 if (success) {
-                    vscode.window.showInformationMessage(`🗑️ 북마크 삭제: ${selected.bookmark.name}`);
+                    vscode.window.showInformationMessage(i18n.t('info.bookmarkDeleted', { name: selected.bookmark.name }));
                 }
             }
             
         } catch (error) {
-            vscode.window.showErrorMessage(`북마크 삭제 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.bookmarkDeleteFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('removeBookmark error:', error);
         }
     });
@@ -2645,7 +2631,7 @@ export function activate(context: vscode.ExtensionContext) {
         
         try {
             if (!bookmarkManager) {
-                vscode.window.showErrorMessage('북마크 관리자를 초기화할 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.bookmarkManagerInitFailed'));
                 return;
             }
             
@@ -2655,15 +2641,15 @@ export function activate(context: vscode.ExtensionContext) {
                 
                 // 확인 대화상자
                 const confirm = await vscode.window.showWarningMessage(
-                    `북마크를 삭제하시겠습니까?\n\n${bookmark.name}`,
+                    i18n.t('warning.deleteBookmark', { name: bookmark.name }),
                     { modal: true },
-                    '삭제'
+                    i18n.t('action.delete')
                 );
                 
-                if (confirm === '삭제') {
+                if (confirm === i18n.t('action.delete')) {
                     const success = bookmarkManager.removeBookmark(bookmark.id);
                     if (success) {
-                        vscode.window.showInformationMessage(`🗑️ 북마크 삭제: ${bookmark.name}`);
+                        vscode.window.showInformationMessage(i18n.t('info.bookmarkDeleted', { name: bookmark.name }));
                         treeProvider.refresh();
                     }
                 }
@@ -2673,7 +2659,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
             
         } catch (error) {
-            vscode.window.showErrorMessage(`북마크 삭제 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.bookmarkDeleteFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('deleteBookmark error:', error);
         }
     });
@@ -2686,14 +2672,14 @@ export function activate(context: vscode.ExtensionContext) {
         
         try {
             if (!bookmarkManager) {
-                vscode.window.showErrorMessage('북마크 관리자를 초기화할 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.bookmarkManagerInitFailed'));
                 return;
             }
             
             const bookmarks = bookmarkManager.getFrequentBookmarks(10);
             
             if (bookmarks.length === 0) {
-                vscode.window.showInformationMessage('⭐ 자주 사용하는 북마크가 없습니다.');
+                vscode.window.showInformationMessage(i18n.t('info.noFrequentBookmarks'));
                 return;
             }
             
@@ -2708,13 +2694,13 @@ export function activate(context: vscode.ExtensionContext) {
                 return {
                     label: `${medal} ${b.name}`,
                     description: `${b.serverName} | ${b.remotePath}`,
-                    detail: `${typeIcon} 사용횟수: ${b.accessCount}회 | ${b.description || ''}`,
+                    detail: `${typeIcon} ${i18n.t('detail.usageCount', { count: b.accessCount })} | ${b.description || ''}`,
                     bookmark: b
                 };
             });
             
             const selected = await vscode.window.showQuickPick(items, {
-                placeHolder: '자주 사용하는 북마크 - 선택하여 열기',
+                placeHolder: i18n.t('prompt.selectFrequentBookmark'),
                 matchOnDescription: true
             });
             
@@ -2723,7 +2709,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
             
         } catch (error) {
-            vscode.window.showErrorMessage(`북마크 조회 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.bookmarkLoadFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('frequentBookmarks error:', error);
         }
     });
@@ -2736,7 +2722,7 @@ export function activate(context: vscode.ExtensionContext) {
         
         try {
             if (!templateManager) {
-                vscode.window.showErrorMessage('템플릿 관리자를 초기화할 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.templateManagerInitFailed'));
                 return;
             }
             
@@ -2750,7 +2736,7 @@ export function activate(context: vscode.ExtensionContext) {
                 const connectedServers = treeProvider.getConnectedServerNames();
                 
                 if (connectedServers.length === 0) {
-                    vscode.window.showErrorMessage('연결된 서버가 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.connectedServersNotFound'));
                     return;
                 }
                 
@@ -2759,7 +2745,7 @@ export function activate(context: vscode.ExtensionContext) {
                     serverName = connectedServers[0];
                 } else {
                     const selected = await vscode.window.showQuickPick(connectedServers, {
-                        placeHolder: '템플릿으로 저장할 서버를 선택하세요'
+                        placeHolder: i18n.t('prompt.selectServerToSaveTemplate')
                     });
                     
                     if (!selected) {
@@ -2770,7 +2756,7 @@ export function activate(context: vscode.ExtensionContext) {
                 
                 const connection = treeProvider.getConnectedServer(serverName);
                 if (!connection) {
-                    vscode.window.showErrorMessage('서버 연결 정보를 찾을 수 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.serverConnectionInfoNotFound'));
                     return;
                 }
                 
@@ -2778,18 +2764,18 @@ export function activate(context: vscode.ExtensionContext) {
             }
             
             if (!config) {
-                vscode.window.showErrorMessage('서버 설정을 찾을 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.serverConfigNotFound'));
                 return;
             }
             
             // 템플릿 이름 입력
             const templateName = await vscode.window.showInputBox({
-                prompt: '템플릿 이름을 입력하세요',
+                prompt: i18n.t('prompt.enterTemplateName'),
                 value: config.name || `${config.username}@${config.host}`,
-                placeHolder: '예: Web Server Config',
+                placeHolder: i18n.t('placeholder.templateName'),
                 validateInput: (value) => {
                     if (!value || value.trim() === '') {
-                        return '이름을 입력해주세요';
+                        return i18n.t('validation.nameRequired');
                     }
                     return null;
                 }
@@ -2801,17 +2787,17 @@ export function activate(context: vscode.ExtensionContext) {
             
             // 설명 입력 (선택사항)
             const description = await vscode.window.showInputBox({
-                prompt: '템플릿 설명 (선택사항)',
-                placeHolder: '예: LAMP 서버 기본 설정'
+                prompt: i18n.t('prompt.templateDescription'),
+                placeHolder: i18n.t('placeholder.templateDescription')
             });
             
             // 템플릿 저장
             const template = templateManager.addTemplate(templateName, config, description);
             
-            vscode.window.showInformationMessage(`💾 템플릿 저장: ${templateName}`);
+            vscode.window.showInformationMessage(i18n.t('info.templateSaved', { templateName }));
             
         } catch (error) {
-            vscode.window.showErrorMessage(`템플릿 저장 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.templateSaveFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('saveAsTemplate error:', error);
         }
     });
@@ -2824,14 +2810,14 @@ export function activate(context: vscode.ExtensionContext) {
         
         try {
             if (!templateManager) {
-                vscode.window.showErrorMessage('템플릿 관리자를 초기화할 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.templateManagerInitFailed'));
                 return;
             }
             
             const templates = templateManager.getAllTemplates();
             
             if (templates.length === 0) {
-                vscode.window.showInformationMessage('💾 저장된 템플릿이 없습니다.\n먼저 서버를 템플릿으로 저장하세요.');
+                vscode.window.showInformationMessage(i18n.t('info.noSavedTemplates'));
                 return;
             }
             
@@ -2865,7 +2851,7 @@ export function activate(context: vscode.ExtensionContext) {
                 placeHolder: 'example.com',
                 validateInput: (value) => {
                     if (!value || value.trim() === '') {
-                        return '호스트를 입력해주세요';
+                        return i18n.t('validation.hostRequired');
                     }
                     return null;
                 }
@@ -2876,11 +2862,11 @@ export function activate(context: vscode.ExtensionContext) {
             }
             
             const username = await vscode.window.showInputBox({
-                prompt: '사용자명을 입력하세요',
+                prompt: i18n.t('prompt.enterUsername'),
                 placeHolder: 'username',
                 validateInput: (value) => {
                     if (!value || value.trim() === '') {
-                        return '사용자명을 입력해주세요';
+                        return i18n.t('validation.usernameRequired');
                     }
                     return null;
                 }
@@ -2891,13 +2877,13 @@ export function activate(context: vscode.ExtensionContext) {
             }
             
             const password = await vscode.window.showInputBox({
-                prompt: '비밀번호를 입력하세요 (선택사항 - 입력하지 않으면 연결 시 입력)',
+                prompt: i18n.t('prompt.enterPasswordOptional'),
                 password: true,
-                placeHolder: '비밀번호'
+                placeHolder: i18n.t('placeholder.password')
             });
             
             const serverName = await vscode.window.showInputBox({
-                prompt: '서버 이름을 입력하세요 (선택사항)',
+                prompt: i18n.t('prompt.enterServerNameOptional'),
                 value: `${username}@${host}`,
                 placeHolder: 'My Server'
             });
@@ -2914,7 +2900,7 @@ export function activate(context: vscode.ExtensionContext) {
             // 설정 파일에 추가
             const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
             if (!workspaceFolder) {
-                vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.workspaceNotFound'));
                 return;
             }
             
@@ -2938,16 +2924,17 @@ export function activate(context: vscode.ExtensionContext) {
             
             fs.writeFileSync(configPath, JSON.stringify(configs, null, 2));
             
-            vscode.window.showInformationMessage(`✅ 서버 추가 완료: ${newConfig.name}\n템플릿: ${template.name}`);
+            vscode.window.showInformationMessage(i18n.t('info.serverAddedFromTemplate', { serverName: newConfig.name || 'Unknown', templateName: template.name }));
             
             // TreeView 새로고침
             treeProvider.refresh();
             
         } catch (error) {
-            vscode.window.showErrorMessage(`서버 추가 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.serverAddFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('addServerFromTemplate error:', error);
         }
     });
+
 
     /**
      * 템플릿 관리 Command
@@ -2957,14 +2944,14 @@ export function activate(context: vscode.ExtensionContext) {
         
         try {
             if (!templateManager) {
-                vscode.window.showErrorMessage('템플릿 관리자를 초기화할 수 없습니다.');
+                vscode.window.showErrorMessage(i18n.t('error.templateManagerInitFailed'));
                 return;
             }
             
             const templates = templateManager.getAllTemplates();
             
             if (templates.length === 0) {
-                vscode.window.showInformationMessage('💾 저장된 템플릿이 없습니다.');
+                vscode.window.showInformationMessage(i18n.t('info.noSavedTemplates'));
                 return;
             }
             
@@ -2979,14 +2966,14 @@ export function activate(context: vscode.ExtensionContext) {
                 
                 return {
                     label: `📋 ${t.name}`,
-                    description: `Port: ${t.config.port || 22} | 사용: ${t.usageCount}회`,
-                    detail: `${t.description || '설명 없음'} | 생성: ${dateStr}`,
+                    description: i18n.t('label.templateDetails', { port: t.config.port || 22, usage: t.usageCount }),
+                    detail: `${t.description || i18n.t('label.noDescription')} | ${i18n.t('label.created', { date: dateStr })}`,
                     template: t
                 };
             });
             
             const selected = await vscode.window.showQuickPick(items, {
-                placeHolder: `${templates.length}개의 템플릿 - 선택하여 삭제`,
+                placeHolder: i18n.t('prompt.selectTemplateToDelete', { count: templates.length }),
                 matchOnDescription: true,
                 matchOnDetail: true
             });
@@ -2999,23 +2986,24 @@ export function activate(context: vscode.ExtensionContext) {
             
             // 삭제 확인
             const confirm = await vscode.window.showWarningMessage(
-                `템플릿을 삭제하시겠습니까?\n\n${template.name}`,
+                i18n.t('confirm.deleteTemplate', { name: template.name }),
                 { modal: true },
-                '삭제'
+                i18n.t('action.delete')
             );
             
-            if (confirm === '삭제') {
+            if (confirm === i18n.t('action.delete')) {
                 const success = templateManager.removeTemplate(template.id);
                 if (success) {
-                    vscode.window.showInformationMessage(`🗑️ 템플릿 삭제: ${template.name}`);
+                    vscode.window.showInformationMessage(i18n.t('info.templateDeleted', { name: template.name }));
                 }
             }
             
         } catch (error) {
-            vscode.window.showErrorMessage(`템플릿 관리 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.templateManageFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('manageTemplates error:', error);
         }
     });
+
 
     /**
      * 설정 파일 열기 Command
@@ -3023,7 +3011,7 @@ export function activate(context: vscode.ExtensionContext) {
     const configCommand = vscode.commands.registerCommand('ctlimSftp.config', async () => {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
-            vscode.window.showErrorMessage('워크스페이스가 열려있지 않습니다.');
+            vscode.window.showErrorMessage(i18n.t('error.noWorkspace'));
             return;
         }
 
@@ -3137,7 +3125,7 @@ export function activate(context: vscode.ExtensionContext) {
             } else {
                 await ensureClient(config);
                 if (!sftpClient) {
-                    vscode.window.showErrorMessage('SFTP 클라이언트 연결 실패');
+                    vscode.window.showErrorMessage(i18n.t('error.sftpConnectionFailed'));
                     return;
                 }
             }
@@ -3148,15 +3136,15 @@ export function activate(context: vscode.ExtensionContext) {
             // 리모트와 로칼이 다를 때
             if(!fSameMetadata){ 
                 const choice = await vscode.window.showWarningMessage(
-                    `⚠️ 충돌 감지!\n\n파일이 서버에서 수정되었습니다: ${path.basename(document.uri.fsPath)}\n\n어떻게 처리하시겠습니까?`,
+                    i18n.t('conflict.detect', { fileName: path.basename(document.uri.fsPath) }),
                     { modal: true },
-                    '덮어쓰기 (로컬 → 서버)',
-                    '다운로드 (서버 → 로컬)',
-                    '비교 및 병합',
+                    i18n.t('conflict.overwrite'),
+                    i18n.t('conflict.download'),
+                    i18n.t('conflict.compare'),
 //                    '취소'
                 );
                 
-                if (choice === '덮어쓰기 (로컬 → 서버)') {
+                if (choice === i18n.t('conflict.overwrite')) {
                     // 로컬 파일로 서버 덮어쓰기
                     const startTime = Date.now();
                     const fileSize = fs.statSync(document.uri.fsPath).size;
@@ -3177,7 +3165,7 @@ export function activate(context: vscode.ExtensionContext) {
                                 serverName
                             );
                             transferHistoryManager.addHistory(history);
-                            vscode.window.showInformationMessage(`✅ 서버 파일 덮어쓰기 완료: ${path.basename(document.uri.fsPath)}`);
+                            vscode.window.showInformationMessage(i18n.t('file.overwriteComplete', { fileName: path.basename(document.uri.fsPath) }));
                         }
                     } catch (uploadError: any) {
                         const duration = Date.now() - startTime;
@@ -3198,21 +3186,21 @@ export function activate(context: vscode.ExtensionContext) {
                         throw uploadError;
                     }
                 } 
-                else if (choice === '다운로드 (서버 → 로컬)') {
+                else if (choice === i18n.t('conflict.download')) {
                     // 서버 파일로 로컬 덮어쓰기
                     const confirmed = await vscode.window.showWarningMessage(
-                        `⚠️ 로컬 변경사항이 손실됩니다!\n\n서버 파일로 덮어쓰시겠습니까?`,
+                        i18n.t('conflict.lossWarning'),
                         { modal: true },
-                        '확인',
+                        i18n.t('action.confirm'),
 //                        '취소'
                     );
                     
-                    if (confirmed === '확인') {
+                    if (confirmed === i18n.t('action.confirm')) {
                         await downloadAndReloadFile(cachedRemotePath, document.uri.fsPath, config, document, false);
-                        vscode.window.showInformationMessage(`✅ 서버 파일 다운로드 완료: ${path.basename(document.uri.fsPath)}`);
+                        vscode.window.showInformationMessage(i18n.t('file.downloadSuccess', { fileName: path.basename(document.uri.fsPath) }));
                     }
                 }
-                else if (choice === '비교 및 병합') {
+                else if (choice === i18n.t('conflict.compare')) {
                     // Diff 뷰 열기 및 병합 옵션 제공
                     let metadataDirTemp = workspaceFolder.uri.fsPath;
                     if(config.workspaceRoot){
@@ -3298,7 +3286,7 @@ export function activate(context: vscode.ExtensionContext) {
                                 transferHistoryManager.addHistory(history);
                             }
                             
-                            vscode.window.showInformationMessage(`✅ 재연결 후 업로드 성공: ${path.basename(document.uri.fsPath)}`);
+                            vscode.window.showInformationMessage(i18n.t('info.uploadSuccessAfterReconnect', { fileName: path.basename(document.uri.fsPath) }));
                             // Update cache with new client
                             documentConfigCache.set(document, { config, client: sftpClient, remotePath: cachedRemotePath });
                         }
@@ -3325,12 +3313,52 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             } 
             catch (retryError) {
-                vscode.window.showErrorMessage(`❌ 재연결 실패(onDidSaveTextDocument : ${document.uri.fsPath}): ${retryError}`);
+                vscode.window.showErrorMessage(i18n.t('error.reconnectFailed', { path: document.uri.fsPath, error: String(retryError) }));
             }
 
         }
     });
 
+
+    /**
+     * SSH Private Key 선택 Command
+     */
+    const selectPrivateKeyCommand = vscode.commands.registerCommand('ctlimSftp.selectPrivateKey', async () => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.selectPrivateKey');
+
+        try {
+            const uris = await vscode.window.showOpenDialog({
+                canSelectFiles: true,
+                canSelectFolders: false,
+                canSelectMany: false,
+                title: i18n.t('prompt.selectPrivateKeyFile'),
+                filters: { // 옵션: 키 파일 필터
+                    'SSH Keys': ['pem', 'key', 'ppk', 'cer'],
+                    'All Files': ['*']
+                }
+            });
+
+            if (uris && uris.length > 0) {
+                const keyPath = uris[0].fsPath.replace(/\\/g, '/');
+                
+                const editor = vscode.window.activeTextEditor;
+                if (editor) {
+                    editor.edit(editBuilder => {
+                        if (editor.selection.isEmpty) {
+                            editBuilder.insert(editor.selection.active, keyPath);
+                        } else {
+                            editBuilder.replace(editor.selection, keyPath);
+                        }
+                    });
+                } else {
+                    await vscode.env.clipboard.writeText(keyPath);
+                    vscode.window.showInformationMessage(i18n.t('info.keyPathCopied'));
+                }
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(i18n.t('error.unknownError', { error: String(error) }));
+        }
+    });
 
     context.subscriptions.push(
         connectServerCommand,
@@ -3368,7 +3396,9 @@ export function activate(context: vscode.ExtensionContext) {
         saveAsTemplateCommand,
         addServerFromTemplateCommand,
         manageTemplatesCommand,
+        selectPrivateKeyCommand,
         saveWatcher
+
         
 //        uploadCommand,
 //        downloadCommand,
@@ -3393,7 +3423,7 @@ async function retryFailedTransfer(history: TransferHistory): Promise<void> {
         
         const config = await findConfigByName(history.serverName);
         if (!config) {
-            vscode.window.showErrorMessage(`서버 설정을 찾을 수 없습니다: ${history.serverName}`);
+            vscode.window.showErrorMessage(i18n.t('error.serverConfigNotFoundWithName', { name: history.serverName }));
             return;
         }
         
@@ -3401,10 +3431,10 @@ async function retryFailedTransfer(history: TransferHistory): Promise<void> {
         let connection = treeProvider.getConnectedServer(history.serverName);
         if (!connection || !connection.client.isConnected()) {
             const reconnect = await vscode.window.showWarningMessage(
-                '서버에 연결되어 있지 않습니다. 연결하시겠습니까?',
-                '연결'
+                i18n.t('confirm.connectToServer'),
+                i18n.t('action.connect')
             );
-            if (reconnect !== '연결') {
+            if (reconnect !== i18n.t('action.connect')) {
                 return;
             }
             
@@ -3415,12 +3445,12 @@ async function retryFailedTransfer(history: TransferHistory): Promise<void> {
                 connection = treeProvider.getConnectedServer(history.serverName);
                 
                 if (!connection) {
-                    vscode.window.showErrorMessage('서버 연결 정보를 가져올 수 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.serverConnectionInfoNotFound'));
                     return;
                 }
             } catch (connectError) {
-                vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
-                return;
+                    vscode.window.showErrorMessage(i18n.t('error.serverConnectionFailed', { error: String(connectError) }));
+                    return;
             }
         }
         
@@ -3430,7 +3460,7 @@ async function retryFailedTransfer(history: TransferHistory): Promise<void> {
             if (history.type === 'upload') {
                 // 재업로드
                 if (!fs.existsSync(history.localPath)) {
-                    vscode.window.showErrorMessage(`로컬 파일을 찾을 수 없습니다: ${history.localPath}`);
+                    vscode.window.showErrorMessage(i18n.t('error.localFileNotFound', { path: history.localPath }));
                     return;
                 }
                 
@@ -3449,13 +3479,13 @@ async function retryFailedTransfer(history: TransferHistory): Promise<void> {
                         history.serverName
                     );
                     transferHistoryManager.addHistory(newHistory);
-                    vscode.window.showInformationMessage(`✅ 재업로드 성공: ${path.basename(history.localPath)}`);
+                    vscode.window.showInformationMessage(i18n.t('info.reuploadSuccess', { fileName: path.basename(history.localPath) }));
                 }
             } else if (history.type === 'download') {
                 // 재다운로드
                 const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
                 if (!workspaceFolder) {
-                    vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+                    vscode.window.showErrorMessage(i18n.t('error.workspaceNotFound'));
                     return;
                 }
                 
@@ -3483,7 +3513,7 @@ async function retryFailedTransfer(history: TransferHistory): Promise<void> {
                             history.serverName
                         );
                         transferHistoryManager.addHistory(newHistory);
-                        vscode.window.showInformationMessage(`✅ 재다운로드 성공: ${path.basename(history.localPath)}`);
+                        vscode.window.showInformationMessage(i18n.t('info.redownloadSuccess', { fileName: path.basename(history.localPath) }));
                     }
                 } else {
                     // FTP protocol
@@ -3502,7 +3532,7 @@ async function retryFailedTransfer(history: TransferHistory): Promise<void> {
                         history.serverName
                     );
                     transferHistoryManager.addHistory(newHistory);
-                    vscode.window.showInformationMessage(`✅ 재다운로드 성공: ${path.basename(history.localPath)}`);
+                    vscode.window.showInformationMessage(i18n.t('info.redownloadSuccess', { fileName: path.basename(history.localPath) }));
                 }
             }
         } catch (retryError: any) {
@@ -3518,12 +3548,12 @@ async function retryFailedTransfer(history: TransferHistory): Promise<void> {
                 retryError.message || String(retryError)
             );
             transferHistoryManager.addHistory(newHistory);
-            vscode.window.showErrorMessage(`재시도 실패: ${retryError}`);
+            vscode.window.showErrorMessage(i18n.t('error.retryFailed', { error: String(retryError) }));
         }
         
     } catch (error) {
         if (DEBUG_MODE) console.error('retryFailedTransfer error:', error);
-        vscode.window.showErrorMessage(`재시도 실패: ${error}`);
+        vscode.window.showErrorMessage(i18n.t('error.retryFailed', { error: String(error) }));
     }
 }
 
@@ -3557,17 +3587,17 @@ function formatDateTime(date: Date): string {
 async function loadConfig(): Promise<SftpConfig | null> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
-        vscode.window.showErrorMessage('워크스페이스가 열려있지 않습니다.');
+        vscode.window.showErrorMessage(i18n.t('error.noWorkspace'));
         return null;
     }
 
     const configPath = path.join(workspaceFolder.uri.fsPath, '.vscode', 'ctlim-sftp.json');
     if (!fs.existsSync(configPath)) {
         const result = await vscode.window.showErrorMessage(
-            'ctlim SFTP 설정 파일이 없습니다. 생성하시겠습니까?',
-            '생성',
+            i18n.t('confirm.createConfigFile'),
+            i18n.t('action.create'),
         );
-        if (result === '생성') {
+        if (result === i18n.t('action.create')) {
             await vscode.commands.executeCommand('ctlimSftp.config');
         }
         return null;
@@ -3599,7 +3629,7 @@ async function loadConfig(): Promise<SftpConfig | null> {
         currentConfig = config;
         return config;
     } catch (error) {
-        vscode.window.showErrorMessage(`설정 파일 로드 실패: ${error}`);
+        vscode.window.showErrorMessage(i18n.t('error.configLoadFailed', { error: String(error) }));
         return null;
     }
 }
@@ -3611,17 +3641,17 @@ async function loadConfig(): Promise<SftpConfig | null> {
 async function loadConfigWithSelection(): Promise<SftpConfig | null> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
-        vscode.window.showErrorMessage('워크스페이스가 열려있지 않습니다.');
+        vscode.window.showErrorMessage(i18n.t('error.noWorkspace'));
         return null;
     }
 
     const configPath = path.join(workspaceFolder.uri.fsPath, '.vscode', 'ctlim-sftp.json');
     if (!fs.existsSync(configPath)) {
         const result = await vscode.window.showErrorMessage(
-            'ctlim SFTP 설정 파일이 없습니다. 생성하시겠습니까?',
-            '생성',
+            i18n.t('confirm.createConfigFile'),
+            i18n.t('action.create'),
         );
-        if (result === '생성') {
+        if (result === i18n.t('action.create')) {
             await vscode.commands.executeCommand('ctlimSftp.config');
         }
         return null;
@@ -3637,7 +3667,7 @@ async function loadConfigWithSelection(): Promise<SftpConfig | null> {
         let config: SftpConfig | undefined;
         
         if (configs.length === 0) {
-            vscode.window.showErrorMessage('설정 파일에 서버 정보가 없습니다.');
+            vscode.window.showErrorMessage(i18n.t('error.noServerInConfig'));
             return null;
         } else if (configs.length === 1) {
             // 하나만 있으면 자동 선택
@@ -3651,7 +3681,7 @@ async function loadConfigWithSelection(): Promise<SftpConfig | null> {
             }));
             
             const selected = await vscode.window.showQuickPick(items, {
-                placeHolder: '연결할 서버를 선택하세요'
+                placeHolder: i18n.t('prompt.selectServerToConnect')
             });
             
             if (!selected) {
@@ -3675,7 +3705,7 @@ async function loadConfigWithSelection(): Promise<SftpConfig | null> {
         currentConfig = config;
         return config;
     } catch (error) {
-        vscode.window.showErrorMessage(`설정 파일 로드 실패: ${error}`);
+        vscode.window.showErrorMessage(i18n.t('error.configLoadFailed', { error: String(error) }));
         return null;
     }
 }
@@ -4000,7 +4030,7 @@ async function selectRemotePathFromTree(client: ClientType, startPath: string, f
             if (currentPath !== '/') {
                 items.push({
                     label: '$(arrow-up) ..',
-                    description: '상위 디렉토리로 이동',
+                    description: i18n.t('label.goUp'),
                     path: path.posix.dirname(currentPath),
                     isDirectory: true,
                     isSpecial: true
@@ -4010,7 +4040,7 @@ async function selectRemotePathFromTree(client: ClientType, startPath: string, f
             // 현재 위치에 저장 옵션
             items.push({
                 label: `$(file) ${fileName}`,
-                description: '현재 디렉토리에 저장',
+                description: i18n.t('label.saveHere'),
                 path: path.posix.join(currentPath, fileName),
                 isDirectory: false,
                 isSpecial: true
@@ -4021,7 +4051,7 @@ async function selectRemotePathFromTree(client: ClientType, startPath: string, f
             for (const dir of directories) {
                 items.push({
                     label: `$(folder) ${dir.name}`,
-                    description: '디렉토리',
+                    description: i18n.t('label.directory'),
                     path: dir.path,
                     isDirectory: true
                 });
@@ -4040,7 +4070,7 @@ async function selectRemotePathFromTree(client: ClientType, startPath: string, f
             
             // QuickPick 표시
             const selected = await vscode.window.showQuickPick(items, {
-                placeHolder: `현재 위치: ${currentPath} - 저장 위치를 선택하세요`,
+                placeHolder: i18n.t('prompt.selectSaveLocation', { path: currentPath }),
                 matchOnDescription: true
             });
             
@@ -4071,17 +4101,17 @@ async function selectRemotePathFromTree(client: ClientType, startPath: string, f
             const newPath = path.posix.join(dir, fileName);
             
             const confirm = await vscode.window.showWarningMessage(
-                `${dir}/ 디렉토리에 ${fileName}로 저장하시겠습니까?`,
-                '저장',
+                i18n.t('confirm.saveAs', { dir: dir, fileName: fileName }),
+                i18n.t('action.save'),
             );
             
-            if (confirm === '저장') {
+            if (confirm === i18n.t('action.save')) {
                 return newPath;
             }
             // 취소 시 계속 탐색
             
         } catch (error) {
-            vscode.window.showErrorMessage(`원격 디렉토리 탐색 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('error.remoteDirExploreFailed', { error: String(error) }));
             return undefined;
         }
     }
@@ -4108,7 +4138,7 @@ async function showDiffWithMergeOptions(
         );
         
         if (!connection || !connection.client.isConnected()) {
-            vscode.window.showErrorMessage('서버에 연결되어 있지 않습니다.');
+            vscode.window.showErrorMessage(i18n.t('error.notConnected'));
             return;
         }
 
@@ -4145,34 +4175,34 @@ async function showDiffWithMergeOptions(
 
         // Show merge action options
         const action = await vscode.window.showInformationMessage(
-            `📊 변경사항을 확인하세요\n\n파일: ${fileName}\n\n병합 후 어떻게 처리하시겠습니까?`,
+            i18n.t('prompt.diffAction', { fileName }),
             { modal: false },
-            '로컬 파일 유지',
-            '서버 파일 사용',
-            '수동 병합 후 업로드',
-            '나중에'
+            i18n.t('action.keepLocal'),
+            i18n.t('action.useRemote'),
+            i18n.t('action.manualMerge'),
+            i18n.t('action.cancel')
         );
 
-        if (action === '로컬 파일 유지') {
+        if (action === i18n.t('action.keepLocal')) {
             // 로컬 파일로 서버 덮어쓰기
             if (connection.client) {
                 await connection.client.uploadFile(localPath, remotePath, config);
-                vscode.window.showInformationMessage(`✅ 로컬 변경사항 업로드 완료: ${fileName}`);
+                vscode.window.showInformationMessage(i18n.t('info.uploadSuccess', { fileName }));
             }
-        } else if (action === '서버 파일 사용') {
+        } else if (action === i18n.t('action.useRemote')) {
             // 서버 파일로 로컬 덮어쓰기
             await downloadAndReloadFile(remotePath, localPath, config, document, false);
-            vscode.window.showInformationMessage(`✅ 서버 파일 다운로드 완료: ${fileName}`);
-        } else if (action === '수동 병합 후 업로드') {
+            vscode.window.showInformationMessage(i18n.t('info.downloadSuccess', { fileName }));
+        } else if (action === i18n.t('action.manualMerge')) {
             // 사용자에게 안내
             vscode.window.showInformationMessage(
-                `📝 병합 안내\n\n1. Diff 뷰에서 변경사항을 확인하세요\n2. 로컬 파일을 직접 편집하여 병합하세요\n3. 저장(Ctrl+S)하면 자동 업로드됩니다`,
-                '확인'
+                i18n.t('info.mergeGuide'),
+                i18n.t('action.ok')
             );
         }
         
     } catch (error) {
-        vscode.window.showErrorMessage(`Diff 표시 실패: ${error}`);
+        vscode.window.showErrorMessage(i18n.t('error.diffFailed', { error: String(error) }));
         if (DEBUG_MODE) console.error('showDiffWithMergeOptions error:', error);
     }
 }
@@ -4188,7 +4218,7 @@ async function showDiffWithMergeOptions(
 async function showDiff(localPath: string, remotePath: string, config: SftpConfig, workspaceFolder: string): Promise<void> {
     try {
         if (!sftpClient || !sftpClient.isConnected()) {
-            vscode.window.showErrorMessage('서버에 연결되어 있지 않습니다.');
+            vscode.window.showErrorMessage(i18n.t('error.notConnected'));
             return;
         }
 
@@ -4234,7 +4264,7 @@ async function showDiff(localPath: string, remotePath: string, config: SftpConfi
             );
         }
     } catch (error) {
-        vscode.window.showErrorMessage(`Diff 표시 실패: ${error}`);
+        vscode.window.showErrorMessage(i18n.t('error.diffFailed', { error: String(error) }));
     }
 }
 
@@ -4567,22 +4597,22 @@ if (DEBUG_MODE) console.log('> checkAndReloadRemoteFiles');
         // 변경된 파일이 있으면 사용자에게 알림
         if (changedFiles.length > 0) {
             const message = changedFiles.length === 1
-                ? `🔄 서버 파일 변경 감지!\n\n파일: ${changedFiles[0].fileName}\n서버의 파일이 수정되었습니다.`
-                : `🔄 서버 파일 변경 감지!\n\n${changedFiles.length}개의 파일이 서버에서 수정되었습니다.`;
+                ? i18n.t('conflict.detectedSingle', { fileName: changedFiles[0].fileName })
+                : i18n.t('conflict.detectedMultiple', { count: changedFiles.length });
 
             const choice = await vscode.window.showInformationMessage(
                 message,
                 { modal: true },
-                '모두 다운로드',
-                '개별 선택',
-                '무시'
+                i18n.t('action.downloadAll'),
+                i18n.t('action.selectIndividually'),
+                i18n.t('action.ignore')
             );
 
-            if (choice === '모두 다운로드') {
+            if (choice === i18n.t('action.downloadAll')) {
                 // 모든 파일 다운로드
                 await vscode.window.withProgress({
                     location: vscode.ProgressLocation.Notification,
-                    title: "원격 파일 다운로드 중...",
+                    title: i18n.t('status.downloadingRemoteFiles'),
                     cancellable: false
                 }, async (progress) => {
                     let completed = 0;
@@ -4604,20 +4634,20 @@ if (DEBUG_MODE) console.log('> checkAndReloadRemoteFiles');
                     }
                 });
 
-                vscode.window.showInformationMessage(`✅ ${changedFiles.length}개 파일 다운로드 완료`);
+                vscode.window.showInformationMessage(i18n.t('info.downloadedMultipleFiles', { count: changedFiles.length }));
 
-            } else if (choice === '개별 선택') {
+            } else if (choice === i18n.t('action.selectIndividually')) {
                 // 개별 파일 선택
                 for (const fileInfo of changedFiles) {
                     const fileName = fileInfo.fileName;
                     const fileChoice = await vscode.window.showWarningMessage(
-                        `⚠️ 파일: ${fileName}\n서버에서 수정되었습니다.`,
+                        i18n.t('conflict.fileChanged', { fileName: fileName }),
                         { modal: true },
-                        '다운로드',
-                        '비교'
+                        i18n.t('action.download'),
+                        i18n.t('action.compare')
                     );
 
-                    if (fileChoice === '다운로드') {
+                    if (fileChoice === i18n.t('action.download')) {
                         const success = await downloadAndReloadFile(
                             fileInfo.remotePath,
                             fileInfo.localPath,
@@ -4627,11 +4657,11 @@ if (DEBUG_MODE) console.log('> checkAndReloadRemoteFiles');
                         );
                         
                         if (success) {
-                            vscode.window.showInformationMessage(`✅ 다운로드 완료: ${fileName}`);
+                            vscode.window.showInformationMessage(i18n.t('info.downloadSuccess', { fileName: fileName }));
                         } else {
-                            vscode.window.showErrorMessage(`❌ 다운로드 실패: ${fileName}`);
+                            vscode.window.showErrorMessage(i18n.t('error.downloadFailed', { fileName: fileName }));
                         }
-                    } else if (fileChoice === '비교') {
+                    } else if (fileChoice === i18n.t('action.compare')) {
                         await showDiff(
                             fileInfo.localPath, 
                             fileInfo.remotePath, 
@@ -4813,7 +4843,7 @@ async function findServerTreeItem(bookmark: Bookmark): Promise<void> {
     } 
     catch (error) {
         if (DEBUG_MODE) console.error('findServerTreeItem error:', error);
-        vscode.window.showWarningMessage(`북마크 네비게이션 실패: ${error}`);
+        vscode.window.showWarningMessage(i18n.t('error.bookmarkNavFailed', { error: String(error) }));
     } finally {
         isNavigatingBookmark = false;
     }
@@ -4826,7 +4856,7 @@ async function findServerTreeItem(bookmark: Bookmark): Promise<void> {
 async function openBookmark(bookmark: Bookmark): Promise<void> {
     try {
         if (!bookmarkManager) {
-            vscode.window.showErrorMessage('북마크 관리자를 초기화할 수 없습니다.');
+            vscode.window.showErrorMessage(i18n.t('error.bookmarkManagerInitFailed'));
             return;
         }
         
@@ -4835,29 +4865,29 @@ async function openBookmark(bookmark: Bookmark): Promise<void> {
         
         if (!connection || !connection.client.isConnected()) {
             const reconnect = await vscode.window.showWarningMessage(
-                `서버에 연결되어 있지 않습니다: ${bookmark.serverName}\n연결하시겠습니까?`,
-                '연결'
+                i18n.t('status.serverNotConnected', { serverName: bookmark.serverName }) + '\n' + i18n.t('action.connectQuery'),
+                i18n.t('action.connect')
             );
-            if (reconnect !== '연결') {
+            if (reconnect !== i18n.t('action.connect')) {
                 return;
             }
             
             try {
                 const serverItem = await treeProvider.getServerItem(bookmark.serverName);
                 if (!serverItem) {
-                    vscode.window.showErrorMessage(`서버 설정을 찾을 수 없습니다: ${bookmark.serverName}`);
+                    vscode.window.showErrorMessage(i18n.t('error.configNotFound', { serverName: bookmark.serverName }));
                     return;
                 }
                 await treeProvider.connectToServer(serverItem);
                 connection = treeProvider.getConnectedServer(bookmark.serverName);
             } catch (connectError) {
-                vscode.window.showErrorMessage(`서버 연결 실패: ${connectError}`);
+                vscode.window.showErrorMessage(i18n.t('error.serverConnectionFailed'));
                 return;
             }
         }
         
         if (!connection) {
-            vscode.window.showErrorMessage('서버 연결을 가져올 수 없습니다.');
+            vscode.window.showErrorMessage(i18n.t('error.cannotGetServerInfo'));
             return;
         }
         
@@ -4868,19 +4898,19 @@ async function openBookmark(bookmark: Bookmark): Promise<void> {
         await findServerTreeItem(bookmark);
         
     } catch (error) {
-        vscode.window.showErrorMessage(`북마크 열기 실패: ${error}`);
+        vscode.window.showErrorMessage(i18n.t('error.openBookmarkFailed', { error: String(error) }));
         if (DEBUG_MODE) console.error('openBookmark error:', error);
     }
 }
 
 
 /**
- * 로컬 파일 백업
- * @param localPath 백업할 로컬 파일 경로
- * @param config 서버 설정
+ * Backup local file
+ * @param localPath Local file path to backup
+ * @param config Server configuration
  */
 async function backupLocalFile(localPath: string, config: SftpConfig): Promise<void> {
-    if (DEBUG_MODE) console.log(`백업 ${localPath}`);
+    if (DEBUG_MODE) console.log(`Backing up ${localPath}`);
 
     try {
         const workspaceRoot = config.workspaceRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -4888,7 +4918,7 @@ async function backupLocalFile(localPath: string, config: SftpConfig): Promise<v
             return;
         }
 
-        if(config.downloadBackup == "" ) return; // 백업 비활성화
+        if(config.downloadBackup == "" ) return; // Backup disabled
         
         // Get remote path from metadata
         let remotePath = '';
@@ -4929,7 +4959,7 @@ async function backupLocalFile(localPath: string, config: SftpConfig): Promise<v
         // Copy file to backup
         fs.copyFileSync(localPath, backupFilePath);
         
-        if (DEBUG_MODE) console.log(`백업 완료: ${backupFilePath}`);
+        if (DEBUG_MODE) console.log(`Backup completed: ${backupFilePath}`);
         
         // Optional: Clean old backups (keep last 5)
         const backupPattern = new RegExp(`^${fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\..*\\.backup$`);
@@ -4946,11 +4976,11 @@ async function backupLocalFile(localPath: string, config: SftpConfig): Promise<v
         if (backupFiles.length > 5) {
             for (let i = 5; i < backupFiles.length; i++) {
                 fs.unlinkSync(backupFiles[i].path);
-                if (DEBUG_MODE) console.log(`오래된 백업 삭제: ${backupFiles[i].name}`);
+                if (DEBUG_MODE) console.log(`Deleted old backup: ${backupFiles[i].name}`);
             }
         }
     } catch (error) {
-        if (DEBUG_MODE) console.error('백업 실패:', error);
+        if (DEBUG_MODE) console.error('Backup failed:', error);
         // Backup failure should not stop the download
     }
 }
@@ -4962,16 +4992,16 @@ function updateStatusBar(): void {
     const connectedServers = treeProvider.getConnectedServerNames();
     
     if (connectedServers.length === 0) {
-        statusBarItem.text = '$(cloud-upload) SFTP: 연결 안 됨';
-        statusBarItem.tooltip = '클릭하여 서버 선택';
+        statusBarItem.text = `$(cloud-upload) SFTP: ${i18n.t('status.disconnected')}`;
+        statusBarItem.tooltip = i18n.t('action.clickToSelect');
         statusBarItem.backgroundColor = undefined;
     } else if (connectedServers.length === 1) {
         statusBarItem.text = `$(cloud) SFTP: ${connectedServers[0]}`;
-        statusBarItem.tooltip = `연결됨: ${connectedServers[0]}\n클릭하여 전환/해제`;
+        statusBarItem.tooltip = i18n.t('status.connected', { serverName: connectedServers[0] }) + '\n' + i18n.t('action.clickToManage');
         statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.prominentBackground');
     } else {
-        statusBarItem.text = `$(cloud) SFTP: ${connectedServers.length}개 서버`;
-        statusBarItem.tooltip = `연결된 서버:\n${connectedServers.join('\n')}\n\n클릭하여 관리`;
+        statusBarItem.text = `$(cloud) SFTP: ${i18n.t('status.connectedCount', { count: connectedServers.length })}`;
+        statusBarItem.tooltip = i18n.t('status.connectedServersList', { list: connectedServers.join('\n') }) + '\n\n' + i18n.t('action.clickToManage');
         statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.prominentBackground');
     }
 }

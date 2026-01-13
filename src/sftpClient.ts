@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { SftpConfig, RemoteFile, FileMetadata } from './types';
 import { config } from 'process';
+import { i18n } from './i18n';
 
 // 개발 모드 여부 (릴리스 시 false로 변경)
 const DEBUG_MODE = false;
@@ -92,14 +93,14 @@ export class SftpClient {
             let password = config.password;
             if (!password) {
                 password = await vscode.window.showInputBox({
-                    prompt: `${config.host}의 비밀번호를 입력하세요`,
+                    prompt: i18n.t('prompt.enterPasswordForHost', { host: config.host }),
                     password: true,
-                    placeHolder: '비밀번호',
+                    placeHolder: 'Password',
                     ignoreFocusOut: true
                 });
                 
                 if (!password) {
-                    throw new Error('비밀번호가 입력되지 않았습니다.');
+                    throw new Error(i18n.t('error.passwordRequired'));
                 }
             }
             connectConfig.password = password;
@@ -108,7 +109,7 @@ export class SftpClient {
         await this.client.connect(connectConfig);
         this.connected = true;
         
-        this.log(`서버 연결 성공: ${config.host}:${config.port}`);
+        this.log(i18n.t('server.connectedDetailed', { host: config.host, port: config.port }));
     }
 
     isConnected(): boolean {
@@ -144,7 +145,7 @@ export class SftpClient {
         
         this.reconnecting = true;
         this.connected = false;
-        this.log(`재연결 시도 중: ${this.lastConfig.host}...`);
+        this.log(i18n.t('server.reconnectingHost', { host: this.lastConfig.host }));
         
         try {
             // 기존 연결 정리
@@ -218,20 +219,20 @@ export class SftpClient {
             await this.client.connect(connectConfig);
             this.connected = true;
             
-            this.log(`✅ 재연결 성공: ${this.lastConfig.host}`);
+            this.log(i18n.t('server.reconnectedHost', { host: this.lastConfig.host }));
             
             // 사용자에게 알림
             vscode.window.showInformationMessage(
-                `🔄 SFTP 재연결 성공: ${this.lastConfig.name || this.lastConfig.host}`
+                i18n.t('server.reconnectedInfo', { serverName: this.lastConfig.name || this.lastConfig.host })
             );
         } catch (error) {
-            this.log(`❌ 재연결 실패 (attemptReconnect): ${error}`);
+            this.log(i18n.t('server.reconnectFailedError', { error: String(error) }));
             this.connected = false;
             this.client = null;
             
             // 사용자에게 알림
             vscode.window.showWarningMessage(
-                `⚠️ SFTP 재연결 실패: ${this.lastConfig.name || this.lastConfig.host}\n다시 연결해주세요.`
+                i18n.t('server.reconnectFailedWarning', { serverName: this.lastConfig.name || this.lastConfig.host })
             );
         } finally {
             this.reconnecting = false;
@@ -258,7 +259,7 @@ export class SftpClient {
         progressCallback?: (current: number, total: number, fileName: string) => void
     ): Promise<{ uploaded: number; downloaded: number; deleted: number; failed: string[] }> {
         if (!this.client) {
-            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.sfptClientNotConnected'));
         }
 
         const result = {
@@ -274,7 +275,7 @@ export class SftpClient {
                 const localFiles = this.getAllFiles(localFolder, config.ignore || []);
                 const total = localFiles.length;
                 
-                this.log(`로컬 → 원격 동기화 시작: ${total}개 파일`);
+                this.log(i18n.t('sync.localToRemoteStarted', { count: total }));
                 
                 for (let i = 0; i < localFiles.length; i++) {
                     const localFile = localFiles[i];
@@ -294,18 +295,18 @@ export class SftpClient {
                         const success = await this.uploadFile(localFile, remoteFilePath, config);
                         if (success) {
                             result.uploaded++;
-                            this.log(`업로드 성공: ${relativePath}`);
+                            this.log(i18n.t('file.uploadSuccessRelative', { path: relativePath }));
                         }
                     } catch (error) {
                         result.failed.push(localFile);
-                        this.log(`업로드 실패: ${localFile} - ${error}`);
+                        this.log(i18n.t('file.uploadFailedError', { file: localFile, error: String(error) }));
                     }
                 }
             }
 
             // 원격 → 로컬 동기화
             if (direction === 'remote-to-local' || direction === 'both') {
-                this.log(`원격 → 로컬 동기화 시작`);
+                this.log(i18n.t('sync.remoteToLocalStarted'));
                 await this.downloadFolderRecursive(remotePath, localFolder, config, result, progressCallback);
             }
 
@@ -322,10 +323,15 @@ export class SftpClient {
                 }
             }
 
-            this.log(`동기화 완료: 업로드=${result.uploaded}, 다운로드=${result.downloaded}, 삭제=${result.deleted}, 실패=${result.failed.length}`);
+            this.log(i18n.t('sync.completedDetailed', { 
+                uploaded: result.uploaded, 
+                downloaded: result.downloaded, 
+                deleted: result.deleted, 
+                failed: result.failed.length 
+            }));
             
         } catch (error) {
-            this.log(`동기화 오류: ${error}`);
+            this.log(i18n.t('sync.error', { error: String(error) }));
             throw error;
         }
 
@@ -390,16 +396,16 @@ export class SftpClient {
                             await this.client.get(remoteFilePath, localFilePath);
                             await this.saveRemoteFileMetadata(remoteFilePath, localFilePath, config, config.workspaceRoot);
                             result.downloaded++;
-                            this.log(`다운로드 성공: ${fileInfo.name}`);
+                            this.log(i18n.t('file.downloadSuccessName', { name: fileInfo.name }));
                         }
                     } catch (error) {
                         result.failed.push(remoteFilePath);
-                        this.log(`다운로드 실패: ${remoteFilePath} - ${error}`);
+                        this.log(i18n.t('file.downloadFailedPath', { path: remoteFilePath, error: String(error) }));
                     }
                 }
             }
         } catch (error) {
-            this.log(`폴더 목록 조회 실패: ${remotePath} - ${error}`);
+            this.log(i18n.t('error.listFolderFailed', { path: remotePath, error: String(error) }));
         }
     }
 
@@ -431,14 +437,14 @@ export class SftpClient {
                     try {
                         await this.deleteRemoteFile(remoteFile.path, remoteFile.isDirectory);
                         result.deleted++;
-                        this.log(`원격 파일 삭제: ${remoteFile.path}`);
+                        this.log(i18n.t('file.remoteDeleted', { path: remoteFile.path }));
                     } catch (error) {
-                        this.log(`원격 파일 삭제 실패: ${remoteFile.path} - ${error}`);
+                        this.log(i18n.t('error.remoteDeleteFailed', { path: remoteFile.path, error: String(error) }));
                     }
                 }
             }
         } catch (error) {
-            this.log(`원격 삭제 파일 처리 실패: ${error}`);
+            this.log(i18n.t('error.remoteRemoveProcessFailed', { error: String(error) }));
         }
     }
 
@@ -472,14 +478,14 @@ export class SftpClient {
                     try {
                         fs.unlinkSync(localFile);
                         result.deleted++;
-                        this.log(`로컬 파일 삭제: ${localFile}`);
+                        this.log(i18n.t('file.localDeleted', { path: localFile }));
                     } catch (error) {
-                        this.log(`로컬 파일 삭제 실패: ${localFile} - ${error}`);
+                        this.log(i18n.t('error.localDeleteFailed', { path: localFile, error: String(error) }));
                     }
                 }
             }
         } catch (error) {
-            this.log(`로컬 삭제 파일 처리 실패: ${error}`);
+            this.log(i18n.t('error.localRemoveProcessFailed', { error: String(error) }));
         }
     }
 
@@ -512,7 +518,7 @@ export class SftpClient {
                 }
             }
         } catch (error) {
-            this.log(`원격 파일 목록 조회 실패: ${remotePath} - ${error}`);
+            this.log(i18n.t('error.listRemoteFilesFailed', { path: remotePath, error: String(error) }));
         }
         
         return result;
@@ -547,7 +553,7 @@ export class SftpClient {
             }
             
             // 다른 에러는 로그 출력하고 재시도
-            this.log(`mkdir 실패 (${remotePath}): ${error.message || error}`);
+            this.log(i18n.t('error.mkdirFailed', { path: remotePath, error: error.message || String(error) }));
             
             // 부모 디렉토리부터 순차적으로 생성 시도
             try {
@@ -571,7 +577,7 @@ export class SftpClient {
                     }
                 }
             } catch (fallbackError) {
-                this.log(`재귀적 mkdir 실패: ${fallbackError}`);
+                this.log(i18n.t('error.recursiveMkdirFailed', { error: String(fallbackError) }));
                 throw fallbackError;
             }
         }
@@ -612,7 +618,7 @@ export class SftpClient {
 
     async listRemoteFiles(remotePath: string): Promise<RemoteFile[]> {
         if (!this.client) {
-            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.sfptClientNotConnected'));
         }
 
         try {
@@ -625,14 +631,14 @@ export class SftpClient {
                 modifyTime: new Date(item.modifyTime)
             }));
         } catch (error) {
-            console.error(`원격 파일 목록 조회 실패: ${remotePath}`, error);
+            console.error(i18n.t('error.listRemoteFilesFailed', { path: remotePath, error: String(error) }));
             return [];
         }
     }
 
     async deleteRemoteFile(remotePath: string, isDirectory: boolean = false): Promise<void> {
         if (!this.client) {
-            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.sfptClientNotConnected'));
         }
 
         if (isDirectory) {
@@ -657,7 +663,7 @@ export class SftpClient {
         maxResults: number = 100
     ): Promise<RemoteFile[]> {
         if (!this.client) {
-            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.sfptClientNotConnected'));
         }
 
         const results: RemoteFile[] = [];
@@ -699,7 +705,7 @@ export class SftpClient {
                     }
                 }
             } catch (error) {
-                this.log(`검색 중 오류 (${currentPath}): ${error}`);
+                this.log(i18n.t('search.error', { path: currentPath, error: String(error) }));
             }
         };
 
@@ -724,7 +730,7 @@ export class SftpClient {
         maxResults: number = 50
     ): Promise<Array<{ file: RemoteFile; matches: Array<{ line: number; text: string }> }>> {
         if (!this.client) {
-            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.sfptClientNotConnected'));
         }
 
         const results: Array<{ file: RemoteFile; matches: Array<{ line: number; text: string }> }> = [];
@@ -808,7 +814,7 @@ export class SftpClient {
                     }
                 }
             } catch (error) {
-                this.log(`내용 검색 중 오류 (${currentPath}): ${error}`);
+                this.log(i18n.t('search.contentError', { path: currentPath, error: String(error) }));
             }
         };
 
@@ -821,12 +827,12 @@ export class SftpClient {
      */
     async createRemoteFile(remotePath: string, content: string = ''): Promise<void> {
         if (!this.client) {
-            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.sfptClientNotConnected'));
         }
 
         // 빈 파일 생성 (Buffer로 전송)
         await this.client.put(Buffer.from(content, 'utf-8'), remotePath);
-        this.log(`파일 생성 완료: ${remotePath}`);
+        this.log(i18n.t('file.created', { path: remotePath }));
     }
 
     /**
@@ -834,11 +840,11 @@ export class SftpClient {
      */
     async createRemoteFolder(remotePath: string): Promise<void> {
         if (!this.client) {
-            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.sfptClientNotConnected'));
         }
 
         await this.client.mkdir(remotePath, false);
-        this.log(`폴더 생성 완료: ${remotePath}`);
+        this.log(i18n.t('file.folderCreated', { path: remotePath }));
     }
 
     /**
@@ -848,18 +854,18 @@ export class SftpClient {
      */
     async changeFilePermissions(remotePath: string, mode: string): Promise<void> {
         if (!this.client) {
-            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.sfptClientNotConnected'));
         }
 
         // 8진수 문자열을 숫자로 변환
         const modeNumber = parseInt(mode, 8);
         
         if (isNaN(modeNumber)) {
-            throw new Error(`잘못된 권한 모드: ${mode}`);
+            throw new Error(i18n.t('file.invalidPermission', { mode }));
         }
 
         await this.client.chmod(remotePath, modeNumber);
-        this.log(`권한 변경 완료: ${remotePath} -> ${mode}`);
+        this.log(i18n.t('file.permissionChanged', { path: remotePath, mode }));
     }
 
     /**
@@ -869,7 +875,7 @@ export class SftpClient {
      */
     async getFilePermissions(remotePath: string): Promise<string> {
         if (!this.client) {
-            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.sfptClientNotConnected'));
         }
 
         const stats = await this.client.stat(remotePath);
@@ -968,7 +974,7 @@ export class SftpClient {
             this.log(`save metadate file ${metadataPath}`);
         } catch (error) {
             console.error('Failed to save metadata:', error);
-            this.log(`메타데이터 저장 실패: ${metadataPath}`);
+            this.log(i18n.t('error.metadataSaveFailed', { path: metadataPath }));
         }
     }
 //#endregion
@@ -981,7 +987,7 @@ export class SftpClient {
     
     async getRemoteFileInfo(remotePath: string): Promise<{ remoteModifyTime: number; remoteFileSize: number }> {
         if (!this.client) {
-            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.sfptClientNotConnected'));
         }
         
         const remoteStats = await this.client.stat(remotePath);
@@ -999,7 +1005,7 @@ export class SftpClient {
     static getWorkspaceMetadataDir(in_config:SftpConfig): string | null{
         const workspaceFolder = in_config.workspaceRoot;
         if (!workspaceFolder) {
-            vscode.window.showErrorMessage('워크스페이스를 찾을 수 없습니다.');
+            vscode.window.showErrorMessage(i18n.t('error.noWorkspace'));
             return null;
         }
         return path.join(workspaceFolder, '.vscode', '.sftp-metadata');
@@ -1052,12 +1058,12 @@ export class SftpClient {
 //    async uploadFile(localPath: string, remotePath: string, skipConflictCheck: boolean = false, config: SftpConfig): Promise<{ uploaded: boolean; conflict: boolean; remotePath: string }> {
     async uploadFile(localPath: string, remotePath: string, config: SftpConfig): Promise<boolean> {
         if (!this.client) {
-            throw new Error('SFTP 클라이언트가 연결되지 않았습니다.');
+            throw new Error(i18n.t('error.sfptClientNotConnected'));
         }
 
         // Check if connection is still alive
         if (!this.isConnected()) {
-            throw new Error('SFTP 연결이 끊어졌습니다. 다시 연결해주세요.');
+            throw new Error(i18n.t('error.connectionLost'));
         }
 /*
         // upload 할 리모트의 경로 계산
@@ -1074,9 +1080,9 @@ export class SftpClient {
         const remoteDir = path.posix.dirname(remotePath);
         await this.ensureRemoteDir(remoteDir);
         
-        this.log(`업로드 중: ${localPath} -> ${remotePath}`);
+        this.log(i18n.t('file.uploading', { local: localPath, remote: remotePath }));
         await this.client.put(localPath, remotePath);
-        this.log(`업로드 완료: '${remotePath}`);
+        this.log(i18n.t('file.uploaded', { path: remotePath }));
         
         // Update metadata after successful upload
         const remoteMetadata = await this.getRemoteFileInfo(remotePath);
@@ -1091,7 +1097,7 @@ export class SftpClient {
      * @param config 서버 설정
      */
     async backupLocalFile(localPath: string, config: SftpConfig): Promise<void> {
-        if (DEBUG_MODE) console.log(`백업 ${localPath}`);
+        if (DEBUG_MODE) console.log(i18n.t('backup.start', { path: localPath }));
 
         try {
             const workspaceRoot = config.workspaceRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -1140,7 +1146,7 @@ export class SftpClient {
             // Copy file to backup
             fs.copyFileSync(localPath, backupFilePath);
             
-            if (DEBUG_MODE) console.log(`백업 완료: ${backupFilePath}`);
+            if (DEBUG_MODE) console.log(i18n.t('backup.complete', { path: backupFilePath }));
             
             // Optional: Clean old backups (keep last 5)
             const backupPattern = new RegExp(`^${fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\..*\\.backup$`);
@@ -1157,11 +1163,11 @@ export class SftpClient {
             if (backupFiles.length > 5) {
                 for (let i = 5; i < backupFiles.length; i++) {
                     fs.unlinkSync(backupFiles[i].path);
-                    if (DEBUG_MODE) console.log(`오래된 백업 삭제: ${backupFiles[i].name}`);
+                    if (DEBUG_MODE) console.log(i18n.t('backup.deletedOld', { name: backupFiles[i].name }));
                 }
             }
         } catch (error) {
-            console.error('백업 실패:', error);
+            console.error(i18n.t('backup.error'), error);
             // Backup failure should not stop the download
         }
     }

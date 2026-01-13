@@ -52,7 +52,7 @@ export interface FileMetadata {
     remoteFileSize: number;
     localPath: string;
     downloadTime: number;
-    configName?: string;  // 파일이 속한 서버 config 이름
+    configName?: string;  // Server config name the file belongs to
     workspaceRoot?: string;
 
 }

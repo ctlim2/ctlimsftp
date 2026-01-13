@@ -5,6 +5,7 @@ import { SftpClient } from './sftpClient';
 import { FtpClient } from './ftpClient';
 import { SftpConfig, RemoteFile, ServerListItem, Bookmark } from './types';
 import { BookmarkManager } from './bookmarkManager';
+import { i18n } from './i18n';
 
 // 개발 모드 여부 (릴리스 시 false로 변경)
 const DEBUG_MODE = true;
@@ -57,7 +58,7 @@ export class SftpTreeItem extends vscode.TreeItem {
             this.id = `group_${groupName || label}`;
             this.iconPath = new vscode.ThemeIcon('folder');
             this.contextValue = 'group';
-            this.tooltip = `그룹: ${label}`;
+            this.tooltip = `${i18n.t('label.group')}: ${label}`;
         } else if (itemType === 'server') {
             this.id = `server_${serverItem ? serverItem.name : label}`;
             // 연결 상태별 아이콘 색상
@@ -75,7 +76,7 @@ export class SftpTreeItem extends vscode.TreeItem {
             this.id = 'bookmark_group_root';
             this.iconPath = new vscode.ThemeIcon('star-full', new vscode.ThemeColor('charts.yellow'));
             this.contextValue = 'bookmarkGroup';
-            this.tooltip = '저장된 북마크';
+            this.tooltip = i18n.t('title.bookmarks');
         } else if (itemType === 'bookmark') {
             this.id = `bookmark_${bookmarkData?.id || label}`;
             const icon = isDirectory ? 'folder' : 'file';
@@ -84,12 +85,12 @@ export class SftpTreeItem extends vscode.TreeItem {
             
             if (bookmarkData) {
                 const accessInfo = bookmarkData.accessCount > 0 
-                    ? ` | ${bookmarkData.accessCount}회 사용`
+                    ? ` | ${i18n.t('detail.usageCount', { count: bookmarkData.accessCount })}`
                     : '';
                 this.description = bookmarkData.serverName;
-                this.tooltip = `${bookmarkData.name}\n경로: ${bookmarkData.remotePath}\n서버: ${bookmarkData.serverName}${accessInfo}`;
+                this.tooltip = `${bookmarkData.name}\n${i18n.t('label.path')}: ${bookmarkData.remotePath}\n${i18n.t('label.server')}: ${bookmarkData.serverName}${accessInfo}`;
                 if (bookmarkData.description) {
-                    this.tooltip += `\n설명: ${bookmarkData.description}`;
+                    this.tooltip += `\n${i18n.t('label.description')}: ${bookmarkData.description}`;
                 }
             }
         } else if (isDirectory) {
@@ -103,7 +104,7 @@ export class SftpTreeItem extends vscode.TreeItem {
             this.contextValue = 'remoteDirectory';
             // 디렉토리는 크기 정보 없음
             if (modifyTime) {
-                this.tooltip = `${label}\n수정: ${formatDateTime(modifyTime)}`;
+                this.tooltip = `${label}\n${i18n.t('detail.modified')}: ${formatDateTime(modifyTime)}`;
             }
         } else if (itemType === 'remoteFile') {
             // Set ID for file for reveal API
@@ -123,11 +124,11 @@ export class SftpTreeItem extends vscode.TreeItem {
             
             // 툴팁에 상세 정보 표시
             if (fileSize !== undefined && modifyTime) {
-                this.tooltip = `${label}\n크기: ${formatFileSize(fileSize)}\n수정: ${formatDateTime(modifyTime)}`;
+                this.tooltip = `${label}\n${i18n.t('detail.size')}: ${formatFileSize(fileSize)}\n${i18n.t('detail.modified')}: ${formatDateTime(modifyTime)}`;
             } else if (fileSize !== undefined) {
-                this.tooltip = `${label}\n크기: ${formatFileSize(fileSize)}`;
+                this.tooltip = `${label}\n${i18n.t('detail.size')}: ${formatFileSize(fileSize)}`;
             } else if (modifyTime) {
-                this.tooltip = `${label}\n수정: ${formatDateTime(modifyTime)}`;
+                this.tooltip = `${label}\n${i18n.t('detail.modified')}: ${formatDateTime(modifyTime)}`;
             } else {
                 this.tooltip = label;
             }
@@ -251,7 +252,7 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
             });
             
             if (!config) {
-                vscode.window.showErrorMessage(`서버 설정을 찾을 수 없습니다: ${serverItem.name}`);
+                vscode.window.showErrorMessage(i18n.t('error.configNotFound', { serverName: serverItem.name }));
                 return;
             }
             
@@ -275,9 +276,9 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
             this.connectedServers.set(serverItem.name, { client, config });
             this.refresh();
 
-            vscode.window.showInformationMessage(`서버 연결 성공: ${serverItem.name}`);
+            vscode.window.showInformationMessage(i18n.t('info.serverConnected', { serverName: serverItem.name }));
         } catch (error) {
-            vscode.window.showErrorMessage(`서버 연결 실패: ${error}`);
+            vscode.window.showErrorMessage(i18n.t('server.connectionFailed', { error: String(error) }));
         }
     }
 
@@ -287,7 +288,7 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
             connection.client.disconnect();
             this.connectedServers.delete(serverName);
             this.refresh();
-            vscode.window.showInformationMessage(`서버 연결 해제: ${serverName}`);
+            vscode.window.showInformationMessage(i18n.t('info.serverDisconnected', { serverName }));
         }
     }
 
@@ -433,7 +434,7 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
                 const bookmarks = this.bookmarkManager.getAllBookmarks();
                 if (bookmarks.length > 0) {
                     items.push(new SftpTreeItem(
-                        `북마크 (${bookmarks.length})`,
+                        `${i18n.t('title.bookmarks')} (${bookmarks.length})`,
                         vscode.TreeItemCollapsibleState.Expanded,
                         'bookmarkGroup'
                     ));
@@ -685,14 +686,14 @@ export class SftpDragAndDropController implements vscode.TreeDragAndDropControll
         
         // Target must be a server or directory
         if (!target || (target.itemType !== 'server' && target.itemType !== 'remoteDirectory')) {
-            vscode.window.showWarningMessage('파일은 서버 또는 폴더로만 드래그할 수 있습니다.');
+            vscode.window.showWarningMessage(i18n.t('error.dragDropTargetInvalid'));
             return;
         }
 
         // Get target remote path
         const targetRemotePath = target.remotePath || target.config?.remotePath;
         if (!targetRemotePath || !target.config) {
-            vscode.window.showErrorMessage('대상 경로를 찾을 수 없습니다.');
+            vscode.window.showErrorMessage(i18n.t('error.targetPathNotFound'));
             return;
         }
 
@@ -721,14 +722,14 @@ export class SftpDragAndDropController implements vscode.TreeDragAndDropControll
         const connection = this.treeProvider.getConnectedServer(serverName);
 
         if (!connection || !connection.client.isConnected()) {
-            vscode.window.showErrorMessage('서버에 연결되어 있지 않습니다.');
+            vscode.window.showErrorMessage(i18n.t('error.serverNotConnected'));
             return;
         }
 
         // Process each dropped file/folder
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: '파일 업로드 중...',
+            title: i18n.t('progress.uploadingFiles'),
             cancellable: false
         }, async (progress) => {
             let completed = 0;
@@ -777,12 +778,12 @@ export class SftpDragAndDropController implements vscode.TreeDragAndDropControll
                     completed++;
                 } catch (error) {
                     this.log(`Upload failed: ${localPath} - ${error}`);
-                    vscode.window.showErrorMessage(`업로드 실패: ${fileName} - ${error}`);
+                    vscode.window.showErrorMessage(i18n.t('error.uploadFailedError', { file: fileName, error: String(error) }));
                 }
             }
 
             if (completed > 0) {
-                vscode.window.showInformationMessage(`✅ ${completed}개 항목 업로드 완료`);
+                vscode.window.showInformationMessage(`✅ ${i18n.t('info.uploadCompleted', { count: completed })}`);
                 this.treeProvider.refresh();
             }
         });
@@ -813,14 +814,14 @@ export class SftpDragAndDropController implements vscode.TreeDragAndDropControll
         const connection = this.treeProvider.getConnectedServer(serverName);
 
         if (!connection || !connection.client.isConnected()) {
-            vscode.window.showWarningMessage('서버에 연결되어 있지 않습니다.');
+            vscode.window.showWarningMessage(i18n.t('error.serverNotConnected'));
             return;
         }
 
         // Get workspace folder
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
-            vscode.window.showWarningMessage('워크스페이스를 찾을 수 없습니다.');
+            vscode.window.showWarningMessage(i18n.t('error.workspaceNotFound'));
             return;
         }
 
