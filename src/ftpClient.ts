@@ -583,6 +583,17 @@ export class FtpClient {
     }
 
     /**
+     * 원격 명령 실행 (FTP는 제한적 지원)
+     * 대부분의 FTP 서버는 임의 쉘 명령 실행을 지원하지 않습니다.
+     * SITE 명령 등을 시도할 수 있습니다.
+     */
+    async executeCommand(command: string): Promise<string> {
+        // FTP 프로토콜은 일반적인 쉘 명령 실행을 표준적으로 지원하지 않음
+        // 여기서는 지원하지 않는 것으로 처리하거나 SITE EXEC 등을 시도할 수 있음
+        throw new Error(i18n.t('error.ftpCommandNotSupported'));
+    }
+
+    /**
      * 원격 파일명 검색 (FTP에서는 제한적 지원)
      */
     async searchRemoteFilesByName(

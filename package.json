@@ -2,7 +2,7 @@
   "name": "ctlim-sftp",
   "displayName": "ctlim-SFTP",
   "description": "Simple SFTP sync extension with upload on save and conflict detection",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "publisher": "ctlim",
   "icon": "resources/icon.png",
   "engines": {
@@ -126,6 +126,11 @@
         "title": "ctlim SFTP: Save As Remote Path"
       },
       {
+        "command": "ctlimSftp.diffWithRemote",
+        "title": "ctlim SFTP: Diff with Remote File",
+        "icon": "$(diff)"
+      },
+      {
         "command": "ctlimSftp.searchRemoteFiles",
         "title": "ctlim SFTP: Search Remote Files by Name",
         "icon": "$(search)"
@@ -164,6 +169,11 @@
         "command": "ctlimSftp.copyRemotePath",
         "title": "ctlim SFTP: Copy Remote Path to Clipboard",
         "icon": "$(copy)"
+      },
+      {
+        "command": "ctlimSftp.executeCustomCommand",
+        "title": "ctlim SFTP: Execute Custom Command",
+        "icon": "$(terminal)"
       },
       {
         "command": "ctlimSftp.copyRemoteFile",
@@ -311,6 +321,11 @@
           "group": "history@2"
         },
         {
+          "command": "ctlimSftp.executeCustomCommand",
+          "when": "view == ctlimSftpView && viewItem == server",
+          "group": "tools@1"
+        },
+        {
           "command": "ctlimSftp.saveAsTemplate",
           "when": "view == ctlimSftpView && viewItem == server",
           "group": "template@1"
@@ -448,6 +463,11 @@
           "command": "ctlimSftp.saveAs",
           "group": "ctlimSftp@1",
           "when": "editorFocus"
+        },
+        {
+          "command": "ctlimSftp.diffWithRemote",
+          "group": "ctlimSftp@2",
+          "when": "editorFocus"
         }
       ]
     },
@@ -457,22 +477,38 @@
         "sftp.host": {
           "type": "string",
           "default": "",
-          "description": "SFTP 서버 호스트"
+          "description": "SFTP server host address"
         },
         "sftp.port": {
           "type": "number",
           "default": 22,
-          "description": "SFTP 서버 포트"
+          "description": "SFTP server port number"
         },
         "sftp.username": {
           "type": "string",
           "default": "",
-          "description": "SFTP 사용자명"
+          "description": "SFTP server username"
         },
         "sftp.remotePath": {
           "type": "string",
           "default": "/",
-          "description": "원격 경로"
+          "description": "Remote server default path"
+        },
+        "ctlimSftp.showServerInfo": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show username@host info next to server name in TreeView"
+        },
+        "ctlimSftp.language": {
+          "type": "string",
+          "default": "auto",
+          "enum": ["auto", "ko", "en"],
+          "enumDescriptions": [
+            "Follow VS Code language setting (auto-detect)",
+            "Korean",
+            "English"
+          ],
+          "description": "Extension language setting"
         }
       }
     }

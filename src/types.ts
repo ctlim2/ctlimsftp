@@ -26,6 +26,19 @@ export interface SftpConfig {
     defaultProfile?: string;
     workspaceRoot?: string;
     metadataPath?: string;
+    // Proxy / Jump Host configuration
+    hop?: {
+        host: string;
+        port?: number;
+        username: string;
+        password?: string;
+        privateKey?: string;
+        passphrase?: string;
+    };
+    commands?: Array<{
+        name: string;
+        command: string;
+    }>;
 }
 
 export interface ServerListItem {

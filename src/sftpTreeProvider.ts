@@ -71,7 +71,9 @@ export class SftpTreeItem extends vscode.TreeItem {
             }
             this.contextValue = 'server';
             this.tooltip = `${serverItem?.host}:${serverItem?.port}`;
-            this.description = `${serverItem?.username}@${serverItem?.host}`;
+            // 설정에 따라 서버 정보 표시 여부 결정
+            const showServerInfo = vscode.workspace.getConfiguration('ctlimSftp').get('showServerInfo', true);
+            this.description = showServerInfo ? `${serverItem?.username}@${serverItem?.host}` : '';
         } else if (itemType === 'bookmarkGroup') {
             this.id = 'bookmark_group_root';
             this.iconPath = new vscode.ThemeIcon('star-full', new vscode.ThemeColor('charts.yellow'));

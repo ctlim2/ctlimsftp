@@ -1,4 +1,5 @@
 import SftpClient2 from 'ssh2-sftp-client';
+import { Client } from 'ssh2';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
@@ -89,21 +90,70 @@ export class SftpClient {
                 connectConfig.passphrase = config.passphrase;
             }
         } else {
-            // Password가 설정에 없으면 사용자에게 입력 요청
-            let password = config.password;
-            if (!password) {
-                password = await vscode.window.showInputBox({
-                    prompt: i18n.t('prompt.enterPasswordForHost', { host: config.host }),
-                    password: true,
-                    placeHolder: 'Password',
-                    ignoreFocusOut: true
-                });
-                
-                if (!password) {
-                    throw new Error(i18n.t('error.passwordRequired'));
+            // Check for hop configuration (Jump Host)
+            if (config.hop) {
+                try {
+                    this.log(i18n.t('server.connectingToHop', { host: config.hop.host }));
+                    
+                    const hopClient = new Client();
+                    const hopConfig: any = {
+                        host: config.hop.host,
+                        port: config.hop.port || 22,
+                        username: config.hop.username,
+                        readyTimeout: 20000
+                    };
+                    
+                    if (config.hop.privateKey) {
+                        hopConfig.privateKey = fs.readFileSync(config.hop.privateKey);
+                        if (config.hop.passphrase) {
+                            hopConfig.passphrase = config.hop.passphrase;
+                        }
+                    } else if (config.hop.password) {
+                        hopConfig.password = config.hop.password;
+                    }
+                    
+                    const stream = await new Promise<any>((resolve, reject) => {
+                        hopClient.on('ready', () => {
+                            this.log(i18n.t('server.hopConnected'));
+                            hopClient.forwardOut(
+                                '127.0.0.1', 
+                                12345, 
+                                config.host, 
+                                config.port, 
+                                (err, stream) => {
+                                    if (err) reject(err);
+                                    else resolve(stream);
+                                }
+                            );
+                        }).on('error', (err) => {
+                            reject(err);
+                        }).connect(hopConfig);
+                    });
+                    
+                    connectConfig.sock = stream;
+                    this.log(i18n.t('server.tunnelCreated'));
+                    
+                } catch (error) {
+                    this.log(i18n.t('error.hopConnectionFailed', { error: String(error) }));
+                    throw error;
                 }
+            } else {
+                // Password가 설정에 없으면 사용자에게 입력 요청
+                let password = config.password;
+                if (!password) {
+                    password = await vscode.window.showInputBox({
+                        prompt: i18n.t('prompt.enterPasswordForHost', { host: config.host }),
+                        password: true,
+                        placeHolder: 'Password',
+                        ignoreFocusOut: true
+                    });
+                    
+                    if (!password) {
+                        throw new Error(i18n.t('error.passwordRequired'));
+                    }
+                }
+                connectConfig.password = password;
             }
-            connectConfig.password = password;
         }
 
         await this.client.connect(connectConfig);
@@ -845,6 +895,55 @@ export class SftpClient {
 
         await this.client.mkdir(remotePath, false);
         this.log(i18n.t('file.folderCreated', { path: remotePath }));
+    }
+
+    /**
+     * 원격 명령 실행
+     * @param command 실행할 쉘 명령어
+     * @returns 명령어 실행 결과 (stdout)
+     */
+    async executeCommand(command: string): Promise<string> {
+        if (!this.client) {
+            throw new Error(i18n.t('error.sfptClientNotConnected'));
+        }
+
+        this.log(i18n.t('command.executing', { command }));
+        
+        // ssh2-sftp-client does not support exec directly, but we can use the underlying ssh2 client
+        // However, sftp-client wrapper might not expose it easily or safely.
+        // Let's check if we can access the ssh2 client.
+        // Sadly, the library creates its own connection and hides it mostly.
+        // But looking at the source or types, 'client' property is the ssh2 Client instance.
+        
+        // @ts-ignore - Accessing internal ssh2 client
+        const sshClient = this.client.client;
+        
+        if (!sshClient) {
+            throw new Error(i18n.t('error.sshClientNotAvailable'));
+        }
+
+        return new Promise((resolve, reject) => {
+            sshClient.exec(command, (err: any, stream: any) => {
+                if (err) {
+                    return reject(err);
+                }
+                
+                let output = '';
+                let errorOutput = '';
+                
+                stream.on('close', (code: any, signal: any) => {
+                    if (code === 0) {
+                        resolve(output);
+                    } else {
+                        reject(new Error(`Command failed with code ${code}: ${errorOutput || output}`));
+                    }
+                }).on('data', (data: any) => {
+                    output += data;
+                }).stderr.on('data', (data: any) => {
+                    errorOutput += data;
+                });
+            });
+        });
     }
 
     /**
