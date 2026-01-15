@@ -135,7 +135,8 @@ export class ConnectConfigWebview {
             fs.writeFileSync(configPath, JSON.stringify(cleanConfigs, null, 4), 'utf8');
             vscode.window.showInformationMessage('SFTP Configuration saved successfully!');
             
-            // 설정 변경 알림 (Extension에서 감지하여 리로드하도록)
+            // TreeProvider 새로고침 신호 전송
+            vscode.commands.executeCommand('ctlimSftp.refresh');
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to save config: ${error}`);
         }
@@ -199,6 +200,7 @@ export class ConnectConfigWebview {
                     <div class="tabs">
                         <div class="tab active" data-tab="basic">Basic</div>
                         <div class="tab" data-tab="advanced">Advanced (Watch/Ignore)</div>
+                        <div class="tab" data-tab="commands">Commands</div>
                     </div>
 
                     <div id="basicTab" class="tab-content">
@@ -268,6 +270,19 @@ export class ConnectConfigWebview {
                             <label>Web URL (for Open in Browser)</label>
                             <input type="text" id="webUrl" placeholder="http://example.com">
                         </div>
+                    </div>
+
+                    <div id="commandsTab" class="tab-content hidden">
+                        <h3>Remote Commands</h3>
+                        <p style="color: var(--vscode-descriptionForeground); font-size: 0.9em; margin-bottom: 15px;">
+                            Define custom commands that can be executed on the remote server. Use "Execute Custom Command" in the command palette.
+                        </p>
+                        
+                        <div id="commandsList" style="margin-bottom: 20px; border: 1px solid var(--vscode-panel-border); border-radius: 2px;">
+                            <!-- Commands will be rendered here -->
+                        </div>
+                        
+                        <button class="btn" id="addCommandBtn">Add Command</button>
                     </div>
 
                     <div style="margin-top: 20px; border-top: 1px solid var(--vscode-panel-border); padding-top: 20px; display: flex; justify-content: space-between;">
@@ -437,6 +452,9 @@ export class ConnectConfigWebview {
             } else {
                 document.getElementById('ignore').value = '';
             }
+            
+            // Load commands
+            renderCommandsList(config.commands || []);
         }
 
         function saveCurrentEditorData() {
@@ -474,7 +492,76 @@ export class ConnectConfigWebview {
             } else {
                 config.ignore = [];
             }
+            
+            // Save commands
+            const commandsDiv = document.getElementById('commandsList');
+            const commandItems = commandsDiv.querySelectorAll('.command-item');
+            const commands = [];
+            commandItems.forEach(item => {
+                const name = item.querySelector('.command-name').value.trim();
+                const command = item.querySelector('.command-text').value.trim();
+                if (name && command) {
+                    commands.push({ name, command });
+                }
+            });
+            if (commands.length > 0) {
+                config.commands = commands;
+            } else {
+                delete config.commands;
+            }
         }
+        
+        function renderCommandsList(commands) {
+            const commandsList = document.getElementById('commandsList');
+            commandsList.innerHTML = '';
+            
+            if (!Array.isArray(commands)) {
+                commands = [];
+            }
+            
+            commands.forEach((cmd, index) => {
+                const commandItem = document.createElement('div');
+                commandItem.className = 'command-item';
+                commandItem.style.padding = '15px';
+                commandItem.style.borderBottom = '1px solid var(--vscode-panel-border)';
+                commandItem.innerHTML = \`
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label style="font-size: 0.9em;">Command Name</label>
+                        <input type="text" class="command-name" value="\${cmd.name || ''}" placeholder="e.g., Restart Apache" style="padding: 6px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label style="font-size: 0.9em;">Command</label>
+                        <input type="text" class="command-text" value="\${cmd.command || ''}" placeholder="e.g., sudo systemctl restart apache2" style="padding: 6px;">
+                    </div>
+                    <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.85em;" onclick="removeCommand(this)">Remove</button>
+                \`;
+                commandsList.appendChild(commandItem);
+            });
+        }
+        
+        function removeCommand(btn) {
+            btn.parentElement.remove();
+        }
+        
+        document.getElementById('addCommandBtn').addEventListener('click', () => {
+            const commandsList = document.getElementById('commandsList');
+            const commandItem = document.createElement('div');
+            commandItem.className = 'command-item';
+            commandItem.style.padding = '15px';
+            commandItem.style.borderBottom = '1px solid var(--vscode-panel-border)';
+            commandItem.innerHTML = \`
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label style="font-size: 0.9em;">Command Name</label>
+                    <input type="text" class="command-name" placeholder="e.g., Restart Apache" style="padding: 6px;">
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label style="font-size: 0.9em;">Command</label>
+                    <input type="text" class="command-text" placeholder="e.g., sudo systemctl restart apache2" style="padding: 6px;">
+                </div>
+                <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.85em;" onclick="removeCommand(this)">Remove</button>
+            \`;
+            commandsList.appendChild(commandItem);
+        });
     </script>
 </body>
 </html>`;

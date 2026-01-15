@@ -825,6 +825,7 @@ export class I18n {
         // BATCH 8 (sftpClient.ts)
         'error.mkdirFailed': 'mkdir 실패 ({path}): {error}',
         'error.recursiveMkdirFailed': '재귀적 mkdir 실패: {error}',
+        'error.unknownError': '알 수 없는 오류가 발생했습니다: {error}',
         'search.error': '검색 중 오류 ({path}): {error}',
         'search.contentError': '내용 검색 중 오류 ({path}): {error}',
         'file.invalidPermission': '잘못된 권한 모드: {mode}',

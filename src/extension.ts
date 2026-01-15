@@ -386,9 +386,20 @@ export function activate(context: vscode.ExtensionContext) {
                         vscode.window.showErrorMessage(i18n.t('error.notImplemented'));
                         return;
                     }
+                    // SFTP 파일 다운로드
+                    await connection.client.client.get(remotePath, localPath);
+                    // 메타데이터 저장
+                    await connection.client.saveRemoteFileMetadata(
+                        remotePath,
+                        localPath,
+                        config,
+                        config.workspaceRoot
+                    );
                 } else {
                     // FTP protocol - use abstracted method
                     await connection.client.downloadFile(remotePath, localPath, config);
+                    // 메타데이터 저장 (FTP도 메타데이터 필요)
+                    await connection.client.saveRemoteFileMetadata(remotePath, localPath, config);
                 }
                 
                 const doc = await vscode.workspace.openTextDocument(localPath);
@@ -1505,12 +1516,47 @@ export function activate(context: vscode.ExtensionContext) {
             let config: SftpConfig | undefined;
             let serverName = '';
 
-            // 1. TreeView에서 호출된 경우
-            if (item && item.config) {
+            // 1. TreeView에서 호출된 경우 (Server item)
+            if (item && item.itemType === 'server' && item.serverItem) {
+                // serverItem에서 서버 이름 가져오기
+                serverName = item.serverItem.name;
+                
+                // treeProvider에서 연결된 서버의 config 가져오기
+                const connection = treeProvider.getConnectedServer(serverName);
+                if (connection) {
+                    config = connection.config;
+                } else {
+                    // 연결되지 않은 서버면 config 파일에서 로드
+                    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                    if (workspaceFolder && item.serverItem.configPath) {
+                        try {
+                            const configContent = fs.readFileSync(item.serverItem.configPath, 'utf-8');
+                            const configData = JSON.parse(configContent);
+                            const configs: SftpConfig[] = Array.isArray(configData) ? configData : [configData];
+                            config = configs.find(c => {
+                                const name = c.name || `${c.username}@${c.host}`;
+                                return name === serverName;
+                            });
+                            
+                            if (config) {
+                                const contextPath = config.context || './';
+                                const workspaceRoot = path.isAbsolute(contextPath) 
+                                    ? contextPath 
+                                    : path.join(workspaceFolder.uri.fsPath, contextPath);
+                                config.workspaceRoot = workspaceRoot;
+                            }
+                        } catch (error) {
+                            if (DEBUG_MODE) console.error('Failed to load config from file:', error);
+                        }
+                    }
+                }
+            } 
+            // 2. item.config가 있는 경우 (직접 config 전달)
+            else if (item && item.config) {
                 config = item.config;
                 serverName = config!.name || `${config!.username}@${config!.host}`;
             } 
-            // 2. Command Palette에서 호출된 경우
+            // 3. Command Palette에서 호출된 경우
             else if (!item) {
                 const connectedServers = treeProvider.getConnectedServerNames();
                 

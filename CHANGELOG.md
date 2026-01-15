@@ -2,6 +2,17 @@
 
 All notable changes to the "ctlim SFTP" extension will be documented in this file.
 
+## [0.5.6] - 2026-01-15
+
+### Fixed
+- executeCustomCommand 에러 수정 - 트리 뷰 아이템의 선택적 config 속성 처리 개선
+- SftpTreeItem 타입 체크 추가로 서버 아이템만 커스텀 명령 실행 가능
+- Config 로딩 fallback chain 개선 (연결 캐시 → 파일 시스템)
+
+### Added
+- Commands 탭 (GUI 설정 편집기에서 서버 커스텀 명령 관리)
+- 명령 추가/수정/삭제 기능
+
 ## [0.2.2] - 2025-12-16
 
 ### Added
