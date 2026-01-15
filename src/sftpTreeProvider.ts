@@ -135,6 +135,8 @@ export class SftpTreeItem extends vscode.TreeItem {
                 this.tooltip = label;
             }
         } else {
+            // message 타입일 때 버튼 스타일로 표시 (파란색)
+            this.iconPath = new vscode.ThemeIcon('add', new vscode.ThemeColor('button'));
             this.contextValue = 'message';
         }
         
@@ -408,9 +410,23 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
         if (!element) {
             // Root level - show groups or servers
             if (this.serverList.length === 0) {
+                const createConfigItem = new SftpTreeItem(
+                    i18n.t('action.createConfig') || '▶ Create SFTP Config',
+                    vscode.TreeItemCollapsibleState.None,
+                    'message'
+                );
+                createConfigItem.command = {
+                    command: 'ctlimSftp.config',
+                    title: 'Create SFTP Config',
+                    arguments: []
+                };
+                // 싱글 클릭으로 명령 실행
+                createConfigItem.tooltip = i18n.t('action.createConfig');
+                createConfigItem.iconPath = new vscode.ThemeIcon('gear', new vscode.ThemeColor('button'));
+                
                 return [
                     new SftpTreeItem('No ctlim SFTP servers configured', vscode.TreeItemCollapsibleState.None, 'message'),
-                    new SftpTreeItem('Run "ctlim SFTP: Config" to setup', vscode.TreeItemCollapsibleState.None, 'message')
+                    createConfigItem
                 ];
             }
 

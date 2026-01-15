@@ -177,12 +177,14 @@ export class I18n {
         'action.delete': 'Delete',
         'action.refresh': 'Refresh',
         'action.reconnect': 'Reconnect',
+        'action.selectFolder': 'Select Folder',
         
         // BATCH 4: saveAsCommand
         'input.selectInputMethod': 'Select how to enter remote path',
         'input.directInput': '$(edit) Direct Input',
         'input.treeSelect': '$(folder-opened) Select from Tree',
         'prompt.remotePathInput': 'Enter remote save path',
+        'prompt.selectWorkspaceFolder': 'Select a workspace folder',
         'placeholder.remotePath': '/var/www/html/file.php',
         'error.pathRequired': 'Please enter a path',
         'error.absolutePath': 'Please enter absolute path (e.g., /var/www/...)',
@@ -469,6 +471,7 @@ export class I18n {
         'action.change': 'Change',
         'action.compare': 'Compare',
         'action.create': 'Create',
+        'action.createConfig': '▢ Create SFTP Config',
         'action.rename': 'Rename',
         'action.retry': 'Retry',
         'action.save': 'Save',
@@ -517,6 +520,7 @@ export class I18n {
         'error.onlyFilesForRename': 'Only files can be renamed',
         'error.openTerminalFailed': 'Failed to open terminal: {error}',
         'error.passwordRequired': 'Password is required',
+        'error.failedToAddWorkspaceFolder': 'Failed to add folder to workspace',
         'error.pathCopyFailed': 'Failed to copy path: {error}',
         'error.reconnectFailed': 'Failed to reconnect and upload: {path} - {error}',
         'error.remoteDirExploreFailed': 'Failed to explore remote directory: {error}',
@@ -684,6 +688,11 @@ export class I18n {
         'warning.permission777': 'WARNING: Setting permissions to 777 is a security risk for {fileName}. Continue?',
         'warning.retryFailedTransfer': 'Retry failed transfer?\nFile: {fileName}\nError: {error}',
         'warning.serverNotConnected': 'Server is not connected. Connect now?',
+
+        // Workspace Management
+        'prompt.enterWorkspaceName': 'Enter workspace name',
+        'placeholder.workspaceName': 'Workspace name (e.g., my-project)',
+        'error.workspaceNameRequired': 'Workspace name is required',
       },
       ko: {
         // 확장 활성화
@@ -762,6 +771,7 @@ export class I18n {
         'action.selectServer': '서버를 선택하세요',
         'action.selectTemplate': '연결할 템플릿 선택',
         'action.selectBookmark': '연결할 북마크 선택',
+        'action.selectFolder': '폴더 선택',
         
         // Extension.ts new keys
         'error.bookmarkManagerInitFailed': '북마크 관리자를 초기화할 수 없습니다.',
@@ -782,6 +792,7 @@ export class I18n {
         'status.downloadingRemoteFiles': '원격 파일 다운로드 중...',
         'info.downloadedMultipleFiles': '✅ {count}개 파일 다운로드 완료',
         'conflict.fileChanged': '⚠️ 파일: {fileName}\n서버에서 수정되었습니다.',
+        'prompt.selectWorkspaceFolder': '워크스페이스 폴더 선택',
         'prompt.diffAction': '파일 충돌 감지: {fileName}\n어떻게 하시겠습니까?',
         'action.keepLocal': '로컬 유지 (서버 덮어쓰기)',
         'action.useRemote': '서버 사용 (로컬 덮어쓰기)',
@@ -912,6 +923,7 @@ export class I18n {
         'action.change': '변경',
         'action.compare': '비교',
         'action.create': '생성',
+        'action.createConfig': '▢ SFTP 설정 생성',
         'action.rename': '이름 변경',
         'action.retry': '재시도',
         'action.save': '저장',
@@ -960,6 +972,7 @@ export class I18n {
         'error.onlyFilesForRename': '파일만 이름을 변경할 수 있습니다',
         'error.openTerminalFailed': '터미널 열기 실패: {error}',
         'error.passwordRequired': '비밀번호가 필요합니다',
+        'error.failedToAddWorkspaceFolder': '워크스페이스에 폴더를 추가하지 못했습니다',
         'error.pathCopyFailed': '경로 복사 실패: {error}',
         'error.reconnectFailed': '재연결 및 업로드 실패: {path} - {error}',
         'error.remoteDirExploreFailed': '원격 디렉토리 탐색 실패: {error}',
@@ -1127,6 +1140,11 @@ export class I18n {
         'warning.permission777': '경고: {fileName}의 권한을 777로 설정하는 것은 보안 위험입니다. 계속하시겠습니까?',
         'warning.retryFailedTransfer': '실패한 전송을 재시도하시겠습니까?\n파일: {fileName}\n오류: {error}',
         'warning.serverNotConnected': '서버가 연결되지 않았습니다. 지금 연결하시겠습니까?',
+
+        // Workspace 관리
+        'prompt.enterWorkspaceName': '워크스페이스 이름을 입력하세요',
+        'placeholder.workspaceName': '워크스페이스 이름 (예: my-project)',
+        'error.workspaceNameRequired': '워크스페이스 이름을 입력해야 합니다',
       }
     };
     

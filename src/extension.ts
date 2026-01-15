@@ -107,9 +107,8 @@ export function activate(context: vscode.ExtensionContext) {
         if (e.selection.length > 0) {
             const item = e.selection[0];
             
-            // Only execute command for servers (single click)
-            // Files require double-click (handled by TreeItem.command)
-            if (item.itemType === 'server' && item.command) {
+            // 싱글 클릭으로 명령 실행: server 또는 message 타입
+            if ((item.itemType === 'server' || item.itemType === 'message') && item.command) {
                 await vscode.commands.executeCommand(
                     item.command.command,
                     ...(item.command.arguments || [])
@@ -3387,16 +3386,111 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
+        let workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        let workspacePath: string | null = null;  // 여기서 선언하여 외부 scope에서도 접근 가능
+        let workspaceName: string | undefined = undefined;  // 워크스페이스 이름도 외부 scope에서 접근 가능
+        
+        // 워크스페이스 없으면 생성
+        if (!workspaceFolder) {
+            // 워크스페이스가 없으면 폴더 선택 제안
+            const result = await vscode.window.showWarningMessage(
+                i18n.t('error.noWorkspace'),
+                i18n.t('action.selectFolder')
+            );
+            
+            if (result === i18n.t('action.selectFolder')) {
+                // 폴더 선택 대화상자 표시
+                const selectedUri = await vscode.window.showOpenDialog({
+                    canSelectFolders: true,
+                    canSelectFiles: false,
+                    canSelectMany: false,
+                    title: i18n.t('prompt.selectWorkspaceFolder'),
+                    openLabel: i18n.t('action.selectFolder')
+                });
+                
+                if (selectedUri && selectedUri.length > 0) {
+                    // 워크스페이스 이름 입력받기
+                    workspaceName = await vscode.window.showInputBox({
+                        prompt: i18n.t('prompt.enterWorkspaceName'),
+                        value: path.basename(selectedUri[0].fsPath),
+                        placeHolder: i18n.t('placeholder.workspaceName'),
+                        validateInput: (value) => {
+                            if (!value || value.trim() === '') {
+                                return i18n.t('error.workspaceNameRequired');
+                            }
+                            return null;
+                        }
+                    });
+                    
+                    if (!workspaceName) {
+                        return; // 사용자가 취소
+                    }
+                    
+                    // .code-workspace 파일 생성
+                    workspacePath = selectedUri[0].fsPath;
+                    const workspaceFileName = `${workspaceName.replace(/\s+/g, '-')}.code-workspace`;
+                    const workspaceFilePath = path.join(workspacePath, workspaceFileName);
+                    
+                    // Workspace 파일 구조
+                    const workspaceContent = {
+                        folders: [
+                            {
+                                path: ".",
+                                name: workspaceName
+                            }
+                        ],
+                        settings: {}
+                    };
+                    
+                    try {
+                        fs.writeFileSync(workspaceFilePath, JSON.stringify(workspaceContent, null, 2));
+                        
+                        // 워크스페이스 폴더를 현재 창에 추가
+                        await vscode.workspace.updateWorkspaceFolders(
+                            vscode.workspace.workspaceFolders?.length ?? 0,
+                            null,
+                            { uri: vscode.Uri.file(workspacePath), name: workspaceName }
+                        );
+                        
+                        // 워크스페이스 업데이트 대기 (500ms)
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        // 워크스페이스 폴더 다시 가져오기
+                        workspaceFolder = vscode.workspace.workspaceFolders?.find(
+                            f => f.uri.fsPath === workspacePath
+                        );
+                        
+                        // 여전히 없으면 폴더를 통해 워크스페이스 열기
+                        if (!workspaceFolder) {
+                            await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(workspacePath), false);
+                            return;
+                        }
+                        
+                        // 워크스페이스가 로드되었으면 계속 진행
+                    } catch (error) {
+                        vscode.window.showErrorMessage(i18n.t('error.failedToAddWorkspaceFolder'));
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            } else {
+                return;
+            }
+        }
+
+        // 워크스페이스가 있으면 GUI 또는 JSON 편집기 열기
         if (method.type === 'gui') {
             ConnectConfigWebview.createOrShow(context.extensionUri);
         } else {
-            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-            if (!workspaceFolder) {
-                vscode.window.showErrorMessage(i18n.t('error.noWorkspace'));
+            // JSON 편집기로 설정 파일 열기
+            // workspaceFolder가 없으면 새로 생성한 workspacePath 또는 첫 번째 workspace 폴더 사용
+            const targetWorkspace = workspaceFolder?.uri.fsPath || workspacePath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            if (!targetWorkspace) {
+                vscode.window.showErrorMessage(i18n.t('error.workspaceNotFound'));
                 return;
             }
-
-            const vscodeFolder = path.join(workspaceFolder.uri.fsPath, '.vscode');
+            const vscodeFolder = path.join(targetWorkspace, '.vscode');
             const configPath = path.join(vscodeFolder, 'ctlim-sftp.json');
 
             if (!fs.existsSync(vscodeFolder)) {
