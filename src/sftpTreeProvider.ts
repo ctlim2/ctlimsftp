@@ -8,7 +8,7 @@ import { BookmarkManager } from './bookmarkManager';
 import { i18n } from './i18n';
 
 // 개발 모드 여부 (릴리스 시 false로 변경)
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 
 // 클라이언트 타입 (SFTP 또는 FTP)
 type ClientType = SftpClient | FtpClient;
@@ -425,7 +425,7 @@ export class SftpTreeProvider implements vscode.TreeDataProvider<SftpTreeItem> {
                 createConfigItem.iconPath = new vscode.ThemeIcon('gear', new vscode.ThemeColor('button'));
                 
                 return [
-                    new SftpTreeItem('No ctlim SFTP servers configured', vscode.TreeItemCollapsibleState.None, 'message'),
+                    new SftpTreeItem(i18n.t('tree.noServerConfig'), vscode.TreeItemCollapsibleState.None, 'message'),
                     createConfigItem
                 ];
             }

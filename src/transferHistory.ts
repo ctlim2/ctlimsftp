@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { TransferHistory, TransferStatistics } from './types';
 
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 
 export class TransferHistoryManager {
     private historyFile: string;
