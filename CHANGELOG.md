@@ -4,44 +4,6 @@ All notable changes to the "ctlim SFTP" extension will be documented in this fil
 
 ## [1.1.4] - 2026-01-19
 
-### Changed
-- README 이미지 URL을 GitHub blob URL(?raw=true)로 변경하여 마켓플레이스 즉시 표시 보장
-
-### Fixed
-- GitHub raw CDN 캐시 지연으로 인한 이미지 404 오류 해결
-
-## [1.1.3] - 2026-01-19
-
-### Changed
-- README 대표 이미지를 충돌 감지(save-dif.gif)로 변경
-- 북마크 기능 설명에 데모 GIF(bookmark.gif) 추가
-- 다른 이름으로 저장 기본 동작을 직접 입력 방식으로 변경
-
-### Improved
-- 문서 시각화 개선으로 기능 이해도 향상
-
-## [0.5.6] - 2026-01-15
-
-### Fixed
-- executeCustomCommand 에러 수정 - 트리 뷰 아이템의 선택적 config 속성 처리 개선
-- SftpTreeItem 타입 체크 추가로 서버 아이템만 커스텀 명령 실행 가능
-- Config 로딩 fallback chain 개선 (연결 캐시 → 파일 시스템)
-
-### Added
-- Commands 탭 (GUI 설정 편집기에서 서버 커스텀 명령 관리)
-- 명령 추가/수정/삭제 기능
-
-## [0.2.2] - 2025-12-16
-
-### Added
-- 패스워드 입력 프롬프트 - 설정 파일에 패스워드가 없을 때 연결 시 입력창 표시
-- 키워드에 "ctlim" 추가로 검색 최적화
-
-### Improved
-- 보안 향상 - 설정 파일에 패스워드를 저장하지 않고 사용 가능
-
-## [0.2.1] - 2025-12-16
-
 ### Added
 - 원격 파일 탐색기 (Remote File Explorer) - Activity Bar에서 서버 연결 및 파일 탐색
 - 다중 서버 설정 지원 (Array of configs in ctlim-sftp.json)
