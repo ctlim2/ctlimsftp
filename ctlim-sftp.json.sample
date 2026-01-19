@@ -1,0 +1,48 @@
+[
+    {
+        "group": "greoup-1",
+        "name": "server name 1",
+        "host": "server ip",
+        "protocol": "sftp",
+        "port": 22,
+        "username": "user",
+        "password": "password",
+        "remotePath": "/",
+        "context": "d:/MyProject/Work/project_1",
+        "uploadOnSave": true,
+        "downloadOnOpen": true,
+        "webUrl": "",
+        "ignore": []
+    },
+    {
+        "group": "greoup-1",
+        "name": "server name 2",
+        "host": "server ip",
+        "protocol": "sftp",
+        "port": 22,
+        "username": "user",
+        "password": "password",
+        "remotePath": "/",
+        "context": "d:/MyProject/Work/project_2",
+        "uploadOnSave": true,
+        "downloadOnOpen": true,
+        "webUrl": "",
+        "ignore": []
+    },
+    {
+        "group": "greoup-2",
+        "name": "server name 3",
+        "host": "server ip",
+        "protocol": "sftp",
+        "port": 22,
+        "username": "user",
+        "password": "password",
+        "remotePath": "/",
+        "context": "d:/MyProject/Work/project_3",
+        "uploadOnSave": true,
+        "downloadOnOpen": true,
+        "webUrl": "",
+        "ignore": []
+    },
+
+]
