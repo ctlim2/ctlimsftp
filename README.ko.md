@@ -7,7 +7,11 @@
 [![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](https://github.com/ctlim2/ctlimsftp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**저장 시 자동 업로드**와 **지능형 충돌 감지**로 원격 서버와 로컬 파일을 안전하게 동기화하세요.
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+![ctlim-sftp-demo](resources/save-dif.gif)
+
+**저장 시 자동 업로드**와 **지능형 충돌 감지** 기능으로 원격 서버와 로컬 파일을 안전하게 동기화하세요.
 
 ---
 
@@ -238,11 +242,13 @@ cursor --install-extension ctlim.ctlim-sftp
 
 ---
 
-## 🔍 충돌 감지 시스템
+### 🔍 충돌 감지 시스템
 
-ctlim SFTP는 메타데이터 기반 충돌 감지로 원격 파일의 안전성을 보장합니다.
+ctlim SFTP는 메타데이터 기반의 충돌 감지 기능으로 원격 파일을 안전하게 보호합니다.
 
-### 작동 원리
+![충돌 감지](resources/save-dif.gif)
+
+#### 작동 방식
 
 ```mermaid
 sequenceDiagram
@@ -410,6 +416,8 @@ ctlim SFTP는 안정적인 연결 유지를 위해 자동 재연결 기능을 �
 ### 1. 북마크 시스템
 
 자주 사용하는 원격 파일이나 폴더를 북마크로 저장하여 빠르게 접근할 수 있습니다.
+
+![북마크 시스템](resources/bookmark.gif)
 
 #### 북마크 추가
 
@@ -852,91 +860,6 @@ ssh -i "/path/to/key" -p 22 username@example.com
 - 빠른 테스트 파일 생성
 - 새 디렉토리 구조 설정
 - 로컬에서 만들지 않고 원격에 직접 생성
-
----
-
-### 12. 서버 템플릿 시스템
-
-자주 사용하는 서버 설정을 템플릿으로 저장하고 재사용할 수 있습니다.
-
-#### 템플릿으로 저장
-
-현재 연결된 서버 설정을 템플릿으로 저장합니다.
-
-**사용법**:
-1. Activity Bar에서 서버 우클릭
-2. `Save as Template` 선택
-3. 템플릿 이름 및 설명 입력
-
-**저장되는 정보**:
-- ✅ 포트 번호, 원격 경로
-- ✅ 업로드/다운로드 설정
-- ✅ 무시 패턴, 백업 설정
-- ❌ 민감 정보 (비밀번호, SSH 키) - 보안상 제외
-
-#### 템플릿에서 서버 추가
-
-저장된 템플릿을 사용하여 새 서버를 빠르게 추가할 수 있습니다.
-
-**사용법**:
-1. Command Palette: `ctlim SFTP: Add Server from Template`
-2. 템플릿 선택
-3. 서버 정보 입력:
-   - 호스트 주소
-   - 사용자명
-   - 비밀번호 (선택사항)
-   - 서버 이름 (선택사항)
-
-**예시**:
-```
-템플릿 선택: 📋 LAMP Server Config
-
-호스트: new-server.example.com
-사용자명: admin
-비밀번호: ******** (선택사항)
-서버 이름: New Dev Server
-
-→ 설정 파일에 자동 추가됨 ✅
-```
-
-#### 템플릿 관리
-
-**Command Palette**: `ctlim SFTP: Manage Templates`
-
-```
-📋 LAMP Server (사용: 5회)
-   Port: 22 | 생성: 2025-12-15
-   설명: Apache + PHP + MySQL 기본 설정
-
-📋 Node.js Server (사용: 3회)
-   Port: 22 | 생성: 2025-11-20
-   설명: Node.js 프로젝트용 설정
-```
-
-**기능**:
-- 템플릿 삭제
-- 사용 통계 확인
-- 템플릿 상세 정보 보기
-
-#### 활용 시나리오
-
-1. **팀 표준 설정 공유**
-   - 팀 내 표준 서버 설정을 템플릿으로 저장
-   - 새 프로젝트 시작 시 빠른 설정
-
-2. **다중 환경 구축**
-   - 동일한 구성의 개발/테스트/운영 서버 추가
-   - 호스트와 인증 정보만 변경
-
-3. **클라이언트 프로젝트 관리**
-   - 클라이언트별 표준 설정 템플릿 유지
-   - 신규 사이트 작업 시 템플릿 재사용
-
-#### 저장 위치
-
-- **파일**: `.vscode/.sftp-templates.json`
-- **공유 방법**: Git에 커밋하여 팀원과 공유 가능
-- **보안**: 민감 정보(비밀번호, 키)는 저장되지 않음
 
 ---
 

@@ -4,8 +4,10 @@
 
 > Simple and Powerful VS Code SFTP/SSH File Synchronization Extension
 
-[![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](https://github.com/ctlim2/ctlimsftp)
+[![Version](https://img.shields.io/badge/version-1.1.2-blue.svg)](https://github.com/ctlim2/ctlimsftp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+![ctlim-sftp-demo](resources/save-dif.gif)
 
 Safely synchronize remote servers and local files with **Auto Upload on Save** and **Intelligent Conflict Detection**.
 
@@ -421,6 +423,8 @@ ctlim SFTP provides auto-reconnection for stable connection maintenance.
 ### 1. Bookmark System
 
 Save frequently used remote files or folders as bookmarks for quick access.
+
+![Bookmark System](resources/bookmark.gif)
 
 #### Add Bookmark
 
@@ -863,91 +867,6 @@ Create files or folders directly on remote server.
 - Quick test file creation
 - Set up new directory structure
 - Create directly on remote without creating locally
-
----
-
-### 12. Server Template System
-
-Save and reuse frequently used server configurations as templates.
-
-#### Save as Template
-
-Save current connected server configuration as template.
-
-**Usage**:
-1. Right-click server in Activity Bar
-2. Select `Save as Template`
-3. Enter template name and description
-
-**Saved Information**:
-- ✅ Port number, remote path
-- ✅ Upload/download settings
-- ✅ Ignore patterns, backup settings
-- ❌ Sensitive information (password, SSH key) - Excluded for security
-
-#### Add Server from Template
-
-Quickly add new server using saved template.
-
-**Usage**:
-1. Command Palette: `ctlim SFTP: Add Server from Template`
-2. Select template
-3. Enter server information:
-   - Host address
-   - Username
-   - Password (optional)
-   - Server name (optional)
-
-**Example**:
-```
-Select template: 📋 LAMP Server Config
-
-Host: new-server.example.com
-Username: admin
-Password: ******** (optional)
-Server name: New Dev Server
-
-→ Automatically added to config file ✅
-```
-
-#### Template Management
-
-**Command Palette**: `ctlim SFTP: Manage Templates`
-
-```
-📋 LAMP Server (Usage: 5 times)
-   Port: 22 | Created: 2025-12-15
-   Description: Apache + PHP + MySQL base config
-
-📋 Node.js Server (Usage: 3 times)
-   Port: 22 | Created: 2025-11-20
-   Description: Configuration for Node.js projects
-```
-
-**Features**:
-- Delete templates
-- Check usage statistics
-- View template details
-
-#### Usage Scenarios
-
-1. **Share Team Standard Configuration**
-   - Save team standard server configuration as template
-   - Quick setup when starting new project
-
-2. **Build Multi-Environment**
-   - Add dev/test/production servers with same configuration
-   - Change only host and authentication info
-
-3. **Client Project Management**
-   - Maintain standard configuration templates for each client
-   - Reuse template when working on new sites
-
-#### Storage Location
-
-- **File**: `.vscode/.sftp-templates.json`
-- **Sharing Method**: Commit to Git to share with team
-- **Security**: Sensitive information (password, keys) not saved
 
 ---
 

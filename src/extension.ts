@@ -697,7 +697,6 @@ export function activate(context: vscode.ExtensionContext) {
                 const result = await vscode.window.showErrorMessage(
                     i18n.t('error.configNotFoundSimple'),
                     i18n.t('config.createOption'),
-//                    '취소'
                 );
                 if (result === i18n.t('config.createOption')) {
                     await vscode.commands.executeCommand('ctlimSftp.config');
@@ -754,40 +753,24 @@ export function activate(context: vscode.ExtensionContext) {
             const relativePath = path.relative(workspaceRoot, localPath).replace(/\\/g, '/');
             const defaultRemotePath = path.posix.join(config.remotePath, relativePath);
 
-            // Ask user to choose input method
-            const inputMethod = await vscode.window.showQuickPick([
-                { label: i18n.t('input.directInput'), method: 'input' },
-                { label: i18n.t('input.treeSelect'), method: 'tree' }
-            ], {
-                placeHolder: i18n.t('input.selectInputMethod')
-            });
-
-            if (!inputMethod) {
-                return; // User cancelled
-            }
-
+            // Ask user for remote path directly
             let remotePath: string | undefined;
 
-            if (inputMethod.method === 'input') {
-                // Direct input
-                remotePath = await vscode.window.showInputBox({
-                    prompt: i18n.t('prompt.remotePathInput'),
-                    value: defaultRemotePath,
-                    placeHolder: i18n.t('placeholder.remotePath'),
-                    validateInput: (value) => {
-                        if (!value || value.trim() === '') {
-                            return i18n.t('error.pathRequired');
-                        }
-                        if (!value.startsWith('/')) {
-                            return i18n.t('error.absolutePath');
-                        }
-                        return null;
+            // Direct input
+            remotePath = await vscode.window.showInputBox({
+                prompt: i18n.t('prompt.remotePathInput'),
+                value: defaultRemotePath,
+                placeHolder: i18n.t('placeholder.remotePath'),
+                validateInput: (value) => {
+                    if (!value || value.trim() === '') {
+                        return i18n.t('error.pathRequired');
                     }
-                });
-            } else {
-                // Tree selection
-                remotePath = await selectRemotePathFromTree(connection.client, config.remotePath, path.basename(localPath));
-            }
+                    if (!value.startsWith('/')) {
+                        return i18n.t('error.absolutePath');
+                    }
+                    return null;
+                }
+            });
 
             if (!remotePath) {
                 return; // User cancelled
