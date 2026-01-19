@@ -7,8 +7,9 @@
 [![Version](https://img.shields.io/badge/version-1.1.4-blue.svg)](https://github.com/ctlim2/ctlimsftp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
+[충돌 감지]
 ![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/blob/main/resources/save-dif.gif?raw=true)
-
+[bookmark]
 ![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/blob/main/resources/bookmark.gif?raw=true)
 
 Safely synchronize remote servers and local files with **Auto Upload on Save** and **Intelligent Conflict Detection**.
@@ -257,6 +258,8 @@ Enter server information in the generated configuration file:
 
 ctlim SFTP ensures remote file safety with metadata-based conflict detection.
 
+![Conflict Detection System](https://github.com/ctlim2/ctlimsftp/blob/main/resources/save-dif.gif?raw=true)
+
 ### How It Works
 
 ```mermaid
@@ -426,7 +429,7 @@ ctlim SFTP provides auto-reconnection for stable connection maintenance.
 
 Save frequently used remote files or folders as bookmarks for quick access.
 
-![Bookmark System](resources/bookmark.gif)
+![Bookmark System](https://github.com/ctlim2/ctlimsftp/blob/main/resources/bookmark.gif?raw=true)
 
 #### Add Bookmark
 

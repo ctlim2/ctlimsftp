@@ -247,7 +247,8 @@ cursor --install-extension ctlim.ctlim-sftp
 
 ctlim SFTP는 메타데이터 기반의 충돌 감지 기능으로 원격 파일을 안전하게 보호합니다.
 
-![충돌 감지](https://github.com/ctlim2/ctlimsftp/blob/main/resources.gif)
+![충돌 감지](https://github.com/ctlim2/ctlimsftp/blob/main/resources/save-dif.gif?raw=true)
+
 
 
 #### 작동 방식
