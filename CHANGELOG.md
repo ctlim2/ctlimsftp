@@ -2,6 +2,14 @@
 
 All notable changes to the "ctlim SFTP" extension will be documented in this file.
 
+## [1.1.4] - 2026-01-19
+
+### Changed
+- README 이미지 URL을 GitHub blob URL(?raw=true)로 변경하여 마켓플레이스 즉시 표시 보장
+
+### Fixed
+- GitHub raw CDN 캐시 지연으로 인한 이미지 404 오류 해결
+
 ## [1.1.3] - 2026-01-19
 
 ### Changed

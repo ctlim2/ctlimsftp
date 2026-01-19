@@ -9,7 +9,7 @@
 
 [충돌 감지]
 ![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/blob/main/resources/save-dif.gif?raw=true)
-
+[북마크 시스템]
 ![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/blob/main/resources/bookmark.gif?raw=true)
 
 **저장 시 자동 업로드**와 **지능형 충돌 감지** 기능으로 원격 서버와 로컬 파일을 안전하게 동기화하세요.
@@ -247,7 +247,7 @@ cursor --install-extension ctlim.ctlim-sftp
 
 ctlim SFTP는 메타데이터 기반의 충돌 감지 기능으로 원격 파일을 안전하게 보호합니다.
 
-![충돌 감지](https://raw.githubusercontent.com/ctlim2/ctlimsftp/main/resources/save-dif.gif)
+![충돌 감지](https://github.com/ctlim2/ctlimsftp/blob/main/resources.gif)
 
 
 #### 작동 방식
@@ -419,7 +419,7 @@ ctlim SFTP는 안정적인 연결 유지를 위해 자동 재연결 기능을 �
 
 자주 사용하는 원격 파일이나 폴더를 북마크로 저장하여 빠르게 접근할 수 있습니다.
 
-![북마크 시스템](https://raw.githubusercontent.com/ctlim2/ctlimsftp/main/resources/bookmark.gif)
+![북마크 시스템](https://github.com/ctlim2/ctlimsftp/blob/main/resources/bookmark.gif)
 
 #### 북마크 추가
 
@@ -955,5 +955,5 @@ Copyright (c) 2026 ctlim2
 이 프로젝트가 유용하다면 ⭐ Star를 눌러주세요!
 
 **개발자**: ctlim  
-**버전**: 0.5.3  
-**마지막 업데이트**: 2026-01-06
+**버전**: 1.1.4  
+**마지막 업데이트**: 2026-01-19
