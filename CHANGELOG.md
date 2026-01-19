@@ -2,6 +2,16 @@
 
 All notable changes to the "ctlim SFTP" extension will be documented in this file.
 
+## [1.1.3] - 2026-01-19
+
+### Changed
+- README 대표 이미지를 충돌 감지(save-dif.gif)로 변경
+- 북마크 기능 설명에 데모 GIF(bookmark.gif) 추가
+- 다른 이름으로 저장 기본 동작을 직접 입력 방식으로 변경
+
+### Improved
+- 문서 시각화 개선으로 기능 이해도 향상
+
 ## [0.5.6] - 2026-01-15
 
 ### Fixed

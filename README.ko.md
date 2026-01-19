@@ -4,12 +4,13 @@
 
 > 간편하고 강력한 VS Code FTP/SFTP/SSH 파일 동기화 확장 프로그램
 
-[![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](https://github.com/ctlim2/ctlimsftp)
+[![Version](https://img.shields.io/badge/version-1.1.3-blue.svg)](https://github.com/ctlim2/ctlimsftp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[충돌 감지]
+![ctlim-sftp-demo](https://raw.githubusercontent.com/ctlim2/ctlimsftp/main/resources/save-dif.gif)
 
-![ctlim-sftp-demo](resources/save-dif.gif)
+![ctlim-sftp-demo](https://raw.githubusercontent.com/ctlim2/ctlimsftp/main/resources/bookmark.gif)
 
 **저장 시 자동 업로드**와 **지능형 충돌 감지** 기능으로 원격 서버와 로컬 파일을 안전하게 동기화하세요.
 
@@ -246,7 +247,8 @@ cursor --install-extension ctlim.ctlim-sftp
 
 ctlim SFTP는 메타데이터 기반의 충돌 감지 기능으로 원격 파일을 안전하게 보호합니다.
 
-![충돌 감지](resources/save-dif.gif)
+![충돌 감지](https://raw.githubusercontent.com/ctlim2/ctlimsftp/main/resources/save-dif.gif)
+
 
 #### 작동 방식
 
@@ -417,7 +419,7 @@ ctlim SFTP는 안정적인 연결 유지를 위해 자동 재연결 기능을 �
 
 자주 사용하는 원격 파일이나 폴더를 북마크로 저장하여 빠르게 접근할 수 있습니다.
 
-![북마크 시스템](resources/bookmark.gif)
+![북마크 시스템](https://raw.githubusercontent.com/ctlim2/ctlimsftp/main/resources/bookmark.gif)
 
 #### 북마크 추가
 
