@@ -7,9 +7,9 @@
 [![Version](https://img.shields.io/badge/version-1.1.3-blue.svg)](https://github.com/ctlim2/ctlimsftp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-![ctlim-sftp-demo](https://raw.githubusercontent.com/ctlim2/ctlimsftp/main/resources/save-dif.gif)
+![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/blob/main/resources/save-dif.gif?raw=true)
 
-![ctlim-sftp-demo](https://raw.githubusercontent.com/ctlim2/ctlimsftp/main/resources/bookmark.gif)
+![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/blob/main/resources/bookmark.gif?raw=true)
 
 Safely synchronize remote servers and local files with **Auto Upload on Save** and **Intelligent Conflict Detection**.
 

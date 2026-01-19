@@ -8,9 +8,9 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 [충돌 감지]
-![ctlim-sftp-demo](https://raw.githubusercontent.com/ctlim2/ctlimsftp/main/resources/save-dif.gif)
+![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/blob/main/resources/save-dif.gif?raw=true)
 
-![ctlim-sftp-demo](https://raw.githubusercontent.com/ctlim2/ctlimsftp/main/resources/bookmark.gif)
+![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/blob/main/resources/bookmark.gif?raw=true)
 
 **저장 시 자동 업로드**와 **지능형 충돌 감지** 기능으로 원격 서버와 로컬 파일을 안전하게 동기화하세요.
 
