@@ -9,10 +9,10 @@
 
 [충돌 감지]
 
-![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/blob/main/resources/save-dif.gif?raw=true)
+![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/raw/main/resources/save-dif.gif)
 [bookmark]
 
-![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/blob/main/resources/bookmark.gif?raw=true)
+![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/raw/main/resources/bookmark.gif)
 
 Safely synchronize remote servers and local files with **Auto Upload on Save** and **Intelligent Conflict Detection**.
 
