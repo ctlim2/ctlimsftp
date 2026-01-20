@@ -2,7 +2,7 @@
   "name": "ctlim-sftp",
   "displayName": "ctlim-SFTP",
   "description": "Simple SFTP sync extension with upload on save and conflict detection",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "publisher": "ctlim",
   "icon": "resources/icon.png",
   "engines": {
@@ -132,13 +132,15 @@
       },
       {
         "command": "ctlimSftp.searchRemoteFiles",
-        "title": "ctlim SFTP: Search Remote Files by Name",
+        "title": "Search: File Name...",
+        "category": "ctlim SFTP",
         "icon": "$(search)"
       },
       {
         "command": "ctlimSftp.searchInRemoteFiles",
-        "title": "ctlim SFTP: Search in Remote Files",
-        "icon": "$(search)"
+        "title": "Search: File Content (grep)...",
+        "category": "ctlim SFTP",
+        "icon": "$(telescope)"
       },
       {
         "command": "ctlimSftp.openSSHTerminal",
@@ -297,12 +299,12 @@
         },
         {
           "command": "ctlimSftp.searchRemoteFiles",
-          "when": "view == ctlimSftpView && viewItem == server",
+          "when": "view == ctlimSftpView && (viewItem == server || viewItem == remoteDirectory)",
           "group": "search@1"
         },
         {
           "command": "ctlimSftp.searchInRemoteFiles",
-          "when": "view == ctlimSftpView && viewItem == server",
+          "when": "view == ctlimSftpView && (viewItem == server || viewItem == remoteDirectory)",
           "group": "search@2"
         },
         {
@@ -322,7 +324,7 @@
         },
         {
           "command": "ctlimSftp.executeCustomCommand",
-          "when": "view == ctlimSftpView && viewItem == server",
+          "when": "view == ctlimSftpView && (viewItem == server || viewItem == remoteDirectory || viewItem == remoteFile)",
           "group": "tools@1"
         },
         {

@@ -12,6 +12,136 @@ import { ConnectConfigWebview } from './configWebview';
 import { SftpFileDecorationProvider } from './fileDecorationProvider';
 import { i18n } from './i18n';
 
+// Helper to manage search history
+class SearchHistoryManager {
+    constructor(private context: vscode.ExtensionContext) {}
+
+    getHistory(key: string): string[] {
+        return this.context.globalState.get<string[]>(key, []);
+    }
+
+    async addHistory(key: string, value: string): Promise<void> {
+        let history = this.getHistory(key);
+        // Remove existing to avoid duplicates and move to top
+        history = history.filter(item => item !== value);
+        history.unshift(value);
+        // Limit to 20 items
+        if (history.length > 20) {
+            history.splice(20);
+        }
+        await this.context.globalState.update(key, history);
+    }
+
+    async clearHistory(key: string): Promise<void> {
+        await this.context.globalState.update(key, []);
+    }
+}
+
+/**
+ * Show a QuickPick with history that allows custom input
+ */
+async function showInputBoxWithHistory(
+    historyManager: SearchHistoryManager,
+    historyKey: string,
+    prompt: string,
+    placeholder: string
+): Promise<string | undefined> {
+    return new Promise((resolve) => {
+        const quickPick = vscode.window.createQuickPick();
+        quickPick.placeholder = placeholder;
+        quickPick.title = prompt;
+        
+        const history = historyManager.getHistory(historyKey);
+        
+        // Add history items
+        quickPick.items = history.map(label => ({ 
+            label, 
+            description: i18n.t('label.history') || 'History' 
+        }));
+        
+        // Add a "Clear History" button if history exists
+        if (history.length > 0) {
+            quickPick.buttons = [{
+                iconPath: new vscode.ThemeIcon('clear-all'),
+                tooltip: i18n.t('action.clearHistory') || 'Clear History'
+            }];
+        }
+
+        quickPick.onDidTriggerButton(async (button) => {
+            if (button.tooltip === (i18n.t('action.clearHistory') || 'Clear History')) {
+                const confirm = await vscode.window.showWarningMessage(
+                    i18n.t('confirm.clearSearchHistory') || 'Clear search history?',
+                    { modal: true },
+                    i18n.t('action.delete') || 'Delete'
+                );
+                
+                if (confirm === (i18n.t('action.delete') || 'Delete')) {
+                    await historyManager.clearHistory(historyKey);
+                    quickPick.items = [];
+                    quickPick.buttons = [];
+                }
+            }
+        });
+
+        // Handle user input
+        quickPick.onDidChangeValue((value) => {
+            if (!value) {
+                quickPick.items = history.map(label => ({ 
+                    label, 
+                    description: i18n.t('label.history') || 'History' 
+                }));
+                return;
+            }
+            
+            // Show history items matching input + option to use current input
+            const matchingHistory = history
+                .filter(h => h.toLowerCase().includes(value.toLowerCase()))
+                .map(label => ({ 
+                    label, 
+                    description: i18n.t('label.history') || 'History' 
+                }));
+            
+            // Check if exact match exists
+            const exactMatch = history.some(h => h === value);
+            
+            const newItems: vscode.QuickPickItem[] = [];
+            
+            // Add "Use: input" item if not exact match (optional, but good for clarity)
+            // But VS Code QuickPick allows accepting value if we handle onDidAccept.
+            
+            // Actually, we can just let user pick from list OR press enter.
+            // If they press enter and no item is selected (or active), we take value.
+            
+            quickPick.items = matchingHistory;
+        });
+
+        quickPick.onDidAccept(async () => {
+            let result = quickPick.value;
+            
+            // If user selected an item from the list, use that
+            if (quickPick.selectedItems.length > 0) {
+                result = quickPick.selectedItems[0].label;
+            }
+            
+            if (result) {
+                // Save to history
+                await historyManager.addHistory(historyKey, result);
+                resolve(result);
+            } else {
+                resolve(undefined);
+            }
+            quickPick.hide();
+        });
+
+        quickPick.onDidHide(() => {
+            resolve(undefined);
+            quickPick.dispose();
+        });
+
+        quickPick.show();
+    });
+}
+
 // 개발 모드 여부 (릴리스 시 false로 변경)
 const DEBUG_MODE = false;
 
@@ -80,6 +210,9 @@ export function activate(context: vscode.ExtensionContext) {
     updateStatusBar();
     statusBarItem.show();
     context.subscriptions.push(statusBarItem);
+    
+    // Initialize search history manager
+    const searchHistoryManager = new SearchHistoryManager(context);
     
     // Create Drag and Drop Controller
     const dragAndDropController = new SftpDragAndDropController(treeProvider, outputChannel);
@@ -1573,25 +1706,118 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            // 명령어 목록 확인
-            if (!config.commands || config.commands.length === 0) {
-                vscode.window.showInformationMessage(i18n.t('info.noCommandsDefined'));
-                return;
+
+            // 명령어 목록 및 직접 입력 옵션 구성
+            interface CommandQuickPickItem extends vscode.QuickPickItem {
+                commandType: 'defined' | 'custom';
+                cmd?: { name: string; command: string };
             }
 
-            // 명령어 선택
-            const commandItems = config.commands.map(cmd => ({
-                label: `$(terminal) ${cmd.name}`,
-                description: cmd.command,
-                cmd: cmd
-            }));
+            const commandItems: CommandQuickPickItem[] = [];
 
-            const selectedCommand = await vscode.window.showQuickPick(commandItems, {
+            // 1. 직접 입력 옵션 추가
+            commandItems.push({
+                label: i18n.t('input.directCommandInput'),
+                description: 'Execute arbitrary command',
+                commandType: 'custom'
+            });
+
+            // 2. 정의된 명령어 추가
+            if (config.commands && config.commands.length > 0) {
+                commandItems.push({
+                    label: 'Defined Commands',
+                    kind: vscode.QuickPickItemKind.Separator,
+                    commandType: 'defined'
+                });
+
+                config.commands.forEach(cmd => {
+                    commandItems.push({
+                        label: `$(terminal) ${cmd.name}`,
+                        description: cmd.command,
+                        commandType: 'defined',
+                        cmd: cmd
+                    });
+                });
+            }
+
+            // 명령어 선택 UI 표시
+            const selectedItem = await vscode.window.showQuickPick(commandItems, {
                 placeHolder: i18n.t('prompt.selectCommandToExecute')
             });
 
-            if (!selectedCommand) {
+            if (!selectedItem) {
                 return;
+            }
+
+            let commandToExecute = '';
+            let commandName = '';
+
+            if (selectedItem.commandType === 'custom') {
+                // 직접 입력
+                const inputCommand = await showInputBoxWithHistory(
+                    searchHistoryManager,
+                    'executeCustomCommandHistory',
+                    i18n.t('prompt.enterRemoteCommand'),
+                    i18n.t('placeholder.remoteCommand')
+                );
+
+                if (!inputCommand) {
+                    return;
+                }
+                commandToExecute = inputCommand;
+                commandName = 'Custom Command';
+            } else {
+                // 정의된 명령어
+                commandToExecute = selectedItem.cmd!.command;
+                commandName = selectedItem.cmd!.name;
+            }
+
+            // 변수 치환 (${file}, ${fileDir}, ${fileName})
+            // 현재 컨텍스트(선택된 파일/폴더) 정보 확인
+            let targetPath = '';
+            let isDirectory = false;
+
+            if (item && (item.remotePath)) {
+                targetPath = item.remotePath;
+                isDirectory = item.isDirectory;
+            }
+
+            // targetPath가 없으면(서버 아이템 등) 루트 경로 사용 또는 빈 값
+            if (!targetPath && config.remotePath) {
+                targetPath = config.remotePath;
+                isDirectory = true;
+            }
+
+            if (targetPath) {
+                // ${file}: 전체 경로
+                commandToExecute = commandToExecute.replace(/\$\{file\}/g, targetPath);
+                
+                // ${fileDir}: 디렉토리 경로 (파일인 경우 dir, 폴더인 경우 자신)
+                const dirPath = isDirectory ? targetPath : path.posix.dirname(targetPath);
+                commandToExecute = commandToExecute.replace(/\$\{fileDir\}/g, dirPath);
+                
+                // ${fileName}: 파일 이름
+                const name = path.posix.basename(targetPath);
+                commandToExecute = commandToExecute.replace(/\$\{fileName\}/g, name);
+            }
+
+            // ${input:variable} 처리
+            // 예: echo "${input:Message}"
+            const inputRegex = /\$\{input:([^}]+)\}/g;
+            let match;
+            while ((match = inputRegex.exec(commandToExecute)) !== null) {
+                const prompt = match[1];
+                const userInput = await vscode.window.showInputBox({
+                    prompt: prompt,
+                    placeHolder: `Value for ${prompt}`
+                });
+                
+                if (userInput === undefined) {
+                    return; // 취소
+                }
+                
+                // replaceAll과 유사하게 동작하도록 모든 발생 변경
+                commandToExecute = commandToExecute.split(match[0]).join(userInput);
             }
 
             // 서버 연결 확인
@@ -1624,21 +1850,21 @@ export function activate(context: vscode.ExtensionContext) {
             // 명령어 실행
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: i18n.t('progress.executingCommand', { command: selectedCommand.cmd.name }),
+                title: i18n.t('progress.executingCommand', { command: commandName }),
                 cancellable: false
             }, async (progress) => {
                 try {
-                    const result = await connection!.client.executeCommand(selectedCommand.cmd.command);
+                    const result = await connection!.client.executeCommand(commandToExecute);
                     
                     // 결과 표시
-                    const outputChannel = vscode.window.createOutputChannel(`SFTP Command: ${selectedCommand.cmd.name}`);
+                    const outputChannel = vscode.window.createOutputChannel(`SFTP Command: ${commandName}`);
                     outputChannel.clear();
-                    outputChannel.appendLine(`Command: ${selectedCommand.cmd.command}`);
+                    outputChannel.appendLine(`Command: ${commandToExecute}`);
                     outputChannel.appendLine('-'.repeat(50));
                     outputChannel.appendLine(result);
                     outputChannel.show();
                     
-                    vscode.window.showInformationMessage(i18n.t('success.commandExecuted', { command: selectedCommand.cmd.name }));
+                    vscode.window.showInformationMessage(i18n.t('success.commandExecuted', { command: commandName }));
                 } catch (error) {
                     vscode.window.showErrorMessage(i18n.t('error.commandExecutionFailed', { error: String(error) }));
                 }
@@ -2004,16 +2230,12 @@ export function activate(context: vscode.ExtensionContext) {
             }
             
             // 검색 패턴 입력
-            const searchPattern = await vscode.window.showInputBox({
-                prompt: i18n.t('prompt.enterSearchPattern'),
-                placeHolder: i18n.t('placeholder.searchPattern'),
-                validateInput: (value) => {
-                    if (!value || value.trim() === '') {
-                        return i18n.t('validation.searchPatternRequired');
-                    }
-                    return null;
-                }
-            });
+            const searchPattern = await showInputBoxWithHistory(
+                searchHistoryManager,
+                'searchRemoteFilesHistory',
+                i18n.t('prompt.enterSearchPattern'),
+                i18n.t('placeholder.searchPattern')
+            );
             
             if (!searchPattern) {
                 return;
@@ -2136,16 +2358,12 @@ export function activate(context: vscode.ExtensionContext) {
             }
             
             // 검색 텍스트 입력
-            const searchText = await vscode.window.showInputBox({
-                prompt: i18n.t('prompt.enterSearchText'),
-                placeHolder: i18n.t('placeholder.searchText'),
-                validateInput: (value) => {
-                    if (!value || value.trim() === '') {
-                        return i18n.t('validation.searchTextRequired');
-                    }
-                    return null;
-                }
-            });
+            const searchText = await showInputBoxWithHistory(
+                searchHistoryManager,
+                'searchInRemoteFilesHistory',
+                i18n.t('prompt.enterSearchText'),
+                i18n.t('placeholder.searchText')
+            );
             
             if (!searchText) {
                 return;

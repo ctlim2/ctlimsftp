@@ -4,21 +4,59 @@
 
 > Simple and Powerful VS Code SFTP/SSH File Synchronization Extension
 
-[![Version](https://img.shields.io/badge/version-1.1.4-blue.svg)](https://github.com/ctlim2/ctlimsftp)
+[![Version](https://img.shields.io/badge/version-1.1.5-blue.svg)](https://github.com/ctlim2/ctlimsftp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-
-[충돌 감지]
-
-![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/raw/main/resources/save-dif.gif)
-[bookmark]
-
-![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/raw/main/resources/bookmark.gif)
 
 Safely synchronize remote servers and local files with **Auto Upload on Save** and **Intelligent Conflict Detection**.
 
 ---
 
-## ✨ Key Features
+## 🔥 Key Features Highlight
+
+### 1. Auto Upload on Save & Intelligent Conflict Detection
+Press `Ctrl+S` to instantly upload to the remote server. If the remote file has been modified by someone else, the intelligent conflict detection system will alert you immediately.
+
+![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/raw/main/resources/save-dif.gif)
+
+- **Overwrite**: Force upload with local content
+- **Compare**: Visually check changes with Diff Viewer
+- **Download**: Update local file with remote content
+
+### 2. Smart Bookmark System
+No need to navigate complex paths every time. Register frequently used remote folders or files as bookmarks and access them with a single click.
+
+![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/raw/main/resources/bookmark.gif)
+
+- **File/Folder Favorites**: Easily add via right-click in Tree View
+- **Frequent List**: Auto-sort based on usage frequency
+- **Activity Bar Integration**: Instant access from the sidebar
+
+### 3. Intuitive Remote File Explorer
+Browse the remote server's file system in real-time with a tree structure, just like VS Code's Explorer.
+- **Multi-Server Support**: Manage Dev/Prod/Test servers in groups
+- **Icon Themes**: Auto-apply icons by file type
+- **Real-time Status**: Check connection status and file modification times
+
+### 4. Powerful Search (Filename & Content)
+Search remote files not just by name, but also by content (grep). Supports regex for precise searching.
+
+**[Search by Filename]**
+![Search by Filename](https://github.com/ctlim2/ctlimsftp/raw/main/resources/searchRemoteFiles.gif)
+
+**[Search by Content]**
+![Search by Content](https://github.com/ctlim2/ctlimsftp/raw/main/resources/searchInRemoteFiles.gif)
+
+- **Search: File Name**: Quickly find files by name
+- **Search: Content (grep)**: Deep search into file contents (utilizing server-side grep)
+
+### 5. Powerful Diff Comparison
+When you suspect a conflict or want to verify changes, compare local and remote files side-by-side (Diff).
+- Highlight code differences line by line
+- Verify content before merging
+
+---
+
+## ✨ Detailed Features
 
 ### 🚀 Core Functionality
 - **Auto Upload on Save** - Press `Ctrl+S` to instantly sync to remote server
@@ -742,7 +780,9 @@ $(warning) 777 - rwxrwxrwx
 
 ---
 
-### 9. SSH Terminal
+### 9. SSH Terminal & Remote Commands
+
+#### Open SSH Terminal
 
 Open connected server's SSH terminal directly in VS Code.
 
@@ -750,18 +790,41 @@ Open connected server's SSH terminal directly in VS Code.
 1. Right-click server → `Open SSH Terminal`
 2. Or Command Palette: `ctlim SFTP: Open SSH Terminal`
 
-**Auto-Generated Command**:
+#### Execute Custom Command
+
+Execute pre-defined or custom shell commands on the remote server instantly.
+
+![Execute Custom Command](https://github.com/ctlim2/ctlimsftp/raw/main/resources/executeCustomCommand.gif)
+
+**Usage**:
+1. Right-click server, file, or folder → `Execute Custom Command`
+2. Choose from list or enter command manually
+
+**Dynamic Variables**:
+- `${file}`: Full path of selected file
+- `${fileDir}`: Directory path of selected file
+- `${fileName}`: Name of selected file
+- `${input:Prompt}`: Request user input
+
+**Example 1: Manual Input**
 ```bash
-ssh -p 22 username@example.com
-# When using Private Key
-ssh -i "/path/to/key" -p 22 username@example.com
+ls -la ${fileDir}
+grep "error" ${file}
 ```
 
-**Usage Scenarios**:
-- Real-time server log checking (`tail -f`)
-- Execute remote commands (restart, backup, etc.)
-- Git operations (pull, commit, etc.)
-- Direct database access
+**Example 2: Config Definition (.vscode/ctlim-sftp.json)**
+```json
+"commands": [
+    {
+        "name": "Check Disk",
+        "command": "df -h"
+    },
+    {
+        "name": "Git Status",
+        "command": "cd ${fileDir} && git status"
+    }
+]
+```
 
 ---
 
@@ -994,5 +1057,5 @@ Copyright (c) 2026 ctlim2
 If you find this project useful, please give it a ⭐ Star!
 
 **Developer**: ctlim  
-**Version**: 1.1.4  
-**Last Updated**: 2026-01-19
+**Version**: 1.1.5  
+**Last Updated**: 2026-01-20

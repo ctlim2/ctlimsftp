@@ -4,21 +4,61 @@
 
 > 간편하고 강력한 VS Code FTP/SFTP/SSH 파일 동기화 확장 프로그램
 
-[![Version](https://img.shields.io/badge/version-1.1.3-blue.svg)](https://github.com/ctlim2/ctlimsftp)
+[![Version](https://img.shields.io/badge/version-1.1.5-blue.svg)](https://github.com/ctlim2/ctlimsftp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-
-[충돌 감지]
-![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/raw/main/resources/save-dif.gif)
-[북마크 시스템]
-![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/raw/main/resources/bookmark.gif)
 
 **저장 시 자동 업로드**와 **지능형 충돌 감지** 기능으로 원격 서버와 로컬 파일을 안전하게 동기화하세요.
 
 ---
 
-## ✨ 주요 특징
+## 🔥 핵심 기능 하이라이트
 
-### 🚀 핵심 기능
+### 1. 저장 시 자동 업로드 & 지능형 충돌 감지
+`Ctrl+S`를 눌러 저장하는 순간 원격 서버로 자동 업로드됩니다. 만약 원격 파일이 다른 사람에 의해 수정되었다면, 똑똑한 충돌 감지 시스템이 즉시 알려줍니다.
+
+![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/raw/main/resources/save-dif.gif)
+
+- **덮어쓰기**: 로컬 내용으로 강제 업로드
+- **비교하기**: Diff 뷰어로 변경 사항 시각적 확인
+- **다운로드**: 원격 파일로 로컬 파일 갱신
+
+### 2. 스마트 북마크 시스템
+복잡한 경로를 매번 찾아갈 필요 없습니다. 자주 쓰는 원격 폴더나 파일을 북마크로 등록하여 한 번의 클릭으로 이동하세요.
+
+![ctlim-sftp-demo](https://github.com/ctlim2/ctlimsftp/raw/main/resources/bookmark.gif)
+
+- **파일/폴더 즐겨찾기**: 트리 뷰에서 우클릭으로 간편 추가
+- **자주 쓰는 목록**: 사용 빈도 기반 자동 정렬
+- **Activity Bar 통합**: 사이드바에서 즉시 접근
+
+### 3. 직관적인 원격 파일 탐색
+VS Code의 탐색기처럼, 원격 서버의 파일 시스템을 트리 구조로 실시간 탐색할 수 있습니다.
+- **다중 서버 지원**: 개발/운영/테스트 서버를 그룹으로 묶어 관리
+- **아이콘 테마**: 파일 타입별 아이콘 자동 적용
+- **실시간 상태**: 연결 여부 및 파일 수정 시간 확인
+
+### 4. 강력한 검색 기능 (파일명 & 내용)
+원격 서버의 파일을 파일명뿐만 아니라 내용(grep)으로도 검색할 수 있습니다. 정규식 지원으로 더욱 정밀한 검색이 가능합니다.
+
+**[파일명 검색]**
+![파일명 검색](https://github.com/ctlim2/ctlimsftp/raw/main/resources/searchRemoteFiles.gif)
+
+**[내용 검색]**
+![내용 검색](https://github.com/ctlim2/ctlimsftp/raw/main/resources/searchInRemoteFiles.gif)
+
+- **Search: File Name**: 파일명으로 빠르게 검색
+- **Search: Content (grep)**: 파일 내용으로 깊이 있게 검색 (서버 grep 활용)
+
+### 5. 강력한 Diff 비교
+충돌이 의심되거나 변경 사항을 확인하고 싶을 때, 로컬 파일과 원격 파일을 나란히 비교(Diff)할 수 있습니다.
+- 코드의 차이점을 라인 단위로 하이라이트
+- 병합(Merge) 전 변경 내용 검증
+
+---
+
+## ✨ 상세 특징
+
+### 🚀 기본 기능
 - **저장 시 자동 업로드** - `Ctrl+S`만 누르면 원격 서버에 즉시 반영
 - **충돌 감지 시스템** - 원격 파일 변경 감지 시 덮어쓰기/비교/취소 선택 가능
 - **다중 서버 관리** - 개발/운영 등 여러 서버를 하나의 설정으로 관리
@@ -731,7 +771,9 @@ $(warning) 777 - rwxrwxrwx
 
 ---
 
-### 9. SSH 터미널
+### 9. SSH 터미널 & 리모트 커맨드
+
+#### SSH 터미널 열기
 
 연결된 서버의 SSH 터미널을 VS Code에서 바로 열 수 있습니다.
 
@@ -739,18 +781,41 @@ $(warning) 777 - rwxrwxrwx
 1. 서버 우클릭 → `Open SSH Terminal`
 2. 또는 Command Palette: `ctlim SFTP: Open SSH Terminal`
 
-**자동 명령**:
+#### Execute Custom Command (원격 명령 실행)
+
+원격 서버에서 미리 정의된 명령어나 임의의 쉘 명령을 즉시 실행합니다.
+
+![Execute Custom Command](https://github.com/ctlim2/ctlimsftp/raw/main/resources/executeCustomCommand.gif)
+
+**사용법**:
+1. 서버, 파일, 또는 폴더 우클릭 → `Execute Custom Command`
+2. 목록에서 선택하거나 직접 명령어 입력
+
+**동적 변수 지원**:
+- `${file}`: 선택된 파일의 전체 경로
+- `${fileDir}`: 선택된 파일의 디렉토리 경로
+- `${fileName}`: 선택된 파일의 이름
+- `${input:Prompt}`: 실행 시 사용자 입력 요청
+
+**예시 1: 직접 입력**
 ```bash
-ssh -p 22 username@example.com
-# Private Key 사용 시
-ssh -i "/path/to/key" -p 22 username@example.com
+ls -la ${fileDir}
+grep "error" ${file}
 ```
 
-**활용 시나리오**:
-- 서버 로그 실시간 확인 (`tail -f`)
-- 원격 명령 실행 (재시작, 백업 등)
-- Git 작업 (pull, commit 등)
-- 데이터베이스 직접 접속
+**예시 2: 설정 파일 정의 (.vscode/ctlim-sftp.json)**
+```json
+"commands": [
+    {
+        "name": "디스크 확인",
+        "command": "df -h"
+    },
+    {
+        "name": "Git 상태",
+        "command": "cd ${fileDir} && git status"
+    }
+]
+```
 
 ---
 
@@ -956,5 +1021,5 @@ Copyright (c) 2026 ctlim2
 이 프로젝트가 유용하다면 ⭐ Star를 눌러주세요!
 
 **개발자**: ctlim  
-**버전**: 1.1.4  
-**마지막 업데이트**: 2026-01-19
+**버전**: 1.1.5  
+**마지막 업데이트**: 2026-01-20

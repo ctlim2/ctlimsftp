@@ -182,6 +182,9 @@ export class I18n {
         'action.refresh': 'Refresh',
         'action.reconnect': 'Reconnect',
         'action.selectFolder': 'Select Folder',
+        'label.history': 'Search History',
+        'action.clearHistory': 'Clear History',
+        'confirm.clearSearchHistory': 'Are you sure you want to clear search history?',
         
         // BATCH 4: saveAsCommand
         'input.selectInputMethod': 'Select how to enter remote path',
@@ -580,6 +583,9 @@ export class I18n {
         'info.uploadSuccessAfterReconnect': 'File uploaded successfully after reconnection: {fileName}',
         'input.config': 'Config',
         'input.selectServer': 'Select server to connect or disconnect',
+        'input.directCommandInput': '$(terminal) Enter Custom Command...',
+        'prompt.enterRemoteCommand': 'Enter remote command to execute',
+        'placeholder.remoteCommand': 'ls -la, git status, etc.',
         'label.created': 'Created: {date}',
         'label.directory': 'Directory',
         'label.goUp': 'Go to parent directory',
@@ -766,9 +772,12 @@ export class I18n {
 
 
         // Missing Keys (KO)
+        'label.history': '검색 기록',
+        'confirm.clearSearchHistory': '검색 기록을 모두 삭제하시겠습니까?',
         'title.bookmarks': '북마크',
         'label.group': '그룹',
         'detail.usageCount': '사용 횟수: {count}',
+        'action.clearHistory': '기록 삭제',
         'label.path': '경로',
         'label.server': '서버',
         'label.description': '설명',
@@ -1355,6 +1364,12 @@ export class I18n {
         'prompt.enterUsername': '사용자명 입력',
         'prompt.enterPasswordOpt': '비밀번호 입력 (선택사항 - 연결 시 확인)',
         'prompt.enterServerNameOpt': '서버 이름 입력 (선택사항)',
+        
+        // Missing keys added
+        'input.directCommandInput': '$(terminal) 직접 명령어 입력...',
+        'prompt.enterRemoteCommand': '실행할 원격 명령어 입력',
+        'placeholder.remoteCommand': 'ls -la, git status 등',
+
         'message.serverAddedFromTemplate': '✅ 서버 추가됨: {serverName}\n템플릿: {templateName}',
         'prompt.templateSelectDelete': '{count}개 템플릿 - 삭제 선택',
         'confirm.deleteTemplate': '템플릿 삭제?\n\n{name}',

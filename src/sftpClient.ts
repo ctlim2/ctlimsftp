@@ -764,7 +764,7 @@ export class SftpClient {
     }
 
     /**
-     * 원격 파일 내용 검색 (재귀적)
+     * 원격 파일 내용 검색 (Grep 사용으로 최적화)
      * @param remotePath 검색 시작 경로
      * @param searchText 검색할 텍스트
      * @param isRegex 정규식 사용 여부
@@ -773,6 +773,109 @@ export class SftpClient {
      * @returns 검색된 파일 목록 (일치하는 줄 번호 포함)
      */
     async searchInRemoteFiles(
+        remotePath: string,
+        searchText: string,
+        isRegex: boolean = false,
+        filePattern: string = '*',
+        maxResults: number = 100
+    ): Promise<Array<{ file: RemoteFile; matches: Array<{ line: number; text: string }> }>> {
+        if (!this.client) {
+            throw new Error(i18n.t('error.sfptClientNotConnected'));
+        }
+
+        // @ts-ignore - Accessing internal ssh2 client
+        const sshClient = this.client.client;
+        
+        // SSH 클라이언트를 사용할 수 없는 경우 (순수 SFTP만 있는 경우 등) 기존 방식 폴백
+        if (!sshClient) {
+            this.log('SSH client execution not available, falling back to slow search');
+            return this.searchInRemoteFilesSlow(remotePath, searchText, isRegex, filePattern, maxResults);
+        }
+
+        try {
+            // Grep 명령어 구성
+            // -r: 재귀적, -n: 줄번호, -I: 바이너리 무시, -H: 파일명 출력
+            // -E: 확장 정규식 (정규식 검색 시)
+            const grepFlag = isRegex ? '-E' : '-F'; // -F: 고정 문자열(빠름)
+            
+            // 파일 패턴 처리 (--include)
+            // filePattern이 '*'이면 모든 파일, 아니면 해당 패턴
+            // 여러 패턴인 경우 콤마로 구분되어 있을 수 있음
+            const includeParts = filePattern.split(',').map(p => p.trim());
+            const includeFlags = includeParts.map(p => `--include="${p}"`).join(' ');
+            
+            // 검색어 이스케이프 (따옴표 처리)
+            const safeSearchText = searchText.replace(/"/g, '\\"');
+            
+            // 명령어 조합
+            // head -n X 로 결과 개수 제한 (파일 수가 아니라 매치 라인 수 제한이긴 함)
+            const command = `grep ${grepFlag}rnIH ${includeFlags} "${safeSearchText}" "${remotePath}" | head -n ${maxResults * 10}`;
+            
+            if (DEBUG_MODE) console.log(`Executing grep: ${command}`);
+            console.log(`Executing grep: ${command}`);
+
+            const output = await this.executeCommand(command);
+            
+            // 결과 파싱
+            const results: Map<string, { file: RemoteFile; matches: Array<{ line: number; text: string }> }> = new Map();
+            const lines = output.split('\n');
+            let matchCount = 0;
+
+            for (const line of lines) {
+                if (!line || matchCount >= maxResults) continue;
+
+                // grep 출력 형식: filename:line:content
+                // 파일명에 콜론이 있을 수 있으므로 첫 두 콜론만 분리
+                const parts = line.split(':');
+                if (parts.length < 3) continue;
+
+                const filePath = parts[0];
+                const lineNumber = parseInt(parts[1], 10);
+                const content = parts.slice(2).join(':');
+
+                if (isNaN(lineNumber)) continue;
+
+                // 이미 결과에 있는 파일인지 확인
+                if (!results.has(filePath)) {
+                    if (results.size >= maxResults) continue;
+                    
+                    const fileName = path.posix.basename(filePath);
+                    results.set(filePath, {
+                        file: {
+                            name: fileName,
+                            path: filePath,
+                            isDirectory: false,
+                            // grep으로는 크기/시간을 알 수 없으므로 기본값
+                            // 필요하면 stat으로 추가 조회할 수 있으나 속도를 위해 생략
+                        },
+                        matches: []
+                    });
+                }
+
+                const fileResult = results.get(filePath);
+                if (fileResult && fileResult.matches.length < 10) { // 파일당 최대 10개 매치만 표시
+                    fileResult.matches.push({
+                        line: lineNumber,
+                        text: content.trim()
+                    });
+                    matchCount++;
+                }
+            }
+
+            return Array.from(results.values());
+
+        } catch (error) {
+            console.error('Grep search failed:', error);
+            this.log(i18n.t('search.grepFailed', { error: String(error) }));
+            // 실패 시 느린 방식으로 폴백
+            return this.searchInRemoteFilesSlow(remotePath, searchText, isRegex, filePattern, maxResults);
+        }
+    }
+
+    /**
+     * 원격 파일 내용 검색 (기존 느린 방식 - 폴백용)
+     */
+    async searchInRemoteFilesSlow(
         remotePath: string,
         searchText: string,
         isRegex: boolean = false,
