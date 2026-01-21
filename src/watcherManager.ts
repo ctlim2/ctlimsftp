@@ -22,6 +22,7 @@ export class WatcherManager {
 
     /**
      * Watcher 시작
+     * 이미 같은 키로 감시 중인 경우 기존 Watcher를 자동으로 중지하고 새로운 Watcher를 시작합니다.
      * @param key 고유 식별자 (예: "serverName:remotePath")
      * @param remotePath 원격 파일 경로
      * @param serverName 서버 이름
@@ -129,6 +130,6 @@ export class WatcherManager {
      */
     dispose(): void {
         this.stopAllWatches();
-        this.activeWatchers.clear();
+        // Map은 stopAllWatches()에서 이미 clear 되므로 중복 호출 불필요
     }
 }

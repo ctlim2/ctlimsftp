@@ -2278,8 +2278,14 @@ export function activate(context: vscode.ExtensionContext) {
             // 고유 식별자 생성 (serverName + remotePath)
             const watcherKey = `${serverName}:${remotePath}`;
             
+            // WatcherManager가 초기화되지 않은 경우 (예외 상황)
+            if (!watcherManager) {
+                vscode.window.showErrorMessage('WatcherManager is not initialized.');
+                return;
+            }
+            
             // 이미 감시 중인지 확인
-            if (watcherManager && watcherManager.hasActiveWatch(watcherKey)) {
+            if (watcherManager.hasActiveWatch(watcherKey)) {
                 const replace = await vscode.window.showWarningMessage(
                     i18n.t('warning.alreadyWatching', { fileName }),
                     i18n.t('action.stopAndRestart'),
@@ -2307,9 +2313,7 @@ export function activate(context: vscode.ExtensionContext) {
                 });
                 
                 // WatcherManager에 등록
-                if (watcherManager) {
-                    watcherManager.startWatch(watcherKey, remotePath, serverName, watcher, outputChannel);
-                }
+                watcherManager.startWatch(watcherKey, remotePath, serverName, watcher, outputChannel);
                 
                 // 감시 중지 버튼 제공 (알림 메시지로)
                 const stopAction = await vscode.window.showInformationMessage(
@@ -2319,14 +2323,7 @@ export function activate(context: vscode.ExtensionContext) {
                 
                 if (stopAction === i18n.t('action.stop')) {
                     // WatcherManager를 통해 중지
-                    if (watcherManager) {
-                        watcherManager.stopWatch(watcherKey);
-                    } else {
-                        // Fallback: 직접 중지
-                        watcher.stop();
-                        outputChannel.appendLine('\n' + '-'.repeat(50));
-                        outputChannel.appendLine('Log watch stopped by user.');
-                    }
+                    watcherManager.stopWatch(watcherKey);
                 }
                 
             } catch (error) {
