@@ -1,6 +1,93 @@
-<?xml version="1.0" encoding="utf-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
-  <path class="a" d="M 149.929 75.648 L 133.019 75.648 C 131.019 75.548 127.089 71.418 124.829 71.418 L 114.929 71.418 C 113.725 71.418 112.748 72.394 112.748 73.598 C 112.748 73.615 112.748 73.632 112.749 73.648 L 112.749 80.938 L 151.749 80.938 L 151.749 77.518 C 151.771 76.508 150.97 75.671 149.959 75.648 L 149.929 75.648 Z" style="fill: none; stroke: rgb(0, 0, 0); stroke-linecap: round; stroke-linejoin: round; stroke-width: 1;"/>
-  <path class="a" d="M 151.749 80.928 L 112.749 80.928 L 112.749 99.648 C 112.737 100.853 113.705 101.838 114.909 101.848 L 114.919 101.848 L 149.569 101.848 C 150.773 101.848 151.749 100.872 151.749 99.668 L 151.749 99.648 L 151.749 80.928 Z" style="fill: none; stroke: rgb(0, 0, 0); stroke-linecap: round; stroke-linejoin: round; stroke-width: 1;"/>
-  <text style="white-space: pre; fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 28px;" x="115.276" y="108.204" transform="matrix(0.308749, 0, 0, 0.296005, 80.806282, 62.805904)">ctlim-ftp</text>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 24 24"
+   version="1.1"
+   id="svg3"
+   sodipodi:docname="icon.svg"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs3">
+    <linearGradient
+       id="linearGradient10"
+       inkscape:swatch="gradient">
+      <stop
+         style="stop-color:#165075;stop-opacity:0.80632414;"
+         offset="0"
+         id="stop10" />
+      <stop
+         style="stop-color:#165075;stop-opacity:0;"
+         offset="1"
+         id="stop11" />
+    </linearGradient>
+    <linearGradient
+       id="swatch3"
+       inkscape:swatch="solid">
+      <stop
+         style="stop-color:#000000;stop-opacity:1;"
+         offset="0"
+         id="stop3" />
+    </linearGradient>
+  </defs>
+  <sodipodi:namedview
+     id="namedview3"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="16.8125"
+     inkscape:cx="5.1449814"
+     inkscape:cy="10.914498"
+     inkscape:window-width="1920"
+     inkscape:window-height="1009"
+     inkscape:window-x="-8"
+     inkscape:window-y="56"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg3" />
+  <!-- Upload arrow -->
+  <path
+     d="m 12.327138,2.1672863 -4.0000005,4 h 2.5000005 v 5.0000007 h 3 V 6.1672863 h 2.5 z"
+     fill="currentColor"
+     id="path1" />
+  <!-- Server/Lock -->
+  <rect
+     x="4.1035452"
+     y="9.9808693"
+     width="15.789191"
+     height="3.3691165"
+     rx="1.5789191"
+     fill="none"
+     stroke="currentColor"
+     stroke-width="1.63088"
+     id="rect1" />
+  <!-- Shield with $ -->
+  <!-- Download arrow -->
+  <path
+     d="m 12.327138,20.167287 -4.0000005,-4 h 2.5000005 v -4 h 3 v 4 h 2.5 z"
+     fill="currentColor"
+     id="path3" />
+  <!-- SFTP text -->
+  <text
+     x="12.237918"
+     y="22.618958"
+     font-family="Arial, sans-serif"
+     font-size="3px"
+     font-weight="bold"
+     text-anchor="middle"
+     fill="currentColor"
+     id="text3">SFTP</text>
+  <rect
+     style="fill:none;fill-opacity:1;stroke:#ff5bdf;stroke-width:0.534732;stroke-linecap:round;stroke-linejoin:miter;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:0.968379;paint-order:markers fill stroke"
+     id="rect10"
+     width="23.189978"
+     height="23.130901"
+     x="0.4491989"
+     y="0.38994047" />
 </svg>

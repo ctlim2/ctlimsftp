@@ -2,6 +2,17 @@
 
 All notable changes to the "ctlim SFTP" extension will be documented in this file.
 
+## [1.1.7] - 2026-01-21
+
+### Fixed
+- 패키징 빌드 오류 수정 (`@types/vscode` 버전 다운그레이드 및 의존성 호환성 개선)
+
+## [1.1.6] - 2026-01-20
+
+### Added
+- **원격 로그 실시간 감시 (Watch Log)**: 원격 파일 컨텍스트 메뉴에서 `tail -f` 명령을 통해 실시간 로그 확인 가능
+- **로그 감시 중지**: 감시 시작 시 알림 메시지의 'Stop' 버튼으로 중지 기능 제공
+
 ## [1.1.4] - 2026-01-19
 
 ### Added

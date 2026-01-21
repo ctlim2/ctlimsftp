@@ -698,6 +698,92 @@ export class SftpClient {
         }
     }
 
+    private activeStreams: Map<string, any> = new Map();
+
+    /**
+     * 원격 파일 실시간 감시 (tail -f)
+     * @param remotePath 감시할 원격 파일 경로
+     * @param callback 데이터 수신 시 호출될 콜백 함수
+     * @returns 스트림 제어 객체 (stop 메서드 포함)
+     */
+    async watchRemoteFile(remotePath: string, callback: (data: string) => void): Promise<{ stop: () => void }> {
+        if (!this.client) {
+            throw new Error(i18n.t('error.sfptClientNotConnected'));
+        }
+
+        // @ts-ignore - Accessing internal ssh2 client
+        const sshClient = this.client.client;
+        
+        if (!sshClient) {
+            throw new Error(i18n.t('error.sshClientNotAvailable'));
+        }
+
+        // 이미 감시 중인 경우 중지
+        if (this.activeStreams.has(remotePath)) {
+            const existingStream = this.activeStreams.get(remotePath);
+            try {
+                existingStream.close();
+            } catch (e) {
+                // Ignore error
+            }
+            this.activeStreams.delete(remotePath);
+        }
+
+        this.log(i18n.t('log.startWatching', { path: remotePath }));
+
+        return new Promise((resolve, reject) => {
+            // tail -f 실행
+            sshClient.exec(`tail -f "${remotePath}"`, (err: any, stream: any) => {
+                if (err) {
+                    return reject(err);
+                }
+
+                this.activeStreams.set(remotePath, stream);
+
+                stream.on('close', (code: any, signal: any) => {
+                    this.log(i18n.t('log.stopWatching', { path: remotePath }));
+                    this.activeStreams.delete(remotePath);
+                }).on('data', (data: any) => {
+                    const text = data.toString();
+                    callback(text);
+                }).stderr.on('data', (data: any) => {
+                    const text = data.toString();
+                    callback(`[STDERR] ${text}`);
+                });
+
+                resolve({
+                    stop: () => {
+                        stream.close(); // ssh2 stream close
+                        // kill process if needed? stream.close() sends EOF usually.
+                        // sending Ctrl+C might be needed for tail -f to stop gracefully on server side
+                        try {
+                            stream.write('\x03');
+                        } catch(e) {
+                            // nothing
+                        } 
+                    }
+                });
+            });
+        });
+    }
+
+    /**
+     * 원격 파일 감시 중지
+     */
+    stopWatchingRemoteFile(remotePath: string): void {
+        const stream = this.activeStreams.get(remotePath);
+        if (stream) {
+            try {
+                // Send Ctrl+C to stop the process
+                stream.write('\x03');
+                stream.close();
+            } catch (error) {
+                // Ignore
+            }
+            this.activeStreams.delete(remotePath);
+        }
+    }
+
     /**
      * 원격 파일명 검색 (재귀적)
      * @param remotePath 검색 시작 경로

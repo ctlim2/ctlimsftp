@@ -674,6 +674,7 @@ export class I18n {
         'success.renameComplete': 'File renamed: {fileName}',
         'success.syncComplete': 'Sync completed successfully',
         'success.syncStats': 'Uploaded: {uploaded}, Downloaded: {downloaded}, Deleted: {deleted}',
+        'info.watchingLog': 'Watching log file: {fileName}',
         'sync.bidirectional': 'Bidirectional (Both ways)',
         'sync.confirmStart': 'Start sync?',
         'sync.deleteChoice': 'Delete removed files? {value}',
@@ -1366,6 +1367,7 @@ export class I18n {
         'prompt.enterServerNameOpt': '서버 이름 입력 (선택사항)',
         
         // Missing keys added
+        'info.watchingLog': '로그 파일 감시 중: {fileName}',
         'input.directCommandInput': '$(terminal) 직접 명령어 입력...',
         'prompt.enterRemoteCommand': '실행할 원격 명령어 입력',
         'placeholder.remoteCommand': 'ls -la, git status 등',

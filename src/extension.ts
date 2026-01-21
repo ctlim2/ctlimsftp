@@ -1820,6 +1820,19 @@ export function activate(context: vscode.ExtensionContext) {
                 commandToExecute = commandToExecute.split(match[0]).join(userInput);
             }
 
+            // 터미널에서 실행할지 여부 확인 (옵션 제공)
+            const executeInTerminal = await vscode.window.showQuickPick(
+                [
+                    { label: i18n.t('option.outputChannel'), description: i18n.t('description.outputChannel'), value: false },
+                    { label: i18n.t('option.terminal'), description: i18n.t('description.terminal'), value: true }
+                ],
+                { placeHolder: i18n.t('prompt.selectExecutionMethod') }
+            );
+
+            if (!executeInTerminal) {
+                return; // 취소
+            }
+
             // 서버 연결 확인
             let connection = treeProvider.getConnectedServer(serverName);
             if (!connection || !connection.client.isConnected()) {
@@ -1847,28 +1860,54 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            // 명령어 실행
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: i18n.t('progress.executingCommand', { command: commandName }),
-                cancellable: false
-            }, async (progress) => {
-                try {
-                    const result = await connection!.client.executeCommand(commandToExecute);
+            if (executeInTerminal.value) {
+                // 터미널에서 실행
+                const terminalName = `SFTP: ${serverName}`;
+                let terminal = vscode.window.terminals.find(t => t.name === terminalName);
+                
+                if (!terminal) {
+                    terminal = vscode.window.createTerminal(terminalName);
                     
-                    // 결과 표시
-                    const outputChannel = vscode.window.createOutputChannel(`SFTP Command: ${commandName}`);
-                    outputChannel.clear();
-                    outputChannel.appendLine(`Command: ${commandToExecute}`);
-                    outputChannel.appendLine('-'.repeat(50));
-                    outputChannel.appendLine(result);
-                    outputChannel.show();
+                    // SSH 접속 명령 실행
+                    let sshCommand = '';
+                    if (config.privateKey) {
+                        sshCommand = `ssh -i "${config.privateKey}" -p ${config.port || 22} ${config.username}@${config.host}`;
+                    } else {
+                        sshCommand = `ssh -p ${config.port || 22} ${config.username}@${config.host}`;
+                    }
+                    terminal.sendText(sshCommand);
                     
-                    vscode.window.showInformationMessage(i18n.t('success.commandExecuted', { command: commandName }));
-                } catch (error) {
-                    vscode.window.showErrorMessage(i18n.t('error.commandExecutionFailed', { error: String(error) }));
+                    // 접속 대기 (간단한 지연) - 실제로는 프롬프트 대기가 필요하지만 단순화
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                 }
-            });
+                
+                terminal.show();
+                terminal.sendText(commandToExecute);
+                
+            } else {
+                // 기존 방식: Output Channel에서 실행
+                await vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: i18n.t('progress.executingCommand', { command: commandName }),
+                    cancellable: false
+                }, async (progress) => {
+                    try {
+                        const result = await connection!.client.executeCommand(commandToExecute);
+                        
+                        // 결과 표시
+                        const outputChannel = vscode.window.createOutputChannel(`SFTP Command: ${commandName}`);
+                        outputChannel.clear();
+                        outputChannel.appendLine(`Command: ${commandToExecute}`);
+                        outputChannel.appendLine('-'.repeat(50));
+                        outputChannel.appendLine(result);
+                        outputChannel.show();
+                        
+                        vscode.window.showInformationMessage(i18n.t('success.commandExecuted', { command: commandName }));
+                    } catch (error) {
+                        vscode.window.showErrorMessage(i18n.t('error.commandExecutionFailed', { error: String(error) }));
+                    }
+                });
+            }
 
         } catch (error) {
             vscode.window.showErrorMessage(i18n.t('error.unknownError', { error: String(error) }));
@@ -2179,6 +2218,95 @@ export function activate(context: vscode.ExtensionContext) {
         } catch (error) {
             vscode.window.showErrorMessage(i18n.t('error.renameFailed', { error: String(error) }));
             if (DEBUG_MODE) console.error('renameRemoteFile error:', error);
+        }
+    });
+
+    /**
+     * 원격 파일 실시간 감시 Command (tail -f)
+     */
+    const watchLogCommand = vscode.commands.registerCommand('ctlimSftp.watchLog', async (item?: any) => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.watchLog');
+        
+        try {
+            // TreeView item에서 정보 가져오기
+            if (!item || !item.config || !item.remotePath || item.isDirectory) {
+                vscode.window.showErrorMessage(i18n.t('error.onlyFilesAllowed'));
+                return;
+            }
+            
+            const config = item.config;
+            const remotePath = item.remotePath;
+            const fileName = path.basename(remotePath);
+            const serverName = config.name || `${config.username}@${config.host}`;
+            
+            // 서버 연결 확인
+            let connection = treeProvider.getConnectedServer(serverName);
+            if (!connection || !connection.client.isConnected()) {
+                const reconnect = await vscode.window.showWarningMessage(
+                    i18n.t('warning.serverNotConnected'),
+                    i18n.t('action.connect')
+                );
+                
+                if (reconnect !== i18n.t('action.connect')) {
+                    return;
+                }
+                
+                try {
+                    const client = createClient(config);
+                    await client.connect(config);
+                    treeProvider.addConnectedServer(serverName, client, config);
+                    connection = treeProvider.getConnectedServer(serverName);
+                } catch (error) {
+                    vscode.window.showErrorMessage(i18n.t('error.connectionFailed', { error: String(error) }));
+                    return;
+                }
+            }
+            
+            if (!connection) return;
+            
+            // FTP는 지원하지 않음
+            if (!(connection.client instanceof SftpClient)) {
+                vscode.window.showErrorMessage('FTP does not support log watching. Only available for SFTP/SSH.');
+                return;
+            }
+            
+            // Output Channel 생성
+            const channelName = `Log: ${fileName} (${serverName})`;
+            const outputChannel = vscode.window.createOutputChannel(channelName);
+            outputChannel.show();
+            outputChannel.appendLine(`Starting watch on ${remotePath}...`);
+            outputChannel.appendLine('-'.repeat(50));
+            
+            try {
+                const watcher = await connection.client.watchRemoteFile(remotePath, (data) => {
+                    outputChannel.append(data);
+                });
+                
+                // 감시 중지 버튼 제공 (알림 메시지로) - 간단한 방법
+                // (더 나은 방법: StatusBarItem을 만들거나, OutputChannel이 닫힐 때 감지)
+                const stopAction = await vscode.window.showInformationMessage(
+                    i18n.t('info.watchingLog', { fileName }), 
+                    i18n.t('action.stop')
+                );
+                
+                if (stopAction === i18n.t('action.stop')) {
+                    watcher.stop();
+                    outputChannel.appendLine('\n' + '-'.repeat(50));
+                    outputChannel.appendLine('Log watch stopped by user.');
+                }
+                
+                // OutputChannel 닫힘 감지해서 중지하는 방법은 복잡하므로,
+                // 여기서는 "중지" 버튼을 누르거나, 다른 로그를 볼 때 관리하는 식으로.
+                // TODO: 전역 Watcher 관리자 만들기
+                
+            } catch (error) {
+                outputChannel.appendLine(`Error: ${error}`);
+                vscode.window.showErrorMessage(`Failed to watch log: ${error}`);
+            }
+            
+        } catch (error) {
+            vscode.window.showErrorMessage(i18n.t('error.unknownError', { error: String(error) }));
+            if (DEBUG_MODE) console.error('watchLog error:', error);
         }
     });
 
@@ -4028,6 +4156,7 @@ export function activate(context: vscode.ExtensionContext) {
         addServerFromTemplateCommand,
         manageTemplatesCommand,
         selectPrivateKeyCommand,
+        watchLogCommand,
         saveWatcher
 
         

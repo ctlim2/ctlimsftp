@@ -2,7 +2,7 @@
   "name": "ctlim-sftp",
   "displayName": "ctlim-SFTP",
   "description": "Simple SFTP sync extension with upload on save and conflict detection",
-  "version": "1.1.5",
+  "version": "1.1.8",
   "publisher": "ctlim",
   "icon": "resources/icon.png",
   "engines": {
@@ -26,12 +26,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/ctlim2/ctlimsftp"
+    "url": "https://github.com/ctlim2/ctlim"
   },
   "bugs": {
-    "url": "https://github.com/ctlim2/ctlimsftp/issues"
+    "url": "https://github.com/ctlim2/ctlim/issues"
   },
-  "homepage": "https://github.com/ctlim2/ctlimsftp#readme",
+  "homepage": "https://github.com/ctlim2/ctlim#readme",
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -236,6 +236,11 @@
         "command": "ctlimSftp.selectPrivateKey",
         "title": "ctlim SFTP: Select SSH Private Key Path",
         "icon": "$(key)"
+      },
+      {
+        "command": "ctlimSftp.watchLog",
+        "title": "ctlim SFTP: Watch Log (tail -f)",
+        "icon": "$(eye)"
       }
     ],
     "menus": {
@@ -373,6 +378,11 @@
           "group": "file@2"
         },
         {
+          "command": "ctlimSftp.watchLog",
+          "when": "view == ctlimSftpView && viewItem == remoteFile",
+          "group": "file@3"
+        },
+        {
           "command": "ctlimSftp.addBookmark",
           "when": "view == ctlimSftpView && viewItem == remoteFile",
           "group": "bookmark@1"
@@ -504,7 +514,11 @@
         "ctlimSftp.language": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "ko", "en"],
+          "enum": [
+            "auto",
+            "ko",
+            "en"
+          ],
           "enumDescriptions": [
             "Follow VS Code language setting (auto-detect)",
             "Korean",
@@ -522,8 +536,8 @@
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/ssh2-sftp-client": "^9.0.0",
+    "@types/node": "^20.19.30",
+    "@types/ssh2-sftp-client": "^9.0.6",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
@@ -531,6 +545,7 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
+    "@types/ssh2": "^1.15.5",
     "basic-ftp": "^5.1.0",
     "ssh2-sftp-client": "^10.0.3"
   }
