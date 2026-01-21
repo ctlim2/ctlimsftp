@@ -1,11 +1,11 @@
 # ctlim SFTP
 
-[English](README.md) | **한국어**
+[English](https://github.com/ctlim2/ctlim/blob/main/resources/README.md) | **한국어**
 
 > 간편하고 강력한 VS Code FTP/SFTP/SSH 파일 동기화 확장 프로그램
 
-[![Version](https://img.shields.io/badge/version-1.1.8-blue.svg)](https://github.com/ctlim2/ctlim)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.1.20-blue.svg)](https://github.com/ctlim2/ctlim)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)]([LICENSE](https://github.com/ctlim2/ctlim/blob/main/LICENSE))
 
 **저장 시 자동 업로드**와 **지능형 충돌 감지** 기능으로 원격 서버와 로컬 파일을 안전하게 동기화하세요.
 
@@ -16,7 +16,7 @@
 ### 1. 저장 시 자동 업로드 & 지능형 충돌 감지
 `Ctrl+S`를 눌러 저장하는 순간 원격 서버로 자동 업로드됩니다. 만약 원격 파일이 다른 사람에 의해 수정되었다면, 똑똑한 충돌 감지 시스템이 즉시 알려줍니다.
 
-![ctlim-sftp-demo](https://github.com/ctlim2/ctlim/raw/main/resources/save-dif.gif)
+![ctlim-sftp-demo](https://raw.githubusercontent.com/ctlim2/ctlim/refs/heads/main/resources/save-dif.gif)
 
 - **덮어쓰기**: 로컬 내용으로 강제 업로드
 - **비교하기**: Diff 뷰어로 변경 사항 시각적 확인
@@ -25,7 +25,7 @@
 ### 2. 스마트 북마크 시스템
 복잡한 경로를 매번 찾아갈 필요 없습니다. 자주 쓰는 원격 폴더나 파일을 북마크로 등록하여 한 번의 클릭으로 이동하세요.
 
-![ctlim-sftp-demo](https://github.com/ctlim2/ctlim/raw/main/resources/bookmark.gif)
+![ctlim-sftp-demo](https://raw.githubusercontent.com/ctlim2/ctlim/refs/heads/main/resources/bookmark.gif)
 
 - **파일/폴더 즐겨찾기**: 트리 뷰에서 우클릭으로 간편 추가
 - **자주 쓰는 목록**: 사용 빈도 기반 자동 정렬
@@ -41,10 +41,10 @@ VS Code의 탐색기처럼, 원격 서버의 파일 시스템을 트리 구조�
 원격 서버의 파일을 파일명뿐만 아니라 내용(grep)으로도 검색할 수 있습니다. 정규식 지원으로 더욱 정밀한 검색이 가능합니다.
 
 **[파일명 검색]**
-![파일명 검색](https://github.com/ctlim2/ctlim/raw/main/resources/searchRemoteFiles.gif)
+![파일명 검색](https://raw.githubusercontent.com/ctlim2/ctlim/refs/heads/main/resources/searchRemoteFiles.gif)
 
 **[내용 검색]**
-![내용 검색](https://github.com/ctlim2/ctlim/raw/main/resources/searchInRemoteFiles.gif)
+![내용 검색](https://raw.githubusercontent.com/ctlim2/ctlim/refs/heads/main/resources/searchInRemoteFiles.gif)
 
 - **Search: File Name**: 파일명으로 빠르게 검색
 - **Search: Content (grep)**: 파일 내용으로 깊이 있게 검색 (서버 grep 활용)
@@ -287,7 +287,7 @@ cursor --install-extension ctlim.ctlim-sftp
 
 ctlim SFTP는 메타데이터 기반의 충돌 감지 기능으로 원격 파일을 안전하게 보호합니다.
 
-![충돌 감지](https://github.com/ctlim2/ctlim/blob/main/resources/save-dif.gif?raw=true)
+![충돌 감지](https://raw.githubusercontent.com/ctlim2/ctlim/refs/heads/main/resources/save-dif.gif)
 
 
 
@@ -460,7 +460,7 @@ ctlim SFTP는 안정적인 연결 유지를 위해 자동 재연결 기능을 �
 
 자주 사용하는 원격 파일이나 폴더를 북마크로 저장하여 빠르게 접근할 수 있습니다.
 
-![북마크 시스템](https://github.com/ctlim2/ctlim/blob/main/resources/bookmark.gif)
+![북마크 시스템](https://raw.githubusercontent.com/ctlim2/ctlim/refs/heads/main/resources/bookmark.gif)
 
 #### 북마크 추가
 
@@ -785,7 +785,7 @@ $(warning) 777 - rwxrwxrwx
 
 원격 서버에서 미리 정의된 명령어나 임의의 쉘 명령을 즉시 실행합니다.
 
-![Execute Custom Command](https://github.com/ctlim2/ctlim/raw/main/resources/executeCustomCommand.gif)
+![Execute Custom Command](https://raw.githubusercontent.com/ctlim2/ctlim/refs/heads/main/resources/executeCustomCommand.gif)
 
 **사용법**:
 1. 서버, 파일, 또는 폴더 우클릭 → `Execute Custom Command`
@@ -1010,7 +1010,7 @@ rm -rf .vscode/.sftp-metadata/
 
 ## 📄 라이선스
 
-MIT License - 자세한 내용은 [LICENSE](LICENSE) 파일 참조
+MIT License - 자세한 내용은 [LICENSE](https://github.com/ctlim2/ctlim/blob/main/LICENSE) 파일 참조
 
 Copyright (c) 2026 ctlim2
 
@@ -1021,5 +1021,5 @@ Copyright (c) 2026 ctlim2
 이 프로젝트가 유용하다면 ⭐ Star를 눌러주세요!
 
 **개발자**: ctlim  
-**버전**: 1.1.8  
+**버전**: 1.1.20 
 **마지막 업데이트**: 2026-01-21

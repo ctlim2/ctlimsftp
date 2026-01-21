@@ -1,10 +1,10 @@
 # ctlim SFTP
 
-**English** | [한국어](README.ko.md)
+**English** | [한국어](https://github.com/ctlim2/ctlim/blob/main/resources/README.ko.md)
 
 > Simple and Powerful VS Code SFTP/SSH File Synchronization Extension
 
-[![Version](https://img.shields.io/badge/version-1.1.8-blue.svg)](https://github.com/ctlim2/ctlim)
+[![Version](https://img.shields.io/badge/version-1.1.20-blue.svg)](https://github.com/ctlim2/ctlim)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Safely synchronize remote servers and local files with **Auto Upload on Save** and **Intelligent Conflict Detection**.
@@ -16,7 +16,7 @@ Safely synchronize remote servers and local files with **Auto Upload on Save** a
 ### 1. Auto Upload on Save & Intelligent Conflict Detection
 Press `Ctrl+S` to instantly upload to the remote server. If the remote file has been modified by someone else, the intelligent conflict detection system will alert you immediately.
 
-![ctlim-sftp-demo](https://github.com/ctlim2/ctlim/raw/main/resources/save-dif.gif)
+![ctlim-sftp-demo](https://raw.githubusercontent.com/ctlim2/ctlim/refs/heads/main/resources/save-dif.gif)
 
 - **Overwrite**: Force upload with local content
 - **Compare**: Visually check changes with Diff Viewer
@@ -25,7 +25,7 @@ Press `Ctrl+S` to instantly upload to the remote server. If the remote file has 
 ### 2. Smart Bookmark System
 No need to navigate complex paths every time. Register frequently used remote folders or files as bookmarks and access them with a single click.
 
-![ctlim-sftp-demo](https://github.com/ctlim2/ctlim/raw/main/resources/bookmark.gif)
+![ctlim-sftp-demo](https://raw.githubusercontent.com/ctlim2/ctlim/refs/heads/main/resources/bookmark.gif)
 
 - **File/Folder Favorites**: Easily add via right-click in Tree View
 - **Frequent List**: Auto-sort based on usage frequency
@@ -41,10 +41,10 @@ Browse the remote server's file system in real-time with a tree structure, just 
 Search remote files not just by name, but also by content (grep). Supports regex for precise searching.
 
 **[Search by Filename]**
-![Search by Filename](https://github.com/ctlim2/ctlim/raw/main/resources/searchRemoteFiles.gif)
+![Search by Filename](https://raw.githubusercontent.com/ctlim2/ctlim/refs/heads/main/resources/searchRemoteFiles.gif)
 
 **[Search by Content]**
-![Search by Content](https://github.com/ctlim2/ctlim/raw/main/resources/searchInRemoteFiles.gif)
+![Search by Content](https://raw.githubusercontent.com/ctlim2/ctlim/refs/heads/main/resources/searchInRemoteFiles.gif)
 
 - **Search: File Name**: Quickly find files by name
 - **Search: Content (grep)**: Deep search into file contents (utilizing server-side grep)
@@ -298,7 +298,7 @@ Enter server information in the generated configuration file:
 
 ctlim SFTP ensures remote file safety with metadata-based conflict detection.
 
-![Conflict Detection System](https://github.com/ctlim2/ctlim/blob/main/resources/save-dif.gif?raw=true)
+![Conflict Detection System](https://github.com/ctlim2/ctlim/raw/main/resources/save-dif.gif)
 
 ### How It Works
 
@@ -469,7 +469,7 @@ ctlim SFTP provides auto-reconnection for stable connection maintenance.
 
 Save frequently used remote files or folders as bookmarks for quick access.
 
-![Bookmark System](https://github.com/ctlim2/ctlim/blob/main/resources/bookmark.gif?raw=true)
+![Bookmark System](https://raw.githubusercontent.com/ctlim2/ctlim/refs/heads/main/resources/bookmark.gif)
 
 #### Add Bookmark
 
@@ -794,7 +794,7 @@ Open connected server's SSH terminal directly in VS Code.
 
 Execute pre-defined or custom shell commands on the remote server instantly.
 
-![Execute Custom Command](https://github.com/ctlim2/ctlim/raw/main/resources/executeCustomCommand.gif)
+![Execute Custom Command](https://raw.githubusercontent.com/ctlim2/ctlim/refs/heads/main/resources/executeCustomCommand.gif)
 
 **Usage**:
 1. Right-click server, file, or folder → `Execute Custom Command`
@@ -1046,7 +1046,7 @@ Bug reports, feature suggestions, and Pull Requests are welcome!
 
 ## 📄 License
 
-MIT License - See [LICENSE](LICENSE) file for details
+MIT License - See [LICENSE](https://github.com/ctlim2/ctlim/blob/main/LICENSE) file for details
 
 Copyright (c) 2026 ctlim2
 
@@ -1057,5 +1057,5 @@ Copyright (c) 2026 ctlim2
 If you find this project useful, please give it a ⭐ Star!
 
 **Developer**: ctlim  
-**Version**: 1.1.8  
+**Version**: 1.1.20  
 **Last Updated**: 2026-01-21
