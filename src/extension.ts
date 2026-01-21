@@ -2304,6 +2304,10 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showErrorMessage(`Failed to watch log: ${error}`);
             }
             
+            // Watcher가 끝나거나 실패한 후, Output 채널의 마지막 줄로 스크롤을 시도할 수 있지만, 
+            // VS Code API에는 OutputChannel 스크롤 제어 기능이 없음.
+            // 대신 사용자가 직접 Output 패널을 볼 때 자동으로 맨 아래로 이동되기를 기대해야함.
+
         } catch (error) {
             vscode.window.showErrorMessage(i18n.t('error.unknownError', { error: String(error) }));
             if (DEBUG_MODE) console.error('watchLog error:', error);
