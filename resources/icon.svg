@@ -58,15 +58,16 @@
      id="path1" />
   <!-- Server/Lock -->
   <rect
-     x="4.1035452"
-     y="9.9808693"
-     width="15.789191"
-     height="3.3691165"
-     rx="1.5789191"
+     x="4.0074744"
+     y="11.133869"
+     width="16.27873"
+     height="1.0036384"
+     rx="1.6278731"
      fill="none"
      stroke="currentColor"
      stroke-width="1.63088"
-     id="rect1" />
+     id="rect1"
+     style="stroke-width:0.238857;stroke-dasharray:none" />
   <!-- Shield with $ -->
   <!-- Download arrow -->
   <path
@@ -84,7 +85,7 @@
      fill="currentColor"
      id="text3">SFTP</text>
   <rect
-     style="fill:none;fill-opacity:1;stroke:#ff5bdf;stroke-width:0.534732;stroke-linecap:round;stroke-linejoin:miter;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:0.968379;paint-order:markers fill stroke"
+     style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.534732;stroke-linecap:round;stroke-linejoin:miter;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:0.96837902;paint-order:markers fill stroke"
      id="rect10"
      width="23.189978"
      height="23.130901"

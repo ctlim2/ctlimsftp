@@ -43,40 +43,41 @@
      inkscape:deskcolor="#d1d1d1"
      showgrid="false"
      inkscape:zoom="16.8125"
-     inkscape:cx="5.1449814"
-     inkscape:cy="10.914498"
-     inkscape:window-width="1920"
-     inkscape:window-height="1009"
-     inkscape:window-x="-8"
-     inkscape:window-y="56"
-     inkscape:window-maximized="1"
+     inkscape:cx="6.394052"
+     inkscape:cy="10.944238"
+     inkscape:window-width="1302"
+     inkscape:window-height="790"
+     inkscape:window-x="836"
+     inkscape:window-y="267"
+     inkscape:window-maximized="0"
      inkscape:current-layer="svg3" />
   <!-- Upload arrow -->
+  <!-- Server/Lock -->
+  <!-- Shield with $ -->
+  <!-- Download arrow -->
+  <!-- SFTP text -->
   <path
-     d="m 12.327138,2.1672863 -4.0000005,4 h 2.5000005 v 5.0000007 h 3 V 6.1672863 h 2.5 z"
+     d="m 12.323743,2.2640427 -3.9999999,4 h 2.4999999 v 5.0000003 h 3 V 6.2640427 h 2.5 z"
      fill="currentColor"
      id="path1" />
-  <!-- Server/Lock -->
   <rect
-     x="4.1035452"
-     y="9.9808693"
-     width="15.789191"
-     height="3.3691165"
-     rx="1.5789191"
+     x="4.0040803"
+     y="11.230625"
+     width="16.27873"
+     height="1.0036384"
+     rx="1.6278731"
      fill="none"
      stroke="currentColor"
      stroke-width="1.63088"
-     id="rect1" />
-  <!-- Shield with $ -->
-  <!-- Download arrow -->
+     id="rect1"
+     style="stroke-width:0.238857;stroke-dasharray:none" />
   <path
-     d="m 12.327138,20.167287 -4.0000005,-4 h 2.5000005 v -4 h 3 v 4 h 2.5 z"
+     d="M 12.323743,20.264044 8.3237431,16.264043 h 2.4999999 v -4 h 3 v 4 h 2.5 z"
      fill="currentColor"
      id="path3" />
-  <!-- SFTP text -->
   <text
-     x="12.237918"
-     y="22.618958"
+     x="12.234523"
+     y="22.715714"
      font-family="Arial, sans-serif"
      font-size="3px"
      font-weight="bold"
@@ -84,10 +85,10 @@
      fill="currentColor"
      id="text3">SFTP</text>
   <rect
-     style="fill:none;fill-opacity:1;stroke:#ff5bdf;stroke-width:0.534732;stroke-linecap:round;stroke-linejoin:miter;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:0.968379;paint-order:markers fill stroke"
+     style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.534732;stroke-linecap:round;stroke-linejoin:miter;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:0.968379;paint-order:markers fill stroke"
      id="rect10"
      width="23.189978"
      height="23.130901"
-     x="0.4491989"
-     y="0.38994047" />
+     x="0.44580409"
+     y="0.48669729" />
 </svg>
