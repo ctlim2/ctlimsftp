@@ -172,7 +172,12 @@ export class WatcherManager {
         }
 
         // Watcher 목록을 QuickPick items로 변환
-        const items: vscode.QuickPickItem[] = watchers.map(w => {
+        // Store watcher ID as a custom property by extending QuickPickItem
+        interface WatcherQuickPickItem extends vscode.QuickPickItem {
+            watcherId: string;
+        }
+
+        const items: WatcherQuickPickItem[] = watchers.map(w => {
             const duration = Math.floor((Date.now() - w.startTime) / 1000);
             const minutes = Math.floor(duration / 60);
             const seconds = duration % 60;
@@ -184,8 +189,8 @@ export class WatcherManager {
                 label: w.fileName,
                 description: w.serverName,
                 detail: `${w.remotePath} (${i18n.t('label.duration')}: ${durationStr})`,
-                // Store watcher id in iconPath as a workaround to pass data
-                iconPath: new vscode.ThemeIcon('eye')
+                iconPath: new vscode.ThemeIcon('eye'),
+                watcherId: w.id
             };
         });
 
@@ -193,7 +198,8 @@ export class WatcherManager {
         items.push({
             label: `$(stop-circle) ${i18n.t('action.stopAllWatchers')}`,
             description: '',
-            detail: i18n.t('description.stopAllWatchers')
+            detail: i18n.t('description.stopAllWatchers'),
+            watcherId: '__STOP_ALL__'
         });
 
         const selected = await vscode.window.showQuickPick(items, {
@@ -206,7 +212,7 @@ export class WatcherManager {
         }
 
         // "Stop All" 선택
-        if (selected.label.includes(i18n.t('action.stopAllWatchers'))) {
+        if (selected.watcherId === '__STOP_ALL__') {
             const confirm = await vscode.window.showWarningMessage(
                 i18n.t('confirm.stopAllWatchers'),
                 { modal: true },
@@ -220,10 +226,8 @@ export class WatcherManager {
             return;
         }
 
-        // 개별 Watcher 중지
-        const watcherToStop = watchers.find(w => 
-            w.fileName === selected.label && w.serverName === selected.description
-        );
+        // 개별 Watcher 중지 - ID를 사용하여 정확하게 식별
+        const watcherToStop = watchers.find(w => w.id === selected.watcherId);
         
         if (watcherToStop) {
             const stopped = this.stopWatcher(watcherToStop.id);
