@@ -10,6 +10,7 @@ import { BookmarkManager } from './bookmarkManager';
 import { TemplateManager } from './templateManager';
 import { ConnectConfigWebview } from './configWebview';
 import { SftpFileDecorationProvider } from './fileDecorationProvider';
+import { WatcherManager } from './watcherManager';
 import { i18n } from './i18n';
 
 // Helper to manage search history
@@ -156,6 +157,7 @@ let statusBarItem: vscode.StatusBarItem;
 let transferHistoryManager: TransferHistoryManager | null = null;
 let bookmarkManager: BookmarkManager | null = null;
 let templateManager: TemplateManager | null = null;
+let watcherManager: WatcherManager | null = null;
 let sftpTreeView: vscode.TreeView<SftpTreeItem> | null = null;
 
 // 북마크 네비게이션 중 onDidChangeSelection 자동 실행 방지
@@ -203,6 +205,10 @@ export function activate(context: vscode.ExtensionContext) {
         transferHistoryManager = new TransferHistoryManager(workspaceFolder.uri.fsPath);
         templateManager = new TemplateManager(workspaceFolder.uri.fsPath);
     }
+    
+    // Initialize Watcher Manager
+    watcherManager = new WatcherManager(DEBUG_MODE);
+    context.subscriptions.push(watcherManager);
     
     // Create Status Bar Item
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
@@ -2282,22 +2288,20 @@ export function activate(context: vscode.ExtensionContext) {
                     outputChannel.append(data);
                 });
                 
-                // 감시 중지 버튼 제공 (알림 메시지로) - 간단한 방법
-                // (더 나은 방법: StatusBarItem을 만들거나, OutputChannel이 닫힐 때 감지)
-                const stopAction = await vscode.window.showInformationMessage(
-                    i18n.t('info.watchingLog', { fileName }), 
-                    i18n.t('action.stop')
-                );
-                
-                if (stopAction === i18n.t('action.stop')) {
-                    watcher.stop();
-                    outputChannel.appendLine('\n' + '-'.repeat(50));
-                    outputChannel.appendLine('Log watch stopped by user.');
+                // WatcherManager에 등록
+                if (watcherManager) {
+                    const watcherId = watcherManager.addWatcher(
+                        remotePath,
+                        serverName,
+                        fileName,
+                        outputChannel,
+                        watcher
+                    );
+                    
+                    if (DEBUG_MODE) {
+                        console.log(`Watcher registered with ID: ${watcherId}`);
+                    }
                 }
-                
-                // OutputChannel 닫힘 감지해서 중지하는 방법은 복잡하므로,
-                // 여기서는 "중지" 버튼을 누르거나, 다른 로그를 볼 때 관리하는 식으로.
-                // TODO: 전역 Watcher 관리자 만들기
                 
             } catch (error) {
                 outputChannel.appendLine(`Error: ${error}`);
@@ -2307,6 +2311,19 @@ export function activate(context: vscode.ExtensionContext) {
         } catch (error) {
             vscode.window.showErrorMessage(i18n.t('error.unknownError', { error: String(error) }));
             if (DEBUG_MODE) console.error('watchLog error:', error);
+        }
+    });
+
+    /**
+     * Watcher 관리 Command
+     */
+    const manageWatchersCommand = vscode.commands.registerCommand('ctlimSftp.manageWatchers', async () => {
+        if (DEBUG_MODE) console.log('> ctlimSftp.manageWatchers');
+        
+        if (watcherManager) {
+            await watcherManager.showManageWatchersUI();
+        } else {
+            vscode.window.showErrorMessage('Watcher Manager is not initialized.');
         }
     });
 
@@ -4157,6 +4174,7 @@ export function activate(context: vscode.ExtensionContext) {
         manageTemplatesCommand,
         selectPrivateKeyCommand,
         watchLogCommand,
+        manageWatchersCommand,
         saveWatcher
 
         
