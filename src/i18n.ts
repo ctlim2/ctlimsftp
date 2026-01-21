@@ -741,6 +741,18 @@ export class I18n {
         'permission.ftpReadFailed': 'Permission Read Failed: {path} - {error}',
         'permission.ftpChanged': 'Permission Changed: {path} -> {mode}',
         'permission.ftpChangeFailed': 'Permission Change Failed: {path} - {error}',
+
+        // Watcher Manager
+        'action.stop': 'Stop',
+        'statusBar.activeWatchers': '{count} active log watcher(s)',
+        'info.noActiveWatchers': 'No active log watchers',
+        'label.duration': 'Duration',
+        'action.stopAllWatchers': 'Stop All Watchers',
+        'description.stopAllWatchers': 'Stop all active log watchers',
+        'prompt.selectWatcherToStop': 'Select a watcher to stop',
+        'confirm.stopAllWatchers': 'Stop all active watchers?',
+        'info.allWatchersStopped': 'All watchers stopped',
+        'info.watcherStopped': 'Watcher stopped: {fileName}',
       },
       ko: {
         // 확장 활성화
@@ -1411,6 +1423,18 @@ export class I18n {
         'folder.createRemote': '폴더 생성: {path}',
         'status.serverNotConnected': '서버 연결 안 됨: {serverName}',
         'error.sfptClientNotConnected': 'SFTP 클라이언트가 연결되지 않았습니다.',
+
+        // Watcher Manager
+        'action.stop': '중지',
+        'statusBar.activeWatchers': '{count}개의 활성 로그 감시',
+        'info.noActiveWatchers': '활성 로그 감시 없음',
+        'label.duration': '지속 시간',
+        'action.stopAllWatchers': '모든 감시 중지',
+        'description.stopAllWatchers': '모든 활성 로그 감시 중지',
+        'prompt.selectWatcherToStop': '중지할 감시 선택',
+        'confirm.stopAllWatchers': '모든 활성 감시를 중지하시겠습니까?',
+        'info.allWatchersStopped': '모든 감시가 중지되었습니다',
+        'info.watcherStopped': '감시 중지됨: {fileName}',
       }
     };
     

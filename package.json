@@ -241,6 +241,11 @@
         "command": "ctlimSftp.watchLog",
         "title": "ctlim SFTP: Watch Log (tail -f)",
         "icon": "$(eye)"
+      },
+      {
+        "command": "ctlimSftp.manageWatchers",
+        "title": "ctlim SFTP: Manage Active Watchers",
+        "icon": "$(eye-watch)"
       }
     ],
     "menus": {
