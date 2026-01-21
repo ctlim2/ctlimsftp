@@ -2278,26 +2278,32 @@ export function activate(context: vscode.ExtensionContext) {
             outputChannel.appendLine('-'.repeat(50));
             
             try {
+                // 1. Watcher 시작
                 const watcher = await connection.client.watchRemoteFile(remotePath, (data) => {
                     outputChannel.append(data);
                 });
                 
-                // 감시 중지 버튼 제공 (알림 메시지로) - 간단한 방법
-                // (더 나은 방법: StatusBarItem을 만들거나, OutputChannel이 닫힐 때 감지)
-                const stopAction = await vscode.window.showInformationMessage(
-                    i18n.t('info.watchingLog', { fileName }), 
-                    i18n.t('action.stop')
-                );
-                
-                if (stopAction === i18n.t('action.stop')) {
+                // 2. Status Bar Item 생성 (우측 하단)
+                const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+                statusBarItem.text = `$(eye) Stop Watch: ${fileName}`;
+                statusBarItem.tooltip = i18n.t('action.clickToStopLog') || 'Click to stop watching log';
+                statusBarItem.command = `ctlimSftp.stopWatchLog.${Date.now()}`; // 고유 커맨드 ID
+                statusBarItem.show();
+
+                // 3. 중지 커맨드 등록 (클로저 활용)
+                const stopCommandDisposable = vscode.commands.registerCommand(statusBarItem.command, () => {
                     watcher.stop();
+                    statusBarItem.dispose();
+                    stopCommandDisposable.dispose();
+                    
                     outputChannel.appendLine('\n' + '-'.repeat(50));
                     outputChannel.appendLine('Log watch stopped by user.');
-                }
-                
-                // OutputChannel 닫힘 감지해서 중지하는 방법은 복잡하므로,
-                // 여기서는 "중지" 버튼을 누르거나, 다른 로그를 볼 때 관리하는 식으로.
-                // TODO: 전역 Watcher 관리자 만들기
+                    vscode.window.showInformationMessage(i18n.t('info.logWatchStopped', { fileName }));
+                });
+
+                // OutputChannel 닫힘 감지는 여전히 어렵지만, 이제 Status Bar 버튼으로 언제든 끌 수 있음.
+                // 사용자에게 안내 메시지 표시
+                vscode.window.showInformationMessage(i18n.t('info.watchingLogStarted', { fileName }));
                 
             } catch (error) {
                 outputChannel.appendLine(`Error: ${error}`);
