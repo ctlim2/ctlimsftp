@@ -10,6 +10,7 @@ import { BookmarkManager } from './bookmarkManager';
 import { TemplateManager } from './templateManager';
 import { ConnectConfigWebview } from './configWebview';
 import { SftpFileDecorationProvider } from './fileDecorationProvider';
+import { WatcherManager } from './watcherManager';
 import { i18n } from './i18n';
 
 // Helper to manage search history
@@ -156,6 +157,7 @@ let statusBarItem: vscode.StatusBarItem;
 let transferHistoryManager: TransferHistoryManager | null = null;
 let bookmarkManager: BookmarkManager | null = null;
 let templateManager: TemplateManager | null = null;
+let watcherManager: WatcherManager | null = null;
 let sftpTreeView: vscode.TreeView<SftpTreeItem> | null = null;
 
 // 북마크 네비게이션 중 onDidChangeSelection 자동 실행 방지
@@ -203,6 +205,9 @@ export function activate(context: vscode.ExtensionContext) {
         transferHistoryManager = new TransferHistoryManager(workspaceFolder.uri.fsPath);
         templateManager = new TemplateManager(workspaceFolder.uri.fsPath);
     }
+    
+    // Initialize Watcher Manager
+    watcherManager = new WatcherManager();
     
     // Create Status Bar Item
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
@@ -2270,6 +2275,25 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             
+            // 고유 식별자 생성 (serverName + remotePath)
+            const watcherKey = `${serverName}:${remotePath}`;
+            
+            // 이미 감시 중인지 확인
+            if (watcherManager && watcherManager.hasActiveWatch(watcherKey)) {
+                const replace = await vscode.window.showWarningMessage(
+                    i18n.t('warning.alreadyWatching', { fileName }),
+                    i18n.t('action.stopAndRestart'),
+                    i18n.t('action.cancel')
+                );
+                
+                if (replace !== i18n.t('action.stopAndRestart')) {
+                    return;
+                }
+                
+                // 기존 감시 중지
+                watcherManager.stopWatch(watcherKey);
+            }
+            
             // Output Channel 생성
             const channelName = `Log: ${fileName} (${serverName})`;
             const outputChannel = vscode.window.createOutputChannel(channelName);
@@ -2282,31 +2306,33 @@ export function activate(context: vscode.ExtensionContext) {
                     outputChannel.append(data);
                 });
                 
-                // 감시 중지 버튼 제공 (알림 메시지로) - 간단한 방법
-                // (더 나은 방법: StatusBarItem을 만들거나, OutputChannel이 닫힐 때 감지)
+                // WatcherManager에 등록
+                if (watcherManager) {
+                    watcherManager.startWatch(watcherKey, remotePath, serverName, watcher, outputChannel);
+                }
+                
+                // 감시 중지 버튼 제공 (알림 메시지로)
                 const stopAction = await vscode.window.showInformationMessage(
                     i18n.t('info.watchingLog', { fileName }), 
                     i18n.t('action.stop')
                 );
                 
                 if (stopAction === i18n.t('action.stop')) {
-                    watcher.stop();
-                    outputChannel.appendLine('\n' + '-'.repeat(50));
-                    outputChannel.appendLine('Log watch stopped by user.');
+                    // WatcherManager를 통해 중지
+                    if (watcherManager) {
+                        watcherManager.stopWatch(watcherKey);
+                    } else {
+                        // Fallback: 직접 중지
+                        watcher.stop();
+                        outputChannel.appendLine('\n' + '-'.repeat(50));
+                        outputChannel.appendLine('Log watch stopped by user.');
+                    }
                 }
-                
-                // OutputChannel 닫힘 감지해서 중지하는 방법은 복잡하므로,
-                // 여기서는 "중지" 버튼을 누르거나, 다른 로그를 볼 때 관리하는 식으로.
-                // TODO: 전역 Watcher 관리자 만들기
                 
             } catch (error) {
                 outputChannel.appendLine(`Error: ${error}`);
                 vscode.window.showErrorMessage(`Failed to watch log: ${error}`);
             }
-            
-            // Watcher가 끝나거나 실패한 후, Output 채널의 마지막 줄로 스크롤을 시도할 수 있지만, 
-            // VS Code API에는 OutputChannel 스크롤 제어 기능이 없음.
-            // 대신 사용자가 직접 Output 패널을 볼 때 자동으로 맨 아래로 이동되기를 기대해야함.
 
         } catch (error) {
             vscode.window.showErrorMessage(i18n.t('error.unknownError', { error: String(error) }));
@@ -5774,6 +5800,12 @@ function updateStatusBar(): void {
  * 
  */
 export function deactivate() {
+    // 모든 Watcher 정리
+    if (watcherManager) {
+        watcherManager.dispose();
+    }
+    
+    // SFTP 클라이언트 연결 종료
     if (sftpClient) {
         sftpClient.disconnect();
     }

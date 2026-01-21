@@ -182,6 +182,8 @@ export class I18n {
         'action.refresh': 'Refresh',
         'action.reconnect': 'Reconnect',
         'action.selectFolder': 'Select Folder',
+        'action.stop': 'Stop',
+        'action.stopAndRestart': 'Stop and Restart',
         'label.history': 'Search History',
         'action.clearHistory': 'Clear History',
         'confirm.clearSearchHistory': 'Are you sure you want to clear search history?',
@@ -701,6 +703,7 @@ export class I18n {
         'warning.permission777': 'WARNING: Setting permissions to 777 is a security risk for {fileName}. Continue?',
         'warning.retryFailedTransfer': 'Retry failed transfer?\nFile: {fileName}\nError: {error}',
         'warning.serverNotConnected': 'Server is not connected. Connect now?',
+        'warning.alreadyWatching': 'Already watching log file: {fileName}. Stop and restart?',
 
         // Workspace Management
         'prompt.enterWorkspaceName': 'Enter workspace name',
@@ -1208,6 +1211,7 @@ export class I18n {
         'warning.permission777': '경고: {fileName}의 권한을 777로 설정하는 것은 보안 위험입니다. 계속하시겠습니까?',
         'warning.retryFailedTransfer': '실패한 전송을 재시도하시겠습니까?\n파일: {fileName}\n오류: {error}',
         'warning.serverNotConnected': '서버가 연결되지 않았습니다. 지금 연결하시겠습니까?',
+        'warning.alreadyWatching': '이미 로그 파일을 감시 중입니다: {fileName}. 중지 후 재시작하시겠습니까?',
 
         // Workspace 관리
         'prompt.enterWorkspaceName': '워크스페이스 이름을 입력하세요',
@@ -1287,6 +1291,8 @@ export class I18n {
         'action.delete': '삭제',
         'action.refresh': '새로고침',
         'action.reconnect': '재연결',
+        'action.stop': '중지',
+        'action.stopAndRestart': '중지 후 재시작',
         'input.selectInputMethod': '원격 경로 입력 방식 선택',
         'input.directInput': '$(edit) 직접 입력',
         'input.treeSelect': '$(folder-opened) 트리에서 선택',
