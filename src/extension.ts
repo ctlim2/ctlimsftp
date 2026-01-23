@@ -164,6 +164,9 @@ let isNavigatingBookmark: boolean = false;
 // Cache document-config and client mapping for performance
 const documentConfigCache = new WeakMap<vscode.TextDocument, { config: SftpConfig; client: ClientType; remotePath: string }>();
 
+// "Save As" 동작 중 해당 파일의 자동 업로드를 방지하기 위한 Set
+const isSavingForSaveAs = new Set<string>();
+
 /**
  * 프로토콜에 따라 적절한 클라이언트 생성
  */
@@ -909,82 +912,124 @@ export function activate(context: vscode.ExtensionContext) {
                 return; // User cancelled
             }
 
-            // Save document if modified
-            if (document.isDirty) {
-                await document.save();
+            const targetRemotePath = remotePath;
+            
+            // Generate temp file with current content (without saving original)
+            const tempDir = path.join(config.workspaceRoot || workspaceFolder.uri.fsPath, '.vscode', '.sftp-tmp');
+            if (!fs.existsSync(tempDir)) {
+                fs.mkdirSync(tempDir, { recursive: true });
             }
+            
+            const tempFileName = `saveAs_${Date.now()}_${path.basename(targetRemotePath)}`;
+            const tempFilePath = path.join(tempDir, tempFileName);
+            
+            try {
+                // Write current document content to temp file
+                fs.writeFileSync(tempFilePath, document.getText(), 'utf-8');
+                
+                // Upload to new path using temp file
+                await vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: i18n.t('progress.uploading', { fileName: path.basename(targetRemotePath) }),
+                    cancellable: false
+                }, async (progress) => {
+                    if (!connection || !config) return;
 
-            // Upload to new path
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: i18n.t('progress.uploading', { fileName: path.basename(remotePath) }),
-                cancellable: false
-            }, async (progress) => {
-                const success = await connection!.client.uploadFile(localPath, remotePath, config!);
-                if (success) {
-                    vscode.window.showInformationMessage(i18n.t('success.uploadComplete', { remotePath }));
-                    
-                    // Calculate new local path for the remote file
-                    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-                    if (!workspaceFolder) {
-                        return;
-                    }
-                    
-                    const newLocalPath = SftpClient.getDownloadFolder(
-                        remotePath, 
-                        workspaceFolder.uri.fsPath, 
-                        config!, 
-                        true, 
-                        false
-                    );
-                    
-                    if (!newLocalPath) {
-                        return;
-                    }
-                    
-                    // Download the uploaded file from remote - protocol aware
-                    if (connection!.client instanceof SftpClient) {
-                        if (connection!.client.client) {
-                            await connection!.client.client.get(remotePath, newLocalPath);
+                    const success = await connection.client.uploadFile(tempFilePath, targetRemotePath, config);
+                    if (success) {
+                        vscode.window.showInformationMessage(i18n.t('success.uploadComplete', { remotePath: targetRemotePath }));
+                        
+                        // Calculate new local path for the remote file
+                        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                        if (!workspaceFolder) {
+                            return;
+                        }
+                        
+                        const newLocalPath = SftpClient.getDownloadFolder(
+                            targetRemotePath, 
+                            workspaceFolder.uri.fsPath, 
+                            config, 
+                            true, 
+                            false
+                        );
+                        
+                        if (!newLocalPath) {
+                            return;
+                        }
+                        
+                        // Download the uploaded file from remote - protocol aware
+                        if (connection.client instanceof SftpClient) {
+                            if (connection.client.client) {
+                                await connection.client.client.get(targetRemotePath, newLocalPath);
+                                
+                                // Save metadata
+                                await connection.client.saveRemoteFileMetadata(
+                                    targetRemotePath,
+                                    newLocalPath,
+                                    config,
+                                    config.workspaceRoot
+                                );
+                                
+                                // Close original editor (revert changes)
+                                if (editor) {
+                                    try {
+                                        await vscode.window.showTextDocument(editor.document, { preview: false, viewColumn: editor.viewColumn });
+                                        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for activation
+                                        await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+                                    } catch (e) {
+                                        // Ignore error if editor is already closed
+                                        if (DEBUG_MODE) console.error('Failed to close original editor:', e);
+                                    }
+                                }
+
+                                // Open the downloaded file
+                                const newDoc = await vscode.workspace.openTextDocument(newLocalPath);
+                                await vscode.window.showTextDocument(newDoc);
+                              
+                                // Update cache with new document
+                                documentConfigCache.set(newDoc, {
+                                    config: config,
+                                    client: connection.client,
+                                    remotePath: targetRemotePath
+                                });
+                            }
+                        } else {
+                            // FTP protocol
+                            await connection.client.downloadFile(targetRemotePath, newLocalPath, config);
                             
-                            // Save metadata
-                            await connection!.client.saveRemoteFileMetadata(
-                                remotePath,
-                                newLocalPath,
-                                config!,
-                                config!.workspaceRoot
-                            );
-                            
+                            // Close original editor (revert changes)
+                            if (editor) {
+                                try {
+                                    await vscode.window.showTextDocument(editor.document, { preview: false, viewColumn: editor.viewColumn });
+                                    await new Promise(resolve => setTimeout(resolve, 100)); // Wait for activation
+                                    await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+                                } catch (e) {
+                                    // Ignore error if editor is already closed
+                                    if (DEBUG_MODE) console.error('Failed to close original editor:', e);
+                                }
+                            }
+
                             // Open the downloaded file
                             const newDoc = await vscode.workspace.openTextDocument(newLocalPath);
                             await vscode.window.showTextDocument(newDoc);
                             
                             // Update cache with new document
                             documentConfigCache.set(newDoc, {
-                                config: config!,
-                                client: connection!.client,
-                                remotePath: remotePath
+                                config: config,
+                                client: connection.client,
+                                remotePath: targetRemotePath
                             });
                         }
                     } else {
-                        // FTP protocol
-                        await connection!.client.downloadFile(remotePath, newLocalPath, config!);
-                        
-                        // Open the downloaded file
-                        const newDoc = await vscode.workspace.openTextDocument(newLocalPath);
-                        await vscode.window.showTextDocument(newDoc);
-                        
-                        // Update cache with new document
-                        documentConfigCache.set(newDoc, {
-                            config: config!,
-                            client: connection!.client,
-                            remotePath: remotePath
-                        });
+                        vscode.window.showErrorMessage(i18n.t('error.uploadFailed', { remotePath: targetRemotePath }));
                     }
-                } else {
-                    vscode.window.showErrorMessage(i18n.t('error.uploadFailed', { remotePath }));
+                });
+            } finally {
+                // Clean up temp file
+                if (fs.existsSync(tempFilePath)) {
+                    fs.unlinkSync(tempFilePath);
                 }
-            });
+            }
 
         } catch (error) {
             vscode.window.showErrorMessage(i18n.t('error.uploadFailedGeneral', { error: String(error) }));
@@ -3833,6 +3878,14 @@ export function activate(context: vscode.ExtensionContext) {
      */
     const saveWatcher = vscode.workspace.onDidSaveTextDocument(async (document) => {
         if (DEBUG_MODE) console.log('> onDidSaveTextDocument');
+        
+        // "Save As" 동작 중이면 자동 업로드 건너뛰기
+        if (isSavingForSaveAs.has(document.uri.fsPath)) {
+            if (DEBUG_MODE) console.log('Skipping uploadOnSave due to Save As operation');
+            isSavingForSaveAs.delete(document.uri.fsPath);
+            return;
+        }
+
         if (document.uri.scheme !== 'file') {
             return; // 파일이 아니면 무시
         }
